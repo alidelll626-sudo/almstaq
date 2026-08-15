@@ -35,19 +35,22 @@ let cart = JSON.parse(localStorage.getItem('cart')) || [];
 let invoices = JSON.parse(localStorage.getItem('invoices')) || [];
 let activeCategory = 'all';
 
-// استرجاع حالة تسجيل الدخول المحفوظة بشكل دائم من localStorage
 let isAdmin = localStorage.getItem('isAdmin') === 'true';
 let loggedCustomer = JSON.parse(localStorage.getItem('loggedCustomer')) || null;
 let currentImageData = ""; 
 
 document.addEventListener('DOMContentLoaded', () => {
-  checkInitialSessionState();
-  renderTabs();
-  renderProducts();
-  updateCartUI();
-  populateCategorySelect();
-  setupImageUploader();
-  renderAdminCustomersList();
+  try {
+    checkInitialSessionState();
+    renderTabs();
+    renderProducts();
+    updateCartUI();
+    populateCategorySelect();
+    setupImageUploader();
+    renderAdminCustomersList();
+  } catch (err) {
+    console.error(err);
+  }
 });
 
 function checkInitialSessionState() {
@@ -66,39 +69,40 @@ function checkInitialSessionState() {
   const isLogged = isAdmin || loggedCustomer;
 
   if (isLogged) {
-    logoutBtn.classList.remove('hidden');
-    loginSelectionBtn.classList.add('hidden');
-    mainSidebar.classList.remove('hidden');
-    searchBarContainer.classList.remove('hidden');
-    productsGrid.classList.remove('hidden');
-    loggedOutWelcome.classList.add('hidden');
-    navInvoicesBtn.classList.remove('hidden');
+    if (logoutBtn) logoutBtn.classList.remove('hidden');
+    if (loginSelectionBtn) loginSelectionBtn.classList.add('hidden');
+    if (mainSidebar) mainSidebar.classList.remove('hidden');
+    if (searchBarContainer) searchBarContainer.classList.remove('hidden');
+    if (productsGrid) productsGrid.classList.remove('hidden');
+    if (loggedOutWelcome) loggedOutWelcome.classList.add('hidden');
+    if (navInvoicesBtn) navInvoicesBtn.classList.remove('hidden');
 
     if (isAdmin) {
-      displaySpan.innerText = 'المدير';
-      adminPanel.classList.remove('hidden');
-      adminTabCreator.classList.remove('hidden');
-      openCartBtn.classList.remove('hidden');
+      if (displaySpan) displaySpan.innerText = 'المدير';
+      if (adminPanel) adminPanel.classList.remove('hidden');
+      if (adminTabCreator) adminTabCreator.classList.remove('hidden');
+      if (openCartBtn) openCartBtn.classList.remove('hidden');
     } else {
-      displaySpan.innerText = `${loggedCustomer.fullname}`;
-      adminPanel.classList.add('hidden');
-      adminTabCreator.classList.add('hidden');
-      openCartBtn.classList.remove('hidden');
-      document.getElementById('cust-name').value = loggedCustomer.fullname;
+      if (displaySpan && loggedCustomer) displaySpan.innerText = `${loggedCustomer.fullname}`;
+      if (adminPanel) adminPanel.classList.add('hidden');
+      if (adminTabCreator) adminTabCreator.classList.add('hidden');
+      if (openCartBtn) openCartBtn.classList.remove('hidden');
+      const custNameInput = document.getElementById('cust-name');
+      if (custNameInput && loggedCustomer) custNameInput.value = loggedCustomer.fullname;
     }
   } else {
-    displaySpan.innerText = '';
-    logoutBtn.classList.add('hidden');
-    loginSelectionBtn.classList.remove('hidden');
-    mainSidebar.classList.add('hidden');
-    searchBarContainer.classList.add('hidden');
-    adminPanel.classList.add('hidden');
-    adminTabCreator.classList.add('hidden');
-    productsGrid.classList.add('hidden');
-    loggedOutWelcome.classList.remove('hidden');
+    if (displaySpan) displaySpan.innerText = '';
+    if (logoutBtn) logoutBtn.classList.add('hidden');
+    if (loginSelectionBtn) loginSelectionBtn.classList.remove('hidden');
+    if (mainSidebar) mainSidebar.classList.add('hidden');
+    if (searchBarContainer) searchBarContainer.classList.add('hidden');
+    if (adminPanel) adminPanel.classList.add('hidden');
+    if (adminTabCreator) adminTabCreator.classList.add('hidden');
+    if (productsGrid) productsGrid.classList.add('hidden');
+    if (loggedOutWelcome) loggedOutWelcome.classList.remove('hidden');
 
-    navInvoicesBtn.classList.add('hidden');
-    openCartBtn.classList.add('hidden');
+    if (navInvoicesBtn) navInvoicesBtn.classList.add('hidden');
+    if (openCartBtn) openCartBtn.classList.add('hidden');
   }
 }
 
@@ -141,7 +145,8 @@ function handleCustomerLogin(e) {
     renderTabs();
     renderProducts();
     updateCartUI();
-    document.getElementById('cust-name').value = found.fullname;
+    const custNameInput = document.getElementById('cust-name');
+    if (custNameInput) custNameInput.value = found.fullname;
   } else {
     alert('اسم المستخدم أو كلمة المرور غير صحيحة!');
   }
@@ -518,7 +523,9 @@ function renderProducts(itemsToRender = null) {
 }
 
 function handleSearch() {
-  const query = document.getElementById('search-input').value.toLowerCase().trim();
+  const searchInput = document.getElementById('search-input');
+  if (!searchInput) return;
+  const query = searchInput.value.toLowerCase().trim();
   const filtered = products.filter(p =>
     (activeCategory === 'all' || p.category === activeCategory) &&
     (p.name.toLowerCase().includes(query) || (p.desc && p.desc.toLowerCase().includes(query)))
@@ -600,7 +607,8 @@ function renderCartModal() {
 
   if (cart.length === 0) {
     cartItemsContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">السلة فارغة حالياً</p>';
-    document.getElementById('cart-total-price').innerText = '0';
+    const totalPriceElem = document.getElementById('cart-total-price');
+    if (totalPriceElem) totalPriceElem.innerText = '0';
     if (clearBtn) clearBtn.style.display = 'none';
     return;
   }
@@ -628,7 +636,8 @@ function renderCartModal() {
     cartItemsContainer.appendChild(div);
   });
 
-  document.getElementById('cart-total-price').innerText = formatPrice(total);
+  const totalPriceElem = document.getElementById('cart-total-price');
+  if (totalPriceElem) totalPriceElem.innerText = formatPrice(total);
 }
 
 function getCurrentLocation() {
@@ -638,7 +647,8 @@ function getCurrentLocation() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
-        document.getElementById('cust-location').value = mapsUrl;
+        const locInput = document.getElementById('cust-location');
+        if (locInput) locInput.value = mapsUrl;
         alert('تم تحديد موقعك بنجاح!');
       },
       () => { alert('لم نتمكن من الوصول لموقعك.'); }
@@ -684,7 +694,8 @@ function handleCheckout(e) {
   cart = [];
   saveCart();
   updateCartUI();
-  document.getElementById('checkout-form').reset();
+  const checkoutForm = document.getElementById('checkout-form');
+  if (checkoutForm) checkoutForm.reset();
   closeCartModal();
   document.getElementById('receipt-modal').classList.remove('hidden');
 }
