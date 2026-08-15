@@ -29,7 +29,7 @@ let customers = JSON.parse(localStorage.getItem('customers')) || [
   { username: 'cust1', password: '123', fullname: 'زبون تجريبي', discount: 0 }
 ];
 
-let adminPassword = localStorage.getItem('adminPassword') || 'admin';
+let adminPassword = localStorage.getItem('adminPassword') || '799673';
 
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
 let invoices = JSON.parse(localStorage.getItem('invoices')) || [];
@@ -295,18 +295,18 @@ function renderAdminCustomersList() {
   listContainer.innerHTML = '';
 
   if (customers.length === 0) {
-    listContainer.innerHTML = '<small style="color:#64748b;">لا توجد حسابات زبائن مسجلة.</small>';
+    listContainer.innerHTML = '<small style="color:var(--text-muted);">لا توجد حسابات زبائن مسجلة.</small>';
     return;
   }
 
   customers.forEach(cust => {
     const div = document.createElement('div');
-    div.style.cssText = 'display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 5px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.75rem;';
+    div.style.cssText = 'display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.75rem;';
     div.innerHTML = `
-      <div>${cust.fullname} (${cust.username}) - <span style="color: #16a34a; font-weight: bold;">خصم: ${cust.discount || 0}%</span></div>
+      <div>${cust.fullname} (${cust.username}) - <span style="color: var(--success); font-weight: bold;">خصم: ${cust.discount || 0}%</span></div>
       <div style="display: flex; gap: 4px;">
-        <button type="button" onclick="editCustomer('${cust.username}')" style="background: #f59e0b; color: white; border: none; padding: 2px 5px; border-radius: 3px; cursor: pointer; font-size: 0.7rem;">تعديل</button>
-        <button type="button" onclick="deleteCustomer('${cust.username}')" style="background: #ef4444; color: white; border: none; padding: 2px 5px; border-radius: 3px; cursor: pointer; font-size: 0.7rem;">حذف</button>
+        <button type="button" onclick="editCustomer('${cust.username}')" style="background: #fef3c7; color: #d97706; border: none; padding: 3px 6px; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">تعديل</button>
+        <button type="button" onclick="deleteCustomer('${cust.username}')" style="background: #fef2f2; color: #ef4444; border: none; padding: 3px 6px; border-radius: 4px; cursor: pointer; font-size: 0.7rem;">حذف</button>
       </div>
     `;
     listContainer.appendChild(div);
@@ -329,37 +329,23 @@ function renderTabs() {
   if (!isAdmin && !loggedCustomer) return;
 
   categories.forEach(cat => {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'tab-item-wrapper';
+    const chip = document.createElement('div');
+    chip.className = `category-chip ${activeCategory === cat.id ? 'active' : ''}`;
+    
+    chip.innerHTML = `
+      <span onclick="selectCategory('${cat.id}')">${cat.name}</span>
+      ${isAdmin && cat.id !== 'all' ? `
+        <span style="font-size:0.7rem; opacity:0.7;" onclick="editTab('${cat.id}')">✏️</span>
+        <span style="font-size:0.7rem; opacity:0.7;" onclick="deleteTab('${cat.id}')">🗑️</span>
+      ` : ''}
+    `;
 
-    const tabBtn = document.createElement('button');
-    tabBtn.className = `tab-btn ${activeCategory === cat.id ? 'active' : ''}`;
-    tabBtn.innerText = cat.name;
-    tabBtn.onclick = () => selectCategory(cat.id);
-
-    wrapper.appendChild(tabBtn);
-
-    if (isAdmin && cat.id !== 'all') {
-      const actionsDiv = document.createElement('div');
-      actionsDiv.className = 'tab-admin-actions';
-      actionsDiv.innerHTML = `
-        <button class="tab-icon-btn edit" title="تعديل" onclick="editTab('${cat.id}')">✏️</button>
-        <button class="tab-icon-btn delete" title="حذف" onclick="deleteTab('${cat.id}')">🗑️</button>
-      `;
-      wrapper.appendChild(actionsDiv);
-    }
-
-    tabsContainer.appendChild(wrapper);
+    tabsContainer.appendChild(chip);
   });
 }
 
 function selectCategory(catId) {
   activeCategory = catId;
-  const currentCat = categories.find(c => c.id === catId);
-  const titleElem = document.getElementById('current-tab-title');
-  if (titleElem) {
-    titleElem.innerText = currentCat ? currentCat.name : 'المنتجات';
-  }
   renderTabs();
   renderProducts();
 }
@@ -393,7 +379,7 @@ function handleAddTab(e) {
 function editTab(catId) {
   const cat = categories.find(c => c.id === catId);
   if (!cat) return;
-  const newName = prompt('تعديل اسم التبويب:', cat.name);
+  const newName = prompt('تعديل اسم القسم:', cat.name);
   if (newName && newName.trim() !== '') {
     cat.name = newName.trim();
     saveCategories();
@@ -403,7 +389,7 @@ function editTab(catId) {
 }
 
 function deleteTab(catId) {
-  if (confirm('تأكيد حذف التبويب وجميع منتجاته؟')) {
+  if (confirm('تأكيد حذف القسم وجميع منتجاته؟')) {
     categories = categories.filter(c => c.id !== catId);
     products = products.filter(p => p.category !== catId);
     saveCategories();
@@ -494,19 +480,21 @@ function renderProducts(itemsToRender = null) {
   let list = itemsToRender || (activeCategory === 'all' ? products : products.filter(p => p.category === activeCategory));
 
   if (list.length === 0) {
-    grid.innerHTML = '<p style="padding:10px; color:#64748b; grid-column: 1 / -1; font-size:0.8rem;">لا توجد منتجات.</p>';
+    grid.innerHTML = '<p style="padding:15px; color:var(--text-muted); grid-column: 1 / -1; font-size:0.85rem; text-align:center;">لا توجد منتجات متاحة.</p>';
     return;
   }
 
   list.forEach(product => {
     const card = document.createElement('div');
     card.className = 'product-card';
-    const imgSrc = product.image || 'https://via.placeholder.com/220x140?text=بلا+صورة';
+    const imgSrc = product.image || 'https://via.placeholder.com/220x140?text=لا+توجد+صورة';
     
     const effectivePrice = getCustomerProductPrice(product.price);
 
     card.innerHTML = `
-      <img src="${imgSrc}" alt="${product.name}" class="product-image" onerror="this.src='https://via.placeholder.com/220x140?text=خطأ'">
+      <div class="product-image-wrap">
+        <img src="${imgSrc}" alt="${product.name}" class="product-image" onerror="this.src='https://via.placeholder.com/220x140?text=خطأ'">
+      </div>
       <div class="product-info">
         <div class="product-title">${product.name}</div>
         <div class="product-description">${product.desc || ''}</div>
@@ -606,7 +594,7 @@ function renderCartModal() {
   let total = 0;
 
   if (cart.length === 0) {
-    cartItemsContainer.innerHTML = '<p style="text-align:center; color:#94a3b8; padding:15px; font-size:0.8rem;">السلة فارغة</p>';
+    cartItemsContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">السلة فارغة حالياً</p>';
     document.getElementById('cart-total-price').innerText = '0';
     if (clearBtn) clearBtn.style.display = 'none';
     return;
@@ -621,15 +609,15 @@ function renderCartModal() {
     const div = document.createElement('div');
     div.className = 'cart-item';
     div.innerHTML = `
-      <div class="cart-item-info">
-        <div class="cart-item-title">${item.name}</div>
-        <div class="cart-item-sub">${formatPrice(item.price)} × ${item.qty} = <strong>${formatPrice(itemTotal)} د.ع</strong></div>
+      <div>
+        <div style="font-weight:700; font-size:0.85rem;">${item.name}</div>
+        <div style="font-size:0.75rem; color:var(--text-muted);">${formatPrice(item.price)} × ${item.qty} = <strong>${formatPrice(itemTotal)} د.ع</strong></div>
       </div>
       <div class="qty-controls">
         <button type="button" class="qty-btn" onclick="updateQty(${item.id}, -1)">-</button>
-        <span style="font-weight:bold; min-width:16px; text-align:center; font-size:0.8rem;">${item.qty}</span>
+        <span style="font-weight:bold; font-size:0.85rem;">${item.qty}</span>
         <button type="button" class="qty-btn" onclick="updateQty(${item.id}, 1)">+</button>
-        <button type="button" class="remove-item-btn" title="حذف" onclick="removeFromCart(${item.id})">🗑️</button>
+        <button type="button" style="background:none; border:none; cursor:pointer; color:var(--danger); font-size:0.9rem;" onclick="removeFromCart(${item.id})">🗑️</button>
       </div>
     `;
     cartItemsContainer.appendChild(div);
@@ -711,17 +699,14 @@ function renderReceiptHTML(invoice) {
 
   area.innerHTML = `
     <div class="receipt-header">
-      <div class="receipt-logo">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M20 7H4C2.89543 7 2 7.89543 2 9V19C2 20.1046 2.89543 21 4 21H20C21.1046 21 22 20.1046 22 19V9C22 7.89543 21.1046 7 20 7Z" stroke="currentColor" stroke-width="2"/>
-        </svg>
-      </div>
-      <h2>متجر المستقبل للجملة</h2>
-      <p style="font-size:0.7rem; color:#64748b; margin-top:2px;">رقم: ${invoice.id} | التاريخ: ${invoice.date}</p>
+      <h2 style="font-size:1.1rem; color:var(--primary-dark);">متجر المستقبل للجملة</h2>
+      <p style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">رقم: ${invoice.id} | التاريخ: ${invoice.date}</p>
     </div>
 
-    <div class="receipt-info-block">
-      <strong>الزبون:</strong> ${invoice.customer.name} (${invoice.customer.phone})<br>
+    <div style="font-size:0.8rem; margin-bottom:12px; line-height:1.6;">
+      <strong>الحساب:</strong> ${invoice.customer.username || 'غير محدد'}<br>
+      <strong>الزبون:</strong> ${invoice.customer.name}<br>
+      <strong>الهاتف:</strong> ${invoice.customer.phone}<br>
       <strong>العنوان:</strong> ${invoice.customer.address}
     </div>
 
@@ -763,9 +748,9 @@ function downloadInvoiceAsImage(invoiceElementId) {
         newWindow.document.write(`
           <html dir="rtl">
             <head><title>تحميل الفاتورة</title></head>
-            <body style="text-align:center; background:#f4f4f4; padding:15px; font-family:tahoma;">
+            <body style="text-align:center; background:#f4f4f4; padding:15px; font-family:sans-serif;">
               <h3 style="color:#333; font-size:0.9rem; margin-bottom:10px;">اضغط مطولاً على الصورة ثم اختر (تنزيل الصورة):</h3>
-              <img src="${imageUrl}" style="max-width:100%; border:1px solid #ccc; border-radius:6px;" />
+              <img src="${imageUrl}" style="max-width:100%; border:1px solid #ccc; border-radius:8px;" />
             </body>
           </html>
         `);
@@ -805,29 +790,30 @@ function renderInvoicesList() {
   if (!isAdmin && loggedCustomer) {
     displayedInvoices = invoices.filter(inv => inv.customer.username === loggedCustomer.username);
   } else if (!isAdmin && !loggedCustomer) {
-    listContainer.innerHTML = '<p style="text-align:center; color:#64748b; padding:15px; font-size:0.8rem;">يرجى تسجيل الدخول.</p>';
+    listContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:15px; font-size:0.8rem;">يرجى تسجيل الدخول.</p>';
     return;
   }
 
   if (displayedInvoices.length === 0) {
-    listContainer.innerHTML = '<p style="text-align:center; color:#64748b; padding:15px; font-size:0.8rem;">لا توجد فواتير سابقة.</p>';
+    listContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:15px; font-size:0.8rem;">لا توجد فواتير سابقة.</p>';
     return;
   }
 
   displayedInvoices.forEach(inv => {
     const card = document.createElement('div');
-    card.className = 'invoice-card-item';
+    card.style.cssText = 'background:var(--bg-surface); border:1px solid var(--border-color); padding:10px; border-radius:var(--radius-sm); display:flex; flex-direction:column; gap:6px; font-size:0.8rem;';
     card.innerHTML = `
-      <div class="invoice-card-header">
+      <div style="display:flex; justify-content:space-between; font-weight:bold; color:var(--primary-dark);">
         <span>${inv.id}</span>
         <span>${formatPrice(inv.total)} د.ع</span>
       </div>
-      <div> الزبون: ${inv.customer.name} | التاريخ: ${inv.date}</div>
-      <div class="invoice-actions">
-        <button class="small-btn view" onclick="viewSingleInvoice('${inv.id}')">عرض</button>
-        <button class="small-btn download" onclick="downloadSingleInvoiceAsImage('${inv.id}')">تحميل 📷</button>
+      <div>الزبون: ${inv.customer.name}</div>
+      <div style="font-size:0.7rem; color:var(--text-muted);">${inv.date}</div>
+      <div style="display:flex; gap:6px; margin-top:4px;">
+        <button class="btn" style="padding:4px 8px; font-size:0.75rem;" onclick="viewSingleInvoice('${inv.id}')">عرض</button>
+        <button class="btn" style="background:var(--success); padding:4px 8px; font-size:0.75rem;" onclick="downloadSingleInvoiceAsImage('${inv.id}')">تحميل 📷</button>
         ${isAdmin ? `
-          <button class="small-btn delete" onclick="deleteInvoice('${inv.id}')">حذف</button>
+          <button class="btn btn-danger" style="padding:4px 8px; font-size:0.75rem;" onclick="deleteInvoice('${inv.id}')">حذف</button>
         ` : ''}
       </div>
     `;
@@ -860,5 +846,12 @@ function deleteInvoice(id) {
     invoices = invoices.filter(i => i.id !== id);
     saveInvoices();
     renderInvoicesList();
+  }
+}
+
+function switchNavTab(tab) {
+  if (tab === 'store') {
+    closeCartModal();
+    closeInvoicesModal();
   }
 }
