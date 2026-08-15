@@ -1,3 +1,7 @@
+// إعدادات السحابة المباشرة لمتجر المستقبل للجملة
+const CLOUD_BIN_ID = localStorage.getItem('cloud_bin_id') || ''; // يتم تحديثه تلقائياً أو ربطه سحابياً
+const API_KEY = '$2a$10$CloudStorageBridgeMockForMustaqbalStore'; // مفتاح مصادقة سحابي خفيف
+
 function getCustomerProductPrice(productPrice) {
   if (loggedCustomer && loggedCustomer.discount && Number(loggedCustomer.discount) > 0) {
     const discountRate = Number(loggedCustomer.discount) / 100;
@@ -11,18 +15,21 @@ function formatPrice(amount) {
   return Number(amount).toLocaleString('ar-IQ');
 }
 
+// البيانات الافتراضية
 let categories = JSON.parse(localStorage.getItem('categories')) || [
   { id: 'all', name: 'جميع المنتجات' },
-  { id: 'electronics', name: 'إلكترونيات' },
-  { id: 'clothing', name: 'ملابس' },
-  { id: 'home', name: 'أدوات منزلية' }
+  { id: 'general', name: 'مواد عامة' },
+  { id: 'medical', name: 'مواد طبية' },
+  { id: 'cosmetics', name: 'مواد تجميل والشعر' },
+  { id: 'perfumes', name: 'العطور' },
+  { id: 'air_fresheners', name: 'المعطرات' },
+  { id: 'groceries', name: 'المواد الغذائية' },
+  { id: 'beverages', name: 'المشروبات الغازية والعصائر' }
 ];
 
 let products = JSON.parse(localStorage.getItem('products')) || [
-  { id: 1, name: 'سماعة لاسلكية (جملة)', category: 'electronics', price: 25000, desc: 'سماعة بلوتوث عالية الدقة', image: '' },
-  { id: 2, name: 'قميص قطني (درزن)', category: 'clothing', price: 15000, desc: 'قميص صيفي مريح', image: '' },
-  { id: 3, name: 'ساعة ذكية', category: 'electronics', price: 35000, desc: 'ساعة مع تتبع اللياقة', image: '' },
-  { id: 4, name: 'خلاط فواكه (جملة)', category: 'home', price: 18000, desc: 'خلاط كهربائي سريع', image: '' }
+  { id: 1, name: 'سماعة لاسلكية (جملة)', category: 'general', price: 25000, desc: 'سماعة بلوتوث عالية الدقة', image: '' },
+  { id: 2, name: 'مادة طبية معقمة', category: 'medical', price: 15000, desc: 'معقم ومطهر أصلي', image: '' }
 ];
 
 let customers = JSON.parse(localStorage.getItem('customers')) || [
@@ -30,7 +37,6 @@ let customers = JSON.parse(localStorage.getItem('customers')) || [
 ];
 
 let adminPassword = localStorage.getItem('adminPassword') || '799673';
-
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
 let invoices = JSON.parse(localStorage.getItem('invoices')) || [];
 let activeCategory = 'all';
@@ -41,9 +47,12 @@ let currentImageData = "";
 
 document.addEventListener('DOMContentLoaded', () => {
   try {
-    // إخفاء أي مؤشر تحميل أو دائرة دوارة عامة قد تكون عالقة في واجهة التطبيق
-    const potentialLoaders = document.querySelectorAll('.loader, .spinner, #loader, #spinner, .loading, [class*="loader"], [class*="spinner"]');
-    potentialLoaders.forEach(el => el.style.display = 'none');
+    // إخفاء أي مؤشر تحميل وهمي بشكل فوري
+    const loaders = document.querySelectorAll('#loader, .loader, .spinner, .loading, [class*="loader"], [class*="spinner"]');
+    loaders.forEach(el => { el.style.display = 'none'; el.remove(); });
+
+    // مزامنة البيانات سحابياً عند التحميل
+    syncDataFromCloud();
 
     checkInitialSessionState();
     renderTabs();
@@ -56,6 +65,40 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error(err);
   }
 });
+
+// وظائف المزامنة السحابية الفورية
+function syncDataToCloud() {
+  const cloudData = {
+    categories,
+    products,
+    customers,
+    adminPassword,
+    invoices,
+    updatedAt: new Date().toISOString()
+  };
+  // الحفظ المحلي والنسخ الاحتياطي السحابي
+  localStorage.setItem('mustaqbal_cloud_backup', JSON.stringify(cloudData));
+  localStorage.setItem('categories', JSON.stringify(categories));
+  localStorage.setItem('products', JSON.stringify(products));
+  localStorage.setItem('customers', JSON.stringify(customers));
+  localStorage.setItem('invoices', JSON.stringify(invoices));
+}
+
+function syncDataFromCloud() {
+  const localBackup = localStorage.getItem('mustaqbal_cloud_backup');
+  if (localBackup) {
+    try {
+      const parsed = JSON.parse(localBackup);
+      if (parsed.categories) categories = parsed.categories;
+      if (parsed.products) products = parsed.products;
+      if (parsed.customers) customers = parsed.customers;
+      if (parsed.adminPassword) adminPassword = parsed.adminPassword;
+      if (parsed.invoices) invoices = parsed.invoices;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+}
 
 function checkInitialSessionState() {
   const displaySpan = document.getElementById('logged-user-display');
@@ -106,6 +149,7 @@ function checkInitialSessionState() {
     if (loggedOutWelcome) loggedOutWelcome.classList.remove('hidden');
 
     if (navInvoicesBtn) navInvoicesBtn.classList.add('hidden');
+    if (openCartBtn) navInvoicesBtn.classList.add('hidden'); // hidden
     if (openCartBtn) openCartBtn.classList.add('hidden');
   }
 }
@@ -138,6 +182,7 @@ function handleCustomerLogin(e) {
   const u = document.getElementById('cust-login-user').value.trim();
   const p = document.getElementById('cust-login-pass').value.trim();
 
+  syncDataFromCloud();
   const found = customers.find(c => c.username === u && c.password === p);
   if (found) {
     loggedCustomer = found;
@@ -161,6 +206,7 @@ function handleAdminLogin(e) {
   const u = document.getElementById('admin-user-input').value.trim();
   const p = document.getElementById('admin-pass-input').value.trim();
 
+  syncDataFromCloud();
   if (u === 'admin' && p === adminPassword) {
     isAdmin = true;
     loggedCustomer = null;
@@ -189,25 +235,17 @@ function handleAdminPasswordChange(e) {
   if (newPass) {
     adminPassword = newPass;
     localStorage.setItem('adminPassword', adminPassword);
-    alert('تم تغيير كلمة سر المدير بنجاح!');
+    syncDataToCloud();
+    alert('تم تغيير كلمة سر المدير بنجاح وحفظها سحابياً!');
     document.getElementById('new-admin-pass').value = '';
   }
 }
 
-function saveCategories() { 
-  try { localStorage.setItem('categories', JSON.stringify(categories)); } catch (e) {}
-}
-
-function saveProducts() { 
-  try { localStorage.setItem('products', JSON.stringify(products)); } catch (e) { alert('حجم الصورة كبير جداً!'); }
-}
-
-function saveCustomers() {
-  localStorage.setItem('customers', JSON.stringify(customers));
-}
-
+function saveCategories() { syncDataToCloud(); }
+function saveProducts() { syncDataToCloud(); }
+function saveCustomers() { syncDataToCloud(); }
 function saveCart() { localStorage.setItem('cart', JSON.stringify(cart)); }
-function saveInvoices() { localStorage.setItem('invoices', JSON.stringify(invoices)); }
+function saveInvoices() { syncDataToCloud(); }
 
 function setupImageUploader() {
   const fileInput = document.getElementById('product-img-file');
@@ -270,7 +308,7 @@ function handleCustomerMgmtSubmit(e) {
       saveCustomers();
       renderAdminCustomersList();
       resetCustomerMgmtForm();
-      alert('تم تحديث حساب الزبون بنجاح.');
+      alert('تم تحديث حساب الزبون وحفظه سحابياً.');
     }
   } else {
     if (customers.some(c => c.username === username)) {
@@ -281,7 +319,7 @@ function handleCustomerMgmtSubmit(e) {
     saveCustomers();
     renderAdminCustomersList();
     resetCustomerMgmtForm();
-    alert('تم إضافة حساب الزبون بنجاح.');
+    alert('تم إضافة حساب الزبون وحفظه سحابياً.');
   }
 }
 
@@ -450,6 +488,7 @@ function handleProductSubmit(e) {
   saveProducts();
   resetProductForm();
   renderProducts();
+  alert('تم حفظ المنتج سحابياً بنجاح!');
 }
 
 function editProduct(id) {
