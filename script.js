@@ -34,7 +34,9 @@ let adminPassword = localStorage.getItem('adminPassword') || '799673';
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
 let invoices = JSON.parse(localStorage.getItem('invoices')) || [];
 let activeCategory = 'all';
-let isAdmin = false;
+
+// استرجاع حالة تسجيل الدخول المحفوظة بشكل دائم من localStorage
+let isAdmin = localStorage.getItem('isAdmin') === 'true';
 let loggedCustomer = JSON.parse(localStorage.getItem('loggedCustomer')) || null;
 let currentImageData = ""; 
 
@@ -133,6 +135,7 @@ function handleCustomerLogin(e) {
     loggedCustomer = found;
     isAdmin = false;
     localStorage.setItem('loggedCustomer', JSON.stringify(loggedCustomer));
+    localStorage.setItem('isAdmin', 'false');
     closeCustomerLoginModal();
     checkInitialSessionState();
     renderTabs();
@@ -153,6 +156,7 @@ function handleAdminLogin(e) {
     isAdmin = true;
     loggedCustomer = null;
     localStorage.removeItem('loggedCustomer');
+    localStorage.setItem('isAdmin', 'true');
     closeAdminLoginModal();
     checkInitialSessionState();
     renderTabs();
@@ -166,6 +170,7 @@ function handleLogout() {
   isAdmin = false;
   loggedCustomer = null;
   localStorage.removeItem('loggedCustomer');
+  localStorage.setItem('isAdmin', 'false');
   checkInitialSessionState();
 }
 
