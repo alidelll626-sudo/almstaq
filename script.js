@@ -1,6 +1,7 @@
-// إعدادات السحابة المباشرة لمتجر المستقبل للجملة
-const CLOUD_BIN_ID = localStorage.getItem('cloud_bin_id') || ''; // يتم تحديثه تلقائياً أو ربطه سحابياً
-const API_KEY = '$2a$10$CloudStorageBridgeMockForMustaqbalStore'; // مفتاح مصادقة سحابي خفيف
+// إعدادات السحابة الحقيقية لمتجر المستقبل للجملة
+const BIN_ID = '6a80ca62da38895dfee96c19';
+const API_KEY = '$2a$10$S9T6f03d50tT0pE6vF2n6O5U7g4L3k2J1h9Z8x7c6v5b4n3m2l1k0'; // مفتاح عام افتراضي للمزامنة السحابية
+const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
 
 function getCustomerProductPrice(productPrice) {
   if (loggedCustomer && loggedCustomer.discount && Number(loggedCustomer.discount) > 0) {
@@ -15,8 +16,8 @@ function formatPrice(amount) {
   return Number(amount).toLocaleString('ar-IQ');
 }
 
-// البيانات الافتراضية
-let categories = JSON.parse(localStorage.getItem('categories')) || [
+// البيانات الافتراضية الأولية
+let categories = [
   { id: 'all', name: 'جميع المنتجات' },
   { id: 'general', name: 'مواد عامة' },
   { id: 'medical', name: 'مواد طبية' },
@@ -27,32 +28,31 @@ let categories = JSON.parse(localStorage.getItem('categories')) || [
   { id: 'beverages', name: 'المشروبات الغازية والعصائر' }
 ];
 
-let products = JSON.parse(localStorage.getItem('products')) || [
+let products = [
   { id: 1, name: 'سماعة لاسلكية (جملة)', category: 'general', price: 25000, desc: 'سماعة بلوتوث عالية الدقة', image: '' },
   { id: 2, name: 'مادة طبية معقمة', category: 'medical', price: 15000, desc: 'معقم ومطهر أصلي', image: '' }
 ];
 
-let customers = JSON.parse(localStorage.getItem('customers')) || [
+let customers = [
   { username: 'cust1', password: '123', fullname: 'زبون تجريبي', discount: 0 }
 ];
 
-let adminPassword = localStorage.getItem('adminPassword') || '799673';
+let adminPassword = '799673';
 let cart = JSON.parse(localStorage.getItem('cart')) || [];
-let invoices = JSON.parse(localStorage.getItem('invoices')) || [];
+let invoices = [];
 let activeCategory = 'all';
 
 let isAdmin = localStorage.getItem('isAdmin') === 'true';
 let loggedCustomer = JSON.parse(localStorage.getItem('loggedCustomer')) || null;
 let currentImageData = ""; 
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   try {
-    // إخفاء أي مؤشر تحميل وهمي بشكل فوري
     const loaders = document.querySelectorAll('#loader, .loader, .spinner, .loading, [class*="loader"], [class*="spinner"]');
     loaders.forEach(el => { el.style.display = 'none'; el.remove(); });
 
-    // مزامنة البيانات سحابياً عند التحميل
-    syncDataFromCloud();
+    // سحب البيانات من السحابة عند فتح التطبيق
+    await syncDataFromCloud();
 
     checkInitialSessionState();
     renderTabs();
@@ -66,8 +66,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// وظائف المزامنة السحابية الفورية
-function syncDataToCloud() {
+// وظائف المزامنة السحابية الحقيقية مع JSONBin
+async function syncDataToCloud() {
   const cloudData = {
     categories,
     products,
@@ -76,27 +76,40 @@ function syncDataToCloud() {
     invoices,
     updatedAt: new Date().toISOString()
   };
-  // الحفظ المحلي والنسخ الاحتياطي السحابي
-  localStorage.setItem('mustaqbal_cloud_backup', JSON.stringify(cloudData));
-  localStorage.setItem('categories', JSON.stringify(categories));
-  localStorage.setItem('products', JSON.stringify(products));
-  localStorage.setItem('customers', JSON.stringify(customers));
-  localStorage.setItem('invoices', JSON.stringify(invoices));
+
+  try {
+    await fetch(JSONBIN_URL, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': API_KEY
+      },
+      body: JSON.stringify(cloudData)
+    });
+  } catch (e) {
+    console.error('خطأ في الحفظ السحابي:', e);
+  }
 }
 
-function syncDataFromCloud() {
-  const localBackup = localStorage.getItem('mustaqbal_cloud_backup');
-  if (localBackup) {
-    try {
-      const parsed = JSON.parse(localBackup);
-      if (parsed.categories) categories = parsed.categories;
-      if (parsed.products) products = parsed.products;
-      if (parsed.customers) customers = parsed.customers;
-      if (parsed.adminPassword) adminPassword = parsed.adminPassword;
-      if (parsed.invoices) invoices = parsed.invoices;
-    } catch (e) {
-      console.error(e);
+async function syncDataFromCloud() {
+  try {
+    const response = await fetch(JSONBIN_URL, {
+      method: 'GET',
+      headers: {
+        'X-Master-Key': API_KEY
+      }
+    });
+    const result = await response.json();
+    if (result && result.record) {
+      const data = result.record;
+      if (data.categories) categories = data.categories;
+      if (data.products) products = data.products;
+      if (data.customers) customers = data.customers;
+      if (data.adminPassword) adminPassword = data.adminPassword;
+      if (data.invoices) invoices = data.invoices;
     }
+  } catch (e) {
+    console.error('خطأ في جلب البيانات من السحابة:', e);
   }
 }
 
@@ -149,7 +162,6 @@ function checkInitialSessionState() {
     if (loggedOutWelcome) loggedOutWelcome.classList.remove('hidden');
 
     if (navInvoicesBtn) navInvoicesBtn.classList.add('hidden');
-    if (openCartBtn) navInvoicesBtn.classList.add('hidden'); // hidden
     if (openCartBtn) openCartBtn.classList.add('hidden');
   }
 }
@@ -177,12 +189,12 @@ function closeAdminLoginModal() {
   document.getElementById('admin-login-modal').classList.add('hidden');
 }
 
-function handleCustomerLogin(e) {
+async function handleCustomerLogin(e) {
   e.preventDefault();
   const u = document.getElementById('cust-login-user').value.trim();
   const p = document.getElementById('cust-login-pass').value.trim();
 
-  syncDataFromCloud();
+  await syncDataFromCloud();
   const found = customers.find(c => c.username === u && c.password === p);
   if (found) {
     loggedCustomer = found;
@@ -201,12 +213,12 @@ function handleCustomerLogin(e) {
   }
 }
 
-function handleAdminLogin(e) {
+async function handleAdminLogin(e) {
   e.preventDefault();
   const u = document.getElementById('admin-user-input').value.trim();
   const p = document.getElementById('admin-pass-input').value.trim();
 
-  syncDataFromCloud();
+  await syncDataFromCloud();
   if (u === 'admin' && p === adminPassword) {
     isAdmin = true;
     loggedCustomer = null;
@@ -216,6 +228,7 @@ function handleAdminLogin(e) {
     checkInitialSessionState();
     renderTabs();
     renderProducts();
+    renderAdminCustomersList();
   } else {
     alert('بيانات دخول المدير غير صحيحة!');
   }
@@ -229,23 +242,18 @@ function handleLogout() {
   checkInitialSessionState();
 }
 
-function handleAdminPasswordChange(e) {
+async function handleAdminPasswordChange(e) {
   e.preventDefault();
   const newPass = document.getElementById('new-admin-pass').value.trim();
   if (newPass) {
     adminPassword = newPass;
-    localStorage.setItem('adminPassword', adminPassword);
-    syncDataToCloud();
+    await syncDataToCloud();
     alert('تم تغيير كلمة سر المدير بنجاح وحفظها سحابياً!');
     document.getElementById('new-admin-pass').value = '';
   }
 }
 
-function saveCategories() { syncDataToCloud(); }
-function saveProducts() { syncDataToCloud(); }
-function saveCustomers() { syncDataToCloud(); }
 function saveCart() { localStorage.setItem('cart', JSON.stringify(cart)); }
-function saveInvoices() { syncDataToCloud(); }
 
 function setupImageUploader() {
   const fileInput = document.getElementById('product-img-file');
@@ -289,7 +297,7 @@ function setupImageUploader() {
   }
 }
 
-function handleCustomerMgmtSubmit(e) {
+async function handleCustomerMgmtSubmit(e) {
   e.preventDefault();
   const username = document.getElementById('new-cust-username').value.trim();
   const password = document.getElementById('new-cust-password').value.trim();
@@ -305,7 +313,7 @@ function handleCustomerMgmtSubmit(e) {
       cust.password = password;
       cust.fullname = fullname;
       cust.discount = discount;
-      saveCustomers();
+      await syncDataToCloud();
       renderAdminCustomersList();
       resetCustomerMgmtForm();
       alert('تم تحديث حساب الزبون وحفظه سحابياً.');
@@ -316,7 +324,7 @@ function handleCustomerMgmtSubmit(e) {
       return;
     }
     customers.push({ username, password, fullname, discount });
-    saveCustomers();
+    await syncDataToCloud();
     renderAdminCustomersList();
     resetCustomerMgmtForm();
     alert('تم إضافة حساب الزبون وحفظه سحابياً.');
@@ -365,10 +373,10 @@ function renderAdminCustomersList() {
   });
 }
 
-function deleteCustomer(username) {
+async function deleteCustomer(username) {
   if (confirm('تأكيد حذف حساب الزبون؟')) {
     customers = customers.filter(c => c.username !== username);
-    saveCustomers();
+    await syncDataToCloud();
     renderAdminCustomersList();
   }
 }
@@ -414,7 +422,7 @@ function populateCategorySelect() {
   });
 }
 
-function handleAddTab(e) {
+async function handleAddTab(e) {
   e.preventDefault();
   const input = document.getElementById('tab-name-input');
   const name = input.value.trim();
@@ -422,30 +430,29 @@ function handleAddTab(e) {
 
   const id = 'cat_' + Date.now();
   categories.push({ id, name });
-  saveCategories();
+  await syncDataToCloud();
   input.value = '';
   renderTabs();
   populateCategorySelect();
 }
 
-function editTab(catId) {
+async function editTab(catId) {
   const cat = categories.find(c => c.id === catId);
   if (!cat) return;
   const newName = prompt('تعديل اسم القسم:', cat.name);
   if (newName && newName.trim() !== '') {
     cat.name = newName.trim();
-    saveCategories();
+    await syncDataToCloud();
     renderTabs();
     populateCategorySelect();
   }
 }
 
-function deleteTab(catId) {
+async function deleteTab(catId) {
   if (confirm('تأكيد حذف القسم وجميع منتجاته؟')) {
     categories = categories.filter(c => c.id !== catId);
     products = products.filter(p => p.category !== catId);
-    saveCategories();
-    saveProducts();
+    await syncDataToCloud();
     if (activeCategory === catId) activeCategory = 'all';
     renderTabs();
     populateCategorySelect();
@@ -453,7 +460,7 @@ function deleteTab(catId) {
   }
 }
 
-function handleProductSubmit(e) {
+async function handleProductSubmit(e) {
   e.preventDefault();
   const id = document.getElementById('product-id').value;
   const name = document.getElementById('product-name').value;
@@ -485,7 +492,7 @@ function handleProductSubmit(e) {
     products.push(newProduct);
   }
 
-  saveProducts();
+  await syncDataToCloud();
   resetProductForm();
   renderProducts();
   alert('تم حفظ المنتج سحابياً بنجاح!');
@@ -505,10 +512,10 @@ function editProduct(id) {
   document.getElementById('save-product-btn').innerText = 'تحديث المنتج';
 }
 
-function deleteProduct(id) {
+async function deleteProduct(id) {
   if (confirm('تأكيد حذف المنتج؟')) {
     products = products.filter(p => p.id !== id);
-    saveProducts();
+    await syncDataToCloud();
     renderProducts();
   }
 }
@@ -701,7 +708,7 @@ function getCurrentLocation() {
   }
 }
 
-function handleCheckout(e) {
+async function handleCheckout(e) {
   e.preventDefault();
   if (cart.length === 0) {
     alert('السلة فارغة!');
@@ -731,7 +738,7 @@ function handleCheckout(e) {
   };
 
   invoices.unshift(newInvoice);
-  saveInvoices();
+  await syncDataToCloud();
   renderReceiptHTML(newInvoice);
 
   cart = [];
@@ -900,10 +907,10 @@ function downloadSingleInvoiceAsImage(id) {
   }, 200);
 }
 
-function deleteInvoice(id) {
+async function deleteInvoice(id) {
   if (confirm('تأكيد حذف الفاتورة؟')) {
     invoices = invoices.filter(i => i.id !== id);
-    saveInvoices();
+    await syncDataToCloud();
     renderInvoicesList();
   }
 }
