@@ -41,6 +41,10 @@ let currentImageData = "";
 
 document.addEventListener('DOMContentLoaded', () => {
   try {
+    // إخفاء أي مؤشر تحميل أو دائرة دوارة عامة قد تكون عالقة في واجهة التطبيق
+    const potentialLoaders = document.querySelectorAll('.loader, .spinner, #loader, #spinner, .loading, [class*="loader"], [class*="spinner"]');
+    potentialLoaders.forEach(el => el.style.display = 'none');
+
     checkInitialSessionState();
     renderTabs();
     renderProducts();
