@@ -7,6 +7,21 @@
   <!-- مكتبة html2canvas لتحويل الفاتورة إلى صورة -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <link rel="stylesheet" href="style.css">
+  <!-- سكريبت فوري لإخفاء أي دائرة تحميل أو مؤشر يعلق عند فتح التطبيق -->
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const hideLoaders = () => {
+        const elements = document.querySelectorAll('#loader, .loader, .spinner, .loading, [class*="loader"], [class*="spinner"]');
+        elements.forEach(el => {
+          el.style.display = 'none';
+          el.remove();
+        });
+      };
+      hideLoaders();
+      setTimeout(hideLoaders, 100);
+      setTimeout(hideLoaders, 500);
+    });
+  </script>
 </head>
 <body>
 
