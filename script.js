@@ -1,8 +1,4 @@
-// إعدادات السحابة الحقيقية لمتجر المستقبل للجملة
-const BIN_ID = '6a80ca62da38895dfee96c19';
-const API_KEY = '$2a$10$S9T6f03d50tT0pE6vF2n6O5U7g4L3k2J1h9Z8x7c6v5b4n3m2l1k0'; // مفتاح عام افتراضي للمزامنة السحابية
-const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
-
+// إعدادات التخزين المحلي والذكي لمتجر المستقبل للجملة
 function getCustomerProductPrice(productPrice) {
   if (loggedCustomer && loggedCustomer.discount && Number(loggedCustomer.discount) > 0) {
     const discountRate = Number(loggedCustomer.discount) / 100;
@@ -16,8 +12,8 @@ function formatPrice(amount) {
   return Number(amount).toLocaleString('ar-IQ');
 }
 
-// البيانات الافتراضية الأولية
-let categories = [
+// تحميل البيانات من الذاكرة المحلية للتطبيق
+let categories = JSON.parse(localStorage.getItem('mustaqbal_categories')) || [
   { id: 'all', name: 'جميع المنتجات' },
   { id: 'general', name: 'مواد عامة' },
   { id: 'medical', name: 'مواد طبية' },
@@ -28,31 +24,28 @@ let categories = [
   { id: 'beverages', name: 'المشروبات الغازية والعصائر' }
 ];
 
-let products = [
+let products = JSON.parse(localStorage.getItem('mustaqbal_products')) || [
   { id: 1, name: 'سماعة لاسلكية (جملة)', category: 'general', price: 25000, desc: 'سماعة بلوتوث عالية الدقة', image: '' },
   { id: 2, name: 'مادة طبية معقمة', category: 'medical', price: 15000, desc: 'معقم ومطهر أصلي', image: '' }
 ];
 
-let customers = [
+let customers = JSON.parse(localStorage.getItem('mustaqbal_customers')) || [
   { username: 'cust1', password: '123', fullname: 'زبون تجريبي', discount: 0 }
 ];
 
-let adminPassword = '799673';
-let cart = JSON.parse(localStorage.getItem('cart')) || [];
-let invoices = [];
+let adminPassword = localStorage.getItem('mustaqbal_admin_pass') || '799673';
+let cart = JSON.parse(localStorage.getItem('mustaqbal_cart')) || [];
+let invoices = JSON.parse(localStorage.getItem('mustaqbal_invoices')) || [];
 let activeCategory = 'all';
 
 let isAdmin = localStorage.getItem('isAdmin') === 'true';
 let loggedCustomer = JSON.parse(localStorage.getItem('loggedCustomer')) || null;
 let currentImageData = ""; 
 
-document.addEventListener('DOMContentLoaded', async () => {
+document.addEventListener('DOMContentLoaded', () => {
   try {
     const loaders = document.querySelectorAll('#loader, .loader, .spinner, .loading, [class*="loader"], [class*="spinner"]');
     loaders.forEach(el => { el.style.display = 'none'; el.remove(); });
-
-    // سحب البيانات من السحابة عند فتح التطبيق
-    await syncDataFromCloud();
 
     checkInitialSessionState();
     renderTabs();
@@ -66,51 +59,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
-// وظائف المزامنة السحابية الحقيقية مع JSONBin
-async function syncDataToCloud() {
-  const cloudData = {
-    categories,
-    products,
-    customers,
-    adminPassword,
-    invoices,
-    updatedAt: new Date().toISOString()
-  };
-
-  try {
-    await fetch(JSONBIN_URL, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Master-Key': API_KEY
-      },
-      body: JSON.stringify(cloudData)
-    });
-  } catch (e) {
-    console.error('خطأ في الحفظ السحابي:', e);
-  }
-}
-
-async function syncDataFromCloud() {
-  try {
-    const response = await fetch(JSONBIN_URL, {
-      method: 'GET',
-      headers: {
-        'X-Master-Key': API_KEY
-      }
-    });
-    const result = await response.json();
-    if (result && result.record) {
-      const data = result.record;
-      if (data.categories) categories = data.categories;
-      if (data.products) products = data.products;
-      if (data.customers) customers = data.customers;
-      if (data.adminPassword) adminPassword = data.adminPassword;
-      if (data.invoices) invoices = data.invoices;
-    }
-  } catch (e) {
-    console.error('خطأ في جلب البيانات من السحابة:', e);
-  }
+// دوال حفظ البيانات محلياً داخل التطبيق
+function saveData() {
+  localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
+  localStorage.setItem('mustaqbal_products', JSON.stringify(products));
+  localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
+  localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
 }
 
 function checkInitialSessionState() {
@@ -189,12 +143,11 @@ function closeAdminLoginModal() {
   document.getElementById('admin-login-modal').classList.add('hidden');
 }
 
-async function handleCustomerLogin(e) {
+function handleCustomerLogin(e) {
   e.preventDefault();
   const u = document.getElementById('cust-login-user').value.trim();
   const p = document.getElementById('cust-login-pass').value.trim();
 
-  await syncDataFromCloud();
   const found = customers.find(c => c.username === u && c.password === p);
   if (found) {
     loggedCustomer = found;
@@ -213,12 +166,11 @@ async function handleCustomerLogin(e) {
   }
 }
 
-async function handleAdminLogin(e) {
+function handleAdminLogin(e) {
   e.preventDefault();
   const u = document.getElementById('admin-user-input').value.trim();
   const p = document.getElementById('admin-pass-input').value.trim();
 
-  await syncDataFromCloud();
   if (u === 'admin' && p === adminPassword) {
     isAdmin = true;
     loggedCustomer = null;
@@ -242,18 +194,18 @@ function handleLogout() {
   checkInitialSessionState();
 }
 
-async function handleAdminPasswordChange(e) {
+function handleAdminPasswordChange(e) {
   e.preventDefault();
   const newPass = document.getElementById('new-admin-pass').value.trim();
   if (newPass) {
     adminPassword = newPass;
-    await syncDataToCloud();
-    alert('تم تغيير كلمة سر المدير بنجاح وحفظها سحابياً!');
+    localStorage.setItem('mustaqbal_admin_pass', adminPassword);
+    alert('تم تغيير كلمة سر المدير بنجاح!');
     document.getElementById('new-admin-pass').value = '';
   }
 }
 
-function saveCart() { localStorage.setItem('cart', JSON.stringify(cart)); }
+function saveCart() { localStorage.setItem('mustaqbal_cart', JSON.stringify(cart)); }
 
 function setupImageUploader() {
   const fileInput = document.getElementById('product-img-file');
@@ -297,7 +249,7 @@ function setupImageUploader() {
   }
 }
 
-async function handleCustomerMgmtSubmit(e) {
+function handleCustomerMgmtSubmit(e) {
   e.preventDefault();
   const username = document.getElementById('new-cust-username').value.trim();
   const password = document.getElementById('new-cust-password').value.trim();
@@ -313,10 +265,10 @@ async function handleCustomerMgmtSubmit(e) {
       cust.password = password;
       cust.fullname = fullname;
       cust.discount = discount;
-      await syncDataToCloud();
+      saveData();
       renderAdminCustomersList();
       resetCustomerMgmtForm();
-      alert('تم تحديث حساب الزبون وحفظه سحابياً.');
+      alert('تم تحديث حساب الزبون بنجاح.');
     }
   } else {
     if (customers.some(c => c.username === username)) {
@@ -324,10 +276,10 @@ async function handleCustomerMgmtSubmit(e) {
       return;
     }
     customers.push({ username, password, fullname, discount });
-    await syncDataToCloud();
+    saveData();
     renderAdminCustomersList();
     resetCustomerMgmtForm();
-    alert('تم إضافة حساب الزبون وحفظه سحابياً.');
+    alert('تم إضافة حساب الزبون بنجاح.');
   }
 }
 
@@ -373,10 +325,10 @@ function renderAdminCustomersList() {
   });
 }
 
-async function deleteCustomer(username) {
+function deleteCustomer(username) {
   if (confirm('تأكيد حذف حساب الزبون؟')) {
     customers = customers.filter(c => c.username !== username);
-    await syncDataToCloud();
+    saveData();
     renderAdminCustomersList();
   }
 }
@@ -422,7 +374,7 @@ function populateCategorySelect() {
   });
 }
 
-async function handleAddTab(e) {
+function handleAddTab(e) {
   e.preventDefault();
   const input = document.getElementById('tab-name-input');
   const name = input.value.trim();
@@ -430,29 +382,29 @@ async function handleAddTab(e) {
 
   const id = 'cat_' + Date.now();
   categories.push({ id, name });
-  await syncDataToCloud();
+  saveData();
   input.value = '';
   renderTabs();
   populateCategorySelect();
 }
 
-async function editTab(catId) {
+function editTab(catId) {
   const cat = categories.find(c => c.id === catId);
   if (!cat) return;
   const newName = prompt('تعديل اسم القسم:', cat.name);
   if (newName && newName.trim() !== '') {
     cat.name = newName.trim();
-    await syncDataToCloud();
+    saveData();
     renderTabs();
     populateCategorySelect();
   }
 }
 
-async function deleteTab(catId) {
+function deleteTab(catId) {
   if (confirm('تأكيد حذف القسم وجميع منتجاته؟')) {
     categories = categories.filter(c => c.id !== catId);
     products = products.filter(p => p.category !== catId);
-    await syncDataToCloud();
+    saveData();
     if (activeCategory === catId) activeCategory = 'all';
     renderTabs();
     populateCategorySelect();
@@ -460,7 +412,7 @@ async function deleteTab(catId) {
   }
 }
 
-async function handleProductSubmit(e) {
+function handleProductSubmit(e) {
   e.preventDefault();
   const id = document.getElementById('product-id').value;
   const name = document.getElementById('product-name').value;
@@ -492,10 +444,10 @@ async function handleProductSubmit(e) {
     products.push(newProduct);
   }
 
-  await syncDataToCloud();
+  saveData();
   resetProductForm();
   renderProducts();
-  alert('تم حفظ المنتج سحابياً بنجاح!');
+  alert('تم حفظ المنتج بنجاح!');
 }
 
 function editProduct(id) {
@@ -512,10 +464,10 @@ function editProduct(id) {
   document.getElementById('save-product-btn').innerText = 'تحديث المنتج';
 }
 
-async function deleteProduct(id) {
+function deleteProduct(id) {
   if (confirm('تأكيد حذف المنتج؟')) {
     products = products.filter(p => p.id !== id);
-    await syncDataToCloud();
+    saveData();
     renderProducts();
   }
 }
@@ -708,7 +660,7 @@ function getCurrentLocation() {
   }
 }
 
-async function handleCheckout(e) {
+function handleCheckout(e) {
   e.preventDefault();
   if (cart.length === 0) {
     alert('السلة فارغة!');
@@ -738,7 +690,7 @@ async function handleCheckout(e) {
   };
 
   invoices.unshift(newInvoice);
-  await syncDataToCloud();
+  saveData();
   renderReceiptHTML(newInvoice);
 
   cart = [];
@@ -907,10 +859,10 @@ function downloadSingleInvoiceAsImage(id) {
   }, 200);
 }
 
-async function deleteInvoice(id) {
+function deleteInvoice(id) {
   if (confirm('تأكيد حذف الفاتورة؟')) {
     invoices = invoices.filter(i => i.id !== id);
-    await syncDataToCloud();
+    saveData();
     renderInvoicesList();
   }
 }
