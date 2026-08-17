@@ -1,3 +1,76 @@
+// إعدادات اتصال Firebase الخاصة بمشروعك السحابي
+const firebaseConfig = {
+  apiKey: "AIzaSyC60355aPCR1Ji6MRlyOXuYCEbjYTjZ9n0",
+  authDomain: "al-mustaqbal-stor.firebaseapp.com",
+  projectId: "al-mustaqbal-stor",
+  storageBucket: "al-mustaqbal-stor.firebasestorage.app",
+  messagingSenderId: "96965787019",
+  appId: "1:96965787019:web:4531931ae87c4b317e438e",
+  measurementId: "G-0JTB3KDKV4"
+};
+
+// تهيئة الاتصال بقاعدة البيانات
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ----------------------------------------------------
+// دوال الجلب والحفظ السحابي
+// ----------------------------------------------------
+
+// جلب البيانات من السحابة عند تشغيل التطبيق
+async function loadCloudData() {
+  try {
+    const catSnap = await db.collection('categories').get();
+    if (!catSnap.empty) {
+      categories = catSnap.docs.map(doc => doc.data());
+    }
+
+    const prodSnap = await db.collection('products').get();
+    if (!prodSnap.empty) {
+      products = prodSnap.docs.map(doc => doc.data());
+    }
+
+    const custSnap = await db.collection('customers').get();
+    if (!custSnap.empty) {
+      customers = custSnap.docs.map(doc => doc.data());
+    }
+
+    // تحديث واجهة المتجر بعد جلب البيانات
+    if (typeof renderTabs === 'function') renderTabs();
+    if (typeof renderProducts === 'function') renderProducts();
+    if (typeof populateCategorySelect === 'function') populateCategorySelect();
+    if (typeof renderAdminCustomersList === 'function') renderAdminCustomersList();
+    
+    console.log("تم جلب البيانات من السحابة بنجاح");
+  } catch (err) {
+    console.error("خطأ في جلب البيانات من السحابة:", err);
+  }
+}
+
+// حفظ أو تحديث البيانات في السحابة وفي الذاكرة المحلية كدعم احتياطي
+async function saveData() {
+  // الحفظ محلياً أولاً لضمان السرعة واستقرار الحالة
+  localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
+  localStorage.setItem('mustaqbal_products', JSON.stringify(products));
+  localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
+  localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
+
+  // الحفظ في السحابة عبر Firestore
+  try {
+    for (let product of products) {
+      await db.collection('products').doc(String(product.id)).set(product);
+    }
+    for (let cat of categories) {
+      await db.collection('categories').doc(String(cat.id)).set(cat);
+    }
+    for (let cust of customers) {
+      await db.collection('customers').doc(String(cust.username)).set(cust);
+    }
+  } catch (err) {
+    console.error("فشل الحفظ في السحابة:", err);
+  }
+}
+
 // إعدادات التخزين المحلي والذكي لمتجر المستقبل للجملة
 function getCustomerProductPrice(productPrice) {
   if (loggedCustomer && loggedCustomer.discount && Number(loggedCustomer.discount) > 0) {
@@ -12,7 +85,7 @@ function formatPrice(amount) {
   return Number(amount).toLocaleString('ar-IQ');
 }
 
-// تحميل البيانات من الذاكرة المحلية للتطبيق
+// تحميل البيانات الافتراضية محلياً كبداية قبل تحديثها من السحابة
 let categories = JSON.parse(localStorage.getItem('mustaqbal_categories')) || [
   { id: 'all', name: 'جميع المنتجات' },
   { id: 'general', name: 'مواد عامة' },
@@ -42,10 +115,14 @@ let isAdmin = localStorage.getItem('isAdmin') === 'true';
 let loggedCustomer = JSON.parse(localStorage.getItem('loggedCustomer')) || null;
 let currentImageData = ""; 
 
+// تفعيل التحميل السحابي وعند تشغيل الصفحة
 document.addEventListener('DOMContentLoaded', () => {
   try {
     const loaders = document.querySelectorAll('#loader, .loader, .spinner, .loading, [class*="loader"], [class*="spinner"]');
     loaders.forEach(el => { el.style.display = 'none'; el.remove(); });
+
+    // استدعاء البيانات من السحابة وتحديث الواجهات
+    loadCloudData();
 
     checkInitialSessionState();
     renderTabs();
@@ -58,14 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error(err);
   }
 });
-
-// دوال حفظ البيانات محلياً داخل التطبيق
-function saveData() {
-  localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
-  localStorage.setItem('mustaqbal_products', JSON.stringify(products));
-  localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
-  localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
-}
 
 function checkInitialSessionState() {
   const displaySpan = document.getElementById('logged-user-display');
@@ -249,7 +318,7 @@ function setupImageUploader() {
   }
 }
 
-function handleCustomerMgmtSubmit(e) {
+async function handleCustomerMgmtSubmit(e) {
   e.preventDefault();
   const username = document.getElementById('new-cust-username').value.trim();
   const password = document.getElementById('new-cust-password').value.trim();
@@ -265,7 +334,7 @@ function handleCustomerMgmtSubmit(e) {
       cust.password = password;
       cust.fullname = fullname;
       cust.discount = discount;
-      saveData();
+      await saveData();
       renderAdminCustomersList();
       resetCustomerMgmtForm();
       alert('تم تحديث حساب الزبون بنجاح.');
@@ -276,7 +345,7 @@ function handleCustomerMgmtSubmit(e) {
       return;
     }
     customers.push({ username, password, fullname, discount });
-    saveData();
+    await saveData();
     renderAdminCustomersList();
     resetCustomerMgmtForm();
     alert('تم إضافة حساب الزبون بنجاح.');
@@ -325,10 +394,15 @@ function renderAdminCustomersList() {
   });
 }
 
-function deleteCustomer(username) {
+async function deleteCustomer(username) {
   if (confirm('تأكيد حذف حساب الزبون؟')) {
     customers = customers.filter(c => c.username !== username);
-    saveData();
+    try {
+      await db.collection('customers').doc(String(username)).delete();
+    } catch (err) {
+      console.error("فشل الحذف من السحابة:", err);
+    }
+    await saveData();
     renderAdminCustomersList();
   }
 }
@@ -374,7 +448,7 @@ function populateCategorySelect() {
   });
 }
 
-function handleAddTab(e) {
+async function handleAddTab(e) {
   e.preventDefault();
   const input = document.getElementById('tab-name-input');
   const name = input.value.trim();
@@ -382,29 +456,34 @@ function handleAddTab(e) {
 
   const id = 'cat_' + Date.now();
   categories.push({ id, name });
-  saveData();
+  await saveData();
   input.value = '';
   renderTabs();
   populateCategorySelect();
 }
 
-function editTab(catId) {
+async function editTab(catId) {
   const cat = categories.find(c => c.id === catId);
   if (!cat) return;
   const newName = prompt('تعديل اسم القسم:', cat.name);
   if (newName && newName.trim() !== '') {
     cat.name = newName.trim();
-    saveData();
+    await saveData();
     renderTabs();
     populateCategorySelect();
   }
 }
 
-function deleteTab(catId) {
+async function deleteTab(catId) {
   if (confirm('تأكيد حذف القسم وجميع منتجاته؟')) {
     categories = categories.filter(c => c.id !== catId);
     products = products.filter(p => p.category !== catId);
-    saveData();
+    try {
+      await db.collection('categories').doc(String(catId)).delete();
+    } catch (err) {
+      console.error("فشل حذف القسم من السحابة:", err);
+    }
+    await saveData();
     if (activeCategory === catId) activeCategory = 'all';
     renderTabs();
     populateCategorySelect();
@@ -412,7 +491,7 @@ function deleteTab(catId) {
   }
 }
 
-function handleProductSubmit(e) {
+async function handleProductSubmit(e) {
   e.preventDefault();
   const id = document.getElementById('product-id').value;
   const name = document.getElementById('product-name').value;
@@ -444,7 +523,7 @@ function handleProductSubmit(e) {
     products.push(newProduct);
   }
 
-  saveData();
+  await saveData();
   resetProductForm();
   renderProducts();
   alert('تم حفظ المنتج بنجاح!');
@@ -464,10 +543,15 @@ function editProduct(id) {
   document.getElementById('save-product-btn').innerText = 'تحديث المنتج';
 }
 
-function deleteProduct(id) {
+async function deleteProduct(id) {
   if (confirm('تأكيد حذف المنتج؟')) {
     products = products.filter(p => p.id !== id);
-    saveData();
+    try {
+      await db.collection('products').doc(String(id)).delete();
+    } catch (err) {
+      console.error("فشل حذف المنتج من السحابة:", err);
+    }
+    await saveData();
     renderProducts();
   }
 }
