@@ -17,58 +17,46 @@ const db = firebase.firestore();
 // دوال الجلب والحفظ السحابي
 // ----------------------------------------------------
 
-// جلب البيانات من السحابة عند تشغيل التطبيق
+// جلب البيانات من السحابة عند تشغيل التطبيق (مع اعتماد البيانات السحابية الحقيقية حصراً)
 async function loadCloudData() {
   try {
     const catSnap = await db.collection('categories').get();
     if (!catSnap.empty) {
       categories = catSnap.docs.map(doc => doc.data());
+      localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
     }
 
     const prodSnap = await db.collection('products').get();
     if (!prodSnap.empty) {
       products = prodSnap.docs.map(doc => doc.data());
+      localStorage.setItem('mustaqbal_products', JSON.stringify(products));
     }
 
     const custSnap = await db.collection('customers').get();
     if (!custSnap.empty) {
       customers = custSnap.docs.map(doc => doc.data());
+      localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
     }
 
-    // تحديث واجهة المتجر بعد جلب البيانات
+    // تحديث واجهة المتجر بعد جلب البيانات نظيفة من السحابة
     if (typeof renderTabs === 'function') renderTabs();
     if (typeof renderProducts === 'function') renderProducts();
     if (typeof populateCategorySelect === 'function') populateCategorySelect();
     if (typeof renderAdminCustomersList === 'function') renderAdminCustomersList();
     
-    console.log("تم جلب البيانات من السحابة بنجاح");
+    console.log("تم جلب البيانات السحابية المحدثة بنجاح");
   } catch (err) {
     console.error("خطأ في جلب البيانات من السحابة:", err);
   }
 }
 
-// حفظ أو تحديث البيانات في السحابة وفي الذاكرة المحلية كدعم احتياطي
+// حفظ البيانات محلياً وتحديث السحابة بدقة
 async function saveData() {
-  // الحفظ محلياً أولاً لضمان السرعة واستقرار الحالة
+  // الحفظ محلياً أولاً
   localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
   localStorage.setItem('mustaqbal_products', JSON.stringify(products));
   localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
   localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
-
-  // الحفظ في السحابة عبر Firestore
-  try {
-    for (let product of products) {
-      await db.collection('products').doc(String(product.id)).set(product);
-    }
-    for (let cat of categories) {
-      await db.collection('categories').doc(String(cat.id)).set(cat);
-    }
-    for (let cust of customers) {
-      await db.collection('customers').doc(String(cust.username)).set(cust);
-    }
-  } catch (err) {
-    console.error("فشل الحفظ في السحابة:", err);
-  }
 }
 
 // إعدادات التخزين المحلي والذكي لمتجر المستقبل للجملة
@@ -85,26 +73,13 @@ function formatPrice(amount) {
   return Number(amount).toLocaleString('ar-IQ');
 }
 
-// تحميل البيانات الافتراضية محلياً كبداية قبل تحديثها من السحابة
+// المتغيرات والبيانات الأساسية
 let categories = JSON.parse(localStorage.getItem('mustaqbal_categories')) || [
-  { id: 'all', name: 'جميع المنتجات' },
-  { id: 'general', name: 'مواد عامة' },
-  { id: 'medical', name: 'مواد طبية' },
-  { id: 'cosmetics', name: 'مواد تجميل والشعر' },
-  { id: 'perfumes', name: 'العطور' },
-  { id: 'air_fresheners', name: 'المعطرات' },
-  { id: 'groceries', name: 'المواد الغذائية' },
-  { id: 'beverages', name: 'المشروبات الغازية والعصائر' }
+  { id: 'all', name: 'جميع المنتجات' }
 ];
 
-let products = JSON.parse(localStorage.getItem('mustaqbal_products')) || [
-  { id: 1, name: 'سماعة لاسلكية (جملة)', category: 'general', price: 25000, desc: 'سماعة بلوتوث عالية الدقة', image: '' },
-  { id: 2, name: 'مادة طبية معقمة', category: 'medical', price: 15000, desc: 'معقم ومطهر أصلي', image: '' }
-];
-
-let customers = JSON.parse(localStorage.getItem('mustaqbal_customers')) || [
-  { username: 'cust1', password: '123', fullname: 'زبون تجريبي', discount: 0 }
-];
+let products = JSON.parse(localStorage.getItem('mustaqbal_products')) || [];
+let customers = JSON.parse(localStorage.getItem('mustaqbal_customers')) || [];
 
 let adminPassword = localStorage.getItem('mustaqbal_admin_pass') || '799673';
 let cart = JSON.parse(localStorage.getItem('mustaqbal_cart')) || [];
@@ -330,10 +305,16 @@ async function handleCustomerMgmtSubmit(e) {
   if (editFlag) {
     const cust = customers.find(c => c.username === editFlag);
     if (cust) {
+      if (editFlag !== username) {
+        customers = customers.filter(c => c.username !== editFlag);
+        await db.collection('customers').doc(String(editFlag)).delete();
+      }
       cust.username = username;
       cust.password = password;
       cust.fullname = fullname;
       cust.discount = discount;
+      
+      await db.collection('customers').doc(String(username)).set(cust);
       await saveData();
       renderAdminCustomersList();
       resetCustomerMgmtForm();
@@ -344,7 +325,9 @@ async function handleCustomerMgmtSubmit(e) {
       alert('اسم المستخدم هذا موجود مسبقاً.');
       return;
     }
-    customers.push({ username, password, fullname, discount });
+    const newCust = { username, password, fullname, discount };
+    customers.push(newCust);
+    await db.collection('customers').doc(String(username)).set(newCust);
     await saveData();
     renderAdminCustomersList();
     resetCustomerMgmtForm();
@@ -455,7 +438,15 @@ async function handleAddTab(e) {
   if (!name) return;
 
   const id = 'cat_' + Date.now();
-  categories.push({ id, name });
+  const newCat = { id, name };
+  categories.push(newCat);
+  
+  try {
+    await db.collection('categories').doc(String(id)).set(newCat);
+  } catch (err) {
+    console.error("فشل حفظ القسم في السحابة:", err);
+  }
+
   await saveData();
   input.value = '';
   renderTabs();
@@ -468,6 +459,11 @@ async function editTab(catId) {
   const newName = prompt('تعديل اسم القسم:', cat.name);
   if (newName && newName.trim() !== '') {
     cat.name = newName.trim();
+    try {
+      await db.collection('categories').doc(String(catId)).set(cat);
+    } catch (err) {
+      console.error("فشل تحديث القسم في السحابة:", err);
+    }
     await saveData();
     renderTabs();
     populateCategorySelect();
@@ -499,10 +495,11 @@ async function handleProductSubmit(e) {
   const price = parseFloat(document.getElementById('product-price').value);
   const desc = document.getElementById('product-desc').value;
 
+  let savedProduct;
   if (id) {
     const index = products.findIndex(p => p.id == id);
     if (index !== -1) {
-      products[index] = {
+      savedProduct = {
         id: Number(id),
         name,
         category,
@@ -510,9 +507,10 @@ async function handleProductSubmit(e) {
         desc,
         image: currentImageData || products[index].image
       };
+      products[index] = savedProduct;
     }
   } else {
-    const newProduct = {
+    savedProduct = {
       id: Date.now(),
       name,
       category,
@@ -520,7 +518,13 @@ async function handleProductSubmit(e) {
       desc,
       image: currentImageData || ''
     };
-    products.push(newProduct);
+    products.push(savedProduct);
+  }
+
+  try {
+    await db.collection('products').doc(String(savedProduct.id)).set(savedProduct);
+  } catch (err) {
+    console.error("فشل حفظ المنتج في السحابة:", err);
   }
 
   await saveData();
