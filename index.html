@@ -43,6 +43,10 @@
       </div>
       <div class="header-actions">
         <span id="logged-user-display" class="user-badge"></span>
+        
+        <!-- زر تحديث البيانات اليدوي -->
+        <button class="btn btn-secondary" onclick="refreshAppData()" style="padding: 6px 10px; font-size: 0.75rem; background: var(--success); color: #fff;" title="تحديث البيانات من السحابة">🔄 تحديث</button>
+        
         <button class="btn btn-secondary hidden" id="logout-btn" onclick="handleLogout()" style="padding: 6px 10px; font-size: 0.75rem;">خروج</button>
         <button class="btn" id="open-login-selection-btn" onclick="openLoginSelectionModal()">دخول 🔑</button>
       </div>

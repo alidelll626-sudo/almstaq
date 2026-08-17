@@ -14,7 +14,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 // ----------------------------------------------------
-// دوال الجلب والحفظ السحابي
+// دوال الجلب والحفظ السحابي والتحديث
 // ----------------------------------------------------
 
 async function loadCloudData() {
@@ -84,6 +84,24 @@ async function saveData() {
     }
   } catch (err) {
     console.error("فشل الحفظ في السحابة:", err);
+  }
+}
+
+// دالة تحديث البيانات يدوياً دون الحاجة لتسجيل الخروج
+async function refreshAppData() {
+  try {
+    console.log("جاري تحديث البيانات...");
+    await loadCloudData();
+    
+    renderTabs();
+    renderProducts();
+    updateCartUI();
+    renderAdminCustomersList();
+    
+    alert('تم تحديث البيانات بنجاح!');
+  } catch (err) {
+    console.error("خطأ أثناء التحديث:", err);
+    alert('فشل تحديث البيانات، يرجى التحقق من الاتصال بالإنترنت.');
   }
 }
 
