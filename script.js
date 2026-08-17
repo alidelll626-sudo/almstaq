@@ -14,45 +14,51 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 // ----------------------------------------------------
-// دوال الجلب والحفظ السحابي
+// دوال الجلب والحفظ السحابي الحقيقي
 // ----------------------------------------------------
 
-// جلب البيانات من السحابة عند تشغيل التطبيق (مع اعتماد البيانات السحابية الحقيقية حصراً)
 async function loadCloudData() {
   try {
+    // جلب الأقسام من السحابة
     const catSnap = await db.collection('categories').get();
     if (!catSnap.empty) {
       categories = catSnap.docs.map(doc => doc.data());
       localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
+    } else {
+      categories = [{ id: 'all', name: 'جميع المنتجات' }];
     }
 
+    // جلب المنتجات من السحابة
     const prodSnap = await db.collection('products').get();
     if (!prodSnap.empty) {
       products = prodSnap.docs.map(doc => doc.data());
       localStorage.setItem('mustaqbal_products', JSON.stringify(products));
+    } else {
+      products = [];
     }
 
+    // جلب الزبائن من السحابة (منع البيانات الافتراضية المتكررة)
     const custSnap = await db.collection('customers').get();
     if (!custSnap.empty) {
       customers = custSnap.docs.map(doc => doc.data());
       localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
+    } else {
+      customers = [];
     }
 
-    // تحديث واجهة المتجر بعد جلب البيانات نظيفة من السحابة
+    // تحديث الواجهات بعد جلب البيانات
     if (typeof renderTabs === 'function') renderTabs();
     if (typeof renderProducts === 'function') renderProducts();
     if (typeof populateCategorySelect === 'function') populateCategorySelect();
     if (typeof renderAdminCustomersList === 'function') renderAdminCustomersList();
     
-    console.log("تم جلب البيانات السحابية المحدثة بنجاح");
+    console.log("تم مزامنة وجلب البيانات السحابية بنجاح");
   } catch (err) {
     console.error("خطأ في جلب البيانات من السحابة:", err);
   }
 }
 
-// حفظ البيانات محلياً وتحديث السحابة بدقة
 async function saveData() {
-  // الحفظ محلياً أولاً
   localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
   localStorage.setItem('mustaqbal_products', JSON.stringify(products));
   localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
@@ -73,7 +79,7 @@ function formatPrice(amount) {
   return Number(amount).toLocaleString('ar-IQ');
 }
 
-// المتغيرات والبيانات الأساسية
+// المتغيرات الأساسية (تبدأ فارغة لحين سحبها نظيفة من Firebase)
 let categories = JSON.parse(localStorage.getItem('mustaqbal_categories')) || [
   { id: 'all', name: 'جميع المنتجات' }
 ];
@@ -90,13 +96,12 @@ let isAdmin = localStorage.getItem('isAdmin') === 'true';
 let loggedCustomer = JSON.parse(localStorage.getItem('loggedCustomer')) || null;
 let currentImageData = ""; 
 
-// تفعيل التحميل السحابي وعند تشغيل الصفحة
+// تفعيل التحميل عند فتح الصفحة
 document.addEventListener('DOMContentLoaded', () => {
   try {
     const loaders = document.querySelectorAll('#loader, .loader, .spinner, .loading, [class*="loader"], [class*="spinner"]');
     loaders.forEach(el => { el.style.display = 'none'; el.remove(); });
 
-    // استدعاء البيانات من السحابة وتحديث الواجهات
     loadCloudData();
 
     checkInitialSessionState();
@@ -170,7 +175,6 @@ function openLoginSelectionModal() {
 function closeLoginSelectionModal() {
   document.getElementById('login-selection-modal').classList.add('hidden');
 }
-
 function openCustomerLoginModal() {
   closeLoginSelectionModal();
   document.getElementById('customer-login-modal').classList.remove('hidden');
@@ -178,7 +182,6 @@ function openCustomerLoginModal() {
 function closeCustomerLoginModal() {
   document.getElementById('customer-login-modal').classList.add('hidden');
 }
-
 function openAdminLoginModal() {
   closeLoginSelectionModal();
   document.getElementById('admin-login-modal').classList.remove('hidden');
@@ -293,6 +296,10 @@ function setupImageUploader() {
   }
 }
 
+// ----------------------------------------------------
+// إدارة الزبائن مع الحفظ والحذف الفعلي من Firebase
+// ----------------------------------------------------
+
 async function handleCustomerMgmtSubmit(e) {
   e.preventDefault();
   const username = document.getElementById('new-cust-username').value.trim();
@@ -390,6 +397,10 @@ async function deleteCustomer(username) {
   }
 }
 
+// ----------------------------------------------------
+// إدارة الأقسام (التويبات) الحقيقية والمزامنة مع Firebase
+// ----------------------------------------------------
+
 function renderTabs() {
   const tabsContainer = document.getElementById('vertical-tabs');
   if (!tabsContainer) return;
@@ -404,8 +415,8 @@ function renderTabs() {
     chip.innerHTML = `
       <span onclick="selectCategory('${cat.id}')">${cat.name}</span>
       ${isAdmin && cat.id !== 'all' ? `
-        <span style="font-size:0.7rem; opacity:0.7;" onclick="editTab('${cat.id}')">✏️</span>
-        <span style="font-size:0.7rem; opacity:0.7;" onclick="deleteTab('${cat.id}')">🗑️</span>
+        <span style="font-size:0.7rem; opacity:0.7; cursor:pointer;" onclick="editTab('${cat.id}')">✏️</span>
+        <span style="font-size:0.7rem; opacity:0.7; cursor:pointer;" onclick="deleteTab('${cat.id}')">🗑️</span>
       ` : ''}
     `;
 
@@ -486,6 +497,10 @@ async function deleteTab(catId) {
     renderProducts();
   }
 }
+
+// ----------------------------------------------------
+// إدارة المنتجات والحذف الفعلي من Firebase
+// ----------------------------------------------------
 
 async function handleProductSubmit(e) {
   e.preventDefault();
@@ -622,6 +637,10 @@ function handleSearch() {
   );
   renderProducts(filtered);
 }
+
+// ----------------------------------------------------
+// السلة والفواتير
+// ----------------------------------------------------
 
 function addToCart(productId) {
   const product = products.find(p => p.id === productId);
