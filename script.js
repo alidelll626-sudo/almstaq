@@ -34,6 +34,13 @@ async function loadCloudData() {
       customers = custSnap.docs.map(doc => doc.data()).filter(c => c && c.username && c.username !== 'undefined');
     }
 
+    // جلب الفواتير من السحابة
+    const invSnap = await db.collection('invoices').get();
+    if (!invSnap.empty) {
+      invoices = invSnap.docs.map(doc => doc.data()).filter(i => i && i.id);
+      localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
+    }
+
     if (!categories.some(c => c.id === 'all')) {
       categories.unshift({ id: 'all', name: 'جميع المنتجات' });
     }
@@ -43,7 +50,7 @@ async function loadCloudData() {
     if (typeof populateCategorySelect === 'function') populateCategorySelect();
     if (typeof renderAdminCustomersList === 'function') renderAdminCustomersList();
     
-    console.log("تم جلب وتصفية البيانات من السحابة بنجاح");
+    console.log("تم جلب وتصفية كافة البيانات والفواتير من السحابة بنجاح");
   } catch (err) {
     console.error("خطأ في جلب البيانات من السحابة:", err);
   }
@@ -70,6 +77,10 @@ async function saveData() {
     }
     for (let cust of customers) {
       await db.collection('customers').doc(String(cust.username)).set(cust);
+    }
+    // حفظ الفواتير في قاعدة البيانات السحابية
+    for (let inv of invoices) {
+      await db.collection('invoices').doc(String(inv.id)).set(inv);
     }
   } catch (err) {
     console.error("فشل الحفظ في السحابة:", err);
