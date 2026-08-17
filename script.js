@@ -78,7 +78,6 @@ async function saveData() {
     for (let cust of customers) {
       await db.collection('customers').doc(String(cust.username)).set(cust);
     }
-    // حفظ الفواتير في قاعدة البيانات السحابية
     for (let inv of invoices) {
       await db.collection('invoices').doc(String(inv.id)).set(inv);
     }
@@ -87,7 +86,6 @@ async function saveData() {
   }
 }
 
-// دالة تحديث البيانات يدوياً دون الحاجة لتسجيل الخروج
 async function refreshAppData() {
   try {
     console.log("جاري تحديث البيانات...");
@@ -785,24 +783,6 @@ function renderCartModal() {
   if (totalPriceElem) totalPriceElem.innerText = formatPrice(total);
 }
 
-function getCurrentLocation() {
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
-        const locInput = document.getElementById('cust-location');
-        if (locInput) locInput.value = mapsUrl;
-        alert('تم تحديد موقعك بنجاح!');
-      },
-      () => { alert('لم نتمكن من الوصول لموقعك.'); }
-    );
-  } else {
-    alert('خاصية تحديد الموقع غير مدعومة.');
-  }
-}
-
 function handleCheckout(e) {
   e.preventDefault();
   if (cart.length === 0) {
@@ -813,7 +793,6 @@ function handleCheckout(e) {
   const custName = document.getElementById('cust-name').value.trim();
   const custPhone = document.getElementById('cust-phone').value.trim();
   const custAddress = document.getElementById('cust-address').value.trim();
-  const custLocation = document.getElementById('cust-location').value.trim();
 
   const totalAmount = cart.reduce((acc, item) => acc + ((item.price || 0) * (item.qty || 0)), 0);
 
@@ -824,7 +803,6 @@ function handleCheckout(e) {
       name: custName, 
       phone: custPhone, 
       address: custAddress, 
-      location: custLocation,
       username: loggedCustomer ? loggedCustomer.username : (isAdmin ? 'admin' : 'غير محدد'),
       discountApplied: loggedCustomer ? loggedCustomer.discount : 0
     },
@@ -910,21 +888,22 @@ function downloadInvoiceAsImage(invoiceElementId) {
           <html dir="rtl">
             <head><title>تحميل الفاتورة</title></head>
             <body style="text-align:center; background:#f4f4f4; padding:15px; font-family:sans-serif;">
-              <h3 style="color:#333; font-size:0.9rem; margin-bottom:10px;">اضغط مطولاً على الصورة ثم اختر (تنزيل الصورة):</h3>
-              <img src="${imageUrl}" style="max-width:100%; border:1px solid #ccc; border-radius:8px;" />
+              <h3>اضغط مطولاً على الصورة ثم اختر (تنزيل الصورة)</h3>
+              <img src="${imageUrl}" style="max-width:100%; border-radius:8px; box-shadow:0 4px 10px rgba(0,0,0,0.1);"/>
             </body>
           </html>
         `);
       } else {
-        window.location.href = imageUrl;
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = 'invoice.png';
+        link.click();
       }
     } else {
-      const downloadLink = document.createElement('a');
-      downloadLink.href = imageUrl;
-      downloadLink.download = 'Invoice-' + Date.now() + '.png';
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
+      const link = document.createElement('a');
+      link.href = imageUrl;
+      link.download = 'invoice.png';
+      link.click();
     }
   });
 }
@@ -938,53 +917,76 @@ function openInvoicesModal() {
   document.getElementById('invoices-modal').classList.remove('hidden');
 }
 
+function renderInvoicesList() {
+  const invoicesListContainer = document.getElementById('invoices-list');
+  const modalTitle = document.getElementById('invoices-modal-title');
+  if (!invoicesListContainer) return;
+
+  invoicesListContainer.innerHTML = '';
+
+  let visibleInvoices = invoices;
+  if (!isAdmin && loggedCustomer) {
+    visibleInvoices = invoices.filter(inv => inv.customer && inv.customer.username === loggedCustomer.username);
+    if (modalTitle) modalTitle.innerText = 'سجل فواتيرك السابقة';
+  } else {
+    if (modalTitle) modalTitle.innerText = 'سجل جميع فواتير الزبائن';
+  }
+
+  if (visibleInvoices.length === 0) {
+    invoicesListContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد فواتير سابقة مسجلة.</p>';
+    return;
+  }
+
+  visibleInvoices.forEach(inv => {
+    const div = document.createElement('div');
+    div.style.cssText = 'background: var(--bg-surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;';
+    
+    div.innerHTML = `
+      <div>
+        <div style="font-weight: 700; font-size: 0.85rem; color: var(--primary-dark);">فاتورة: ${inv.id}</div>
+        <div style="font-size: 0.75rem; color: var(--text-muted);">الزبون: ${inv.customer.name || 'غير محدد'} | التاريخ: ${inv.date}</div>
+        <div style="font-size: 0.8rem; font-weight: 800; margin-top: 4px;">المجموع: ${formatPrice(inv.total || 0)} د.ع</div>
+      </div>
+      <div style="display: flex; gap: 6px;">
+        <button type="button" class="btn" style="padding: 6px 10px; font-size: 0.75rem;" onclick="viewInvoiceDetails('${inv.id}')">عرض 📄</button>
+        ${isAdmin ? `<button type="button" class="btn btn-secondary btn-danger" style="padding: 6px 10px; font-size: 0.75rem;" onclick="deleteInvoice('${inv.id}')">حذف</button>` : ''}
+      </div>
+    `;
+    invoicesListContainer.appendChild(div);
+  });
+}
+
 function closeInvoicesModal() {
   document.getElementById('invoices-modal').classList.add('hidden');
 }
 
-function renderInvoicesList() {
-  const listContainer = document.getElementById('invoices-list');
-  if (!listContainer) return;
-  listContainer.innerHTML = '';
+function viewInvoiceDetails(invoiceId) {
+  const inv = invoices.find(i => i && i.id === invoiceId);
+  if (!inv) return;
 
-  let displayedInvoices = invoices;
-  if (!isAdmin && loggedCustomer) {
-    displayedInvoices = invoices.filter(inv => inv && inv.customer && inv.customer.username === loggedCustomer.username);
-  } else if (!isAdmin && !loggedCustomer) {
-    listContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:15px; font-size:0.8rem;">يرجى تسجيل الدخول.</p>';
-    return;
-  }
-
-  if (displayedInvoices.length === 0) {
-    listContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:15px; font-size:0.8rem;">لا توجد فواتير سابقة.</p>';
-    return;
-  }
-
-  displayedInvoices.forEach(inv => {
-    if (!inv) return;
-    const card = document.createElement('div');
-    card.style.cssText = 'background:var(--bg-surface); border:1px solid var(--border-color); padding:10px; border-radius:var(--radius-sm); display:flex; flex-direction:column; gap:6px; font-size:0.8rem;';
-    card.innerHTML = `
-      <div style="display:flex; justify-content:space-between; font-weight:bold; color:var(--primary-dark);">
-        <span>${inv.id || 'INV'}</span>
-        <span>${formatPrice(inv.total || 0)} د.ع</span>
-      </div>
-      <div>الزبون: ${inv.customer && inv.customer.name ? inv.customer.name : 'غير محدد'}</div>
-      <div style="font-size:0.7rem; color:var(--text-muted);">${inv.date || ''}</div>
-      <div style="display:flex; gap:6px; margin-top:4px;">
-        <button class="btn" style="padding:4px 8px; font-size:0.75rem;" onclick="viewSingleInvoice('${inv.id}')">عرض</button>
-        <button class="btn" style="background:var(--success); padding:4px 8px; font-size:0.75rem;" onclick="viewSingleInvoice('${inv.id}')">تحميل</button>
-      </div>
-    `;
-    listContainer.appendChild(card);
-  });
+  closeInvoicesModal();
+  renderReceiptHTML(inv);
+  document.getElementById('receipt-modal').classList.remove('hidden');
 }
 
-function viewSingleInvoice(invoiceId) {
-  const inv = invoices.find(i => i && i.id === invoiceId);
-  if (inv) {
-    renderReceiptHTML(inv);
-    closeInvoicesModal();
-    document.getElementById('receipt-modal').classList.remove('hidden');
+async function deleteInvoice(invoiceId) {
+  if (confirm('تأكيد حذف هذه الفاتورة من السجل؟')) {
+    invoices = invoices.filter(i => i && i.id !== invoiceId);
+    try {
+      await db.collection('invoices').doc(String(invoiceId)).delete();
+    } catch (err) {
+      console.error("فشل حذف الفاتورة من السحابة:", err);
+    }
+    saveData();
+    renderInvoicesList();
+  }
+}
+
+function switchNavTab(tabName) {
+  const navItems = document.querySelectorAll('.bottom-nav .nav-item');
+  navItems.forEach(item => item.classList.remove('active'));
+  
+  if (tabName === 'store') {
+    event.currentTarget.classList.add('active');
   }
 }
