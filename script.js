@@ -1,49 +1,86 @@
-// المتغيرات الأساسية مع تصفية أي بيانات تالفة أو undefined مسبقة
-let categories = JSON.parse(localStorage.getItem('mustaqbal_categories')) || [
-  { id: 'all', name: 'جميع المنتجات' }
-];
+// تهيئة قاعدة البيانات السحابية
+const db = firebase.firestore();
 
-let products = JSON.parse(localStorage.getItem('mustaqbal_products')) || [];
-let customers = JSON.parse(localStorage.getItem('mustaqbal_customers')) || [];
-
+// المتغيرات الأساسية للتطبيق
+let categories = [{ id: 'all', name: 'جميع المنتجات' }];
+let products = [];
+let customers = [];
+let invoices = [];
 let adminPassword = localStorage.getItem('mustaqbal_admin_pass') || '799673';
 let cart = JSON.parse(localStorage.getItem('mustaqbal_cart')) || [];
-let invoices = JSON.parse(localStorage.getItem('mustaqbal_invoices')) || [];
 let activeCategory = 'all';
 
 let isAdmin = localStorage.getItem('isAdmin') === 'true';
 let loggedCustomer = JSON.parse(localStorage.getItem('loggedCustomer')) || null;
 let currentImageData = ""; 
 
-// تهيئة التطبيق عند فتح الصفحة
+// 1. مزامنة وجلب البيانات من السحابة (Firebase) عند فتح الصفحة
+async function syncFromCloud() {
+  try {
+    const snapshot = await db.collection('store_data').doc('main_data').get();
+    if (snapshot.exists) {
+      const data = snapshot.data();
+      categories = data.categories || [{ id: 'all', name: 'جميع المنتجات' }];
+      products = data.products || [];
+      customers = data.customers || [];
+      invoices = data.invoices || [];
+    }
+  } catch (e) {
+    console.error("خطأ في جلب البيانات من السحابة:", e);
+  } finally {
+    // تنظيف البيانات التالفة أو undefined لضمان عدم ظهورها
+    categories = categories.filter(c => c && c.id && c.name);
+    products = products.filter(p => p && p.id && p.name);
+    customers = customers.filter(cust => cust && cust.username);
+
+    // التأكد من وجود قسم "جميع المنتجات" دائماً
+    if (!categories.some(c => c.id === 'all')) {
+      categories.unshift({ id: 'all', name: 'جميع المنتجات' });
+    }
+
+    renderApp();
+  }
+}
+
+// 2. حفظ البيانات مباشرة إلى السحابة
+async function saveToCloud() {
+  try {
+    await db.collection('store_data').doc('main_data').set({
+      categories,
+      products,
+      customers,
+      invoices
+    });
+  } catch (e) {
+    console.error("خطأ في حفظ البيانات إلى السحابة:", e);
+  }
+}
+
+function saveData() {
+  saveToCloud();
+}
+
+function renderApp() {
+  renderTabs();
+  renderProducts();
+  renderAdminCustomersList();
+  populateCategorySelect();
+}
+
+// تهيئة التطبيق عند تحميل الصفحة
 document.addEventListener('DOMContentLoaded', () => {
   try {
     const loaders = document.querySelectorAll('#loader, .loader, .spinner, .loading');
     loaders.forEach(el => { el.style.display = 'none'; el.remove(); });
 
-    // تنظيف البيانات التالفة عند البداية
-    categories = categories.filter(c => c && c.id && c.name);
-    products = products.filter(p => p && p.id && p.name);
-    customers = customers.filter(cust => cust && cust.username);
-
     checkInitialSessionState();
-    renderTabs();
-    renderProducts();
+    syncFromCloud(); // جلب وتحديث البيانات سحابياً
     updateCartUI();
-    populateCategorySelect();
     setupImageUploader();
-    renderAdminCustomersList();
   } catch (err) {
     console.error(err);
   }
 });
-
-function saveData() {
-  localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
-  localStorage.setItem('mustaqbal_products', JSON.stringify(products));
-  localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
-  localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
-}
 
 function getCustomerProductPrice(productPrice) {
   if (loggedCustomer && loggedCustomer.discount && Number(loggedCustomer.discount) > 0) {
@@ -129,9 +166,7 @@ function handleCustomerLogin(e) {
     localStorage.setItem('isAdmin', 'false');
     closeCustomerLoginModal();
     checkInitialSessionState();
-    renderTabs();
-    renderProducts();
-    updateCartUI();
+    renderApp();
     const custNameInput = document.getElementById('cust-name');
     if (custNameInput) custNameInput.value = found.fullname;
   } else {
@@ -150,9 +185,7 @@ function handleAdminLogin(e) {
     localStorage.setItem('isAdmin', 'true');
     closeAdminLoginModal();
     checkInitialSessionState();
-    renderTabs();
-    renderProducts();
-    renderAdminCustomersList();
+    renderApp();
   } else {
     alert('بيانات دخول المدير غير صحيحة!');
   }
@@ -164,8 +197,7 @@ function handleLogout() {
   localStorage.removeItem('loggedCustomer');
   localStorage.setItem('isAdmin', 'false');
   checkInitialSessionState();
-  renderTabs();
-  renderProducts();
+  renderApp();
 }
 
 function handleAdminPasswordChange(e) {
@@ -315,10 +347,8 @@ function renderTabs() {
 
   if (!isAdmin && !loggedCustomer) return;
 
-  // تنظيف المصفوفة وإلغاء أي عناصر غير صالحة أو undefined
   categories = categories.filter(c => c && c.id && c.name);
 
-  // التأكد من وجود قسم "جميع المنتجات" في البداية دائماً
   if (!categories.some(c => c.id === 'all')) {
     categories.unshift({ id: 'all', name: 'جميع المنتجات' });
   }
@@ -471,7 +501,6 @@ function renderProducts(itemsToRender = null) {
 
   if (!isAdmin && !loggedCustomer) return;
 
-  // تنظيف المنتجات من أي عناصر تالفة أو undefined
   products = products.filter(p => p && p.id && p.name);
 
   let list = itemsToRender || (activeCategory === 'all' ? products : products.filter(p => p && p.category === activeCategory));
