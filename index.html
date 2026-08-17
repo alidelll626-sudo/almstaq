@@ -4,9 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>متجر المستقبل للجملة</title>
+  
+  <!-- مكتبات Firebase الأساسية وقاعدة البيانات -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
   <!-- مكتبة html2canvas لتحويل الفاتورة إلى صورة -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  
   <link rel="stylesheet" href="style.css">
+  
   <!-- سكريبت فوري لإخفاء أي دائرة تحميل أو مؤشر يعلق عند فتح التطبيق -->
   <script>
     window.addEventListener('DOMContentLoaded', () => {
