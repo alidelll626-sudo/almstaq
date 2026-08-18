@@ -14,48 +14,109 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 // ----------------------------------------------------
-// دوال الجلب والحفظ السحابي والتحديث
+// نظام المزامنة والاتصال الحي الفوري (Realtime Sync)
 // ----------------------------------------------------
 
-async function loadCloudData() {
-  try {
-    const catSnap = await db.collection('categories').get();
-    if (!catSnap.empty) {
-      categories = catSnap.docs.map(doc => doc.data()).filter(c => c && c.id && c.name && c.name !== 'undefined');
-    }
-
-    const prodSnap = await db.collection('products').get();
-    if (!prodSnap.empty) {
-      products = prodSnap.docs.map(doc => doc.data()).filter(p => p && p.id && p.name && p.name !== 'undefined');
-    }
-
-    const custSnap = await db.collection('customers').get();
-    if (!custSnap.empty) {
-      customers = custSnap.docs.map(doc => doc.data()).filter(c => c && c.username && c.username !== 'undefined');
-    }
-
-    // جلب الفواتير من السحابة
-    const invSnap = await db.collection('invoices').get();
-    if (!invSnap.empty) {
-      invoices = invSnap.docs.map(doc => doc.data()).filter(i => i && i.id);
-      localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
-    }
+function initRealtimeListeners() {
+  // 1. الاستماع لتغييرات الأقسام (التبويبات) فوراً
+  db.collection('categories').onSnapshot(snapshot => {
+    categories = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data && data.id && data.name && data.name !== 'undefined') {
+        categories.push(data);
+      }
+    });
 
     if (!categories.some(c => c.id === 'all')) {
       categories.unshift({ id: 'all', name: 'جميع المنتجات' });
     }
 
-    if (typeof renderTabs === 'function') renderTabs();
-    if (typeof renderProducts === 'function') renderProducts();
-    if (typeof populateCategorySelect === 'function') populateCategorySelect();
-    if (typeof renderAdminCustomersList === 'function') renderAdminCustomersList();
+    localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
     
-    console.log("تم جلب وتصفية كافة البيانات والفواتير من السحابة بنجاح");
-  } catch (err) {
-    console.error("خطأ في جلب البيانات من السحابة:", err);
-  }
+    if (typeof renderTabs === 'function') renderTabs();
+    if (typeof populateCategorySelect === 'function') populateCategorySelect();
+  }, err => {
+    console.error("خطأ في مزامنة الأقسام الفورية:", err);
+  });
+
+  // 2. الاستماع لتغييرات المنتجات فوراً (الأسعار، الأسماء، الإضافات، الحذف)
+  db.collection('products').onSnapshot(snapshot => {
+    products = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data && data.id && data.name && data.name !== 'undefined') {
+        products.push(data);
+      }
+    });
+
+    localStorage.setItem('mustaqbal_products', JSON.stringify(products));
+
+    if (typeof renderProducts === 'function') {
+      const searchInput = document.getElementById('search-input');
+      if (searchInput && searchInput.value.trim() !== '') {
+        handleSearch();
+      } else {
+        renderProducts();
+      }
+    }
+  }, err => {
+    console.error("خطأ في مزامنة المنتجات الفورية:", err);
+  });
+
+  // 3. الاستماع لتغييرات الزبائن (الخصومات، الحسابات، وتغيير البيانات)
+  db.collection('customers').onSnapshot(snapshot => {
+    customers = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data && data.username && data.username !== 'undefined') {
+        customers.push(data);
+      }
+    });
+
+    localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
+
+    // فحص ما إذا كان الزبون مسجلاً دخوله حالياً
+    if (loggedCustomer) {
+      // البحث عن النسخة المحدثة لهذا الزبون في قاعدة البيانات بناءً على هويته القديمة أو اسمه
+      const updatedMe = customers.find(c => c && c.username === loggedCustomer.username || (c && c.fullname === loggedCustomer.fullname));
+      
+      // إذا قام المدير بتغيير اسم المستخدم أو كلمة المرور أو حذف الحساب بالكامل
+      if (!updatedMe || (updatedMe.password !== loggedCustomer.password)) {
+        alert('تم تغيير بيانات حسابك أو كلمة المرور من قبل الإدارة، يرجى تسجيل الدخول من جديد.');
+        handleLogout();
+      } else {
+        // إذا تغيرت الخصومات أو البيانات الأخرى فقط
+        loggedCustomer = updatedMe;
+        localStorage.setItem('loggedCustomer', JSON.stringify(loggedCustomer));
+        if (typeof renderProducts === 'function') renderProducts();
+      }
+    }
+
+    if (typeof renderAdminCustomersList === 'function') renderAdminCustomersList();
+  }, err => {
+    console.error("خطأ في مزامنة الزبائن الفورية:", err);
+  });
+
+  // 4. الاستماع للفواتير
+  db.collection('invoices').onSnapshot(snapshot => {
+    invoices = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data && data.id) {
+        invoices.push(data);
+      }
+    });
+    localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
+    if (typeof renderInvoicesList === 'function' && document.getElementById('invoices-modal') && !document.getElementById('invoices-modal').classList.contains('hidden')) {
+      renderInvoicesList();
+    }
+  }, err => {
+    console.error("خطأ في مزامنة الفواتير:", err);
+  });
 }
 
+// دالة الحفظ اليدوي وإرسال التعديلات للسحابة
 async function saveData() {
   categories = categories.filter(c => c && c.id && c.name && c.name !== 'undefined');
   products = products.filter(p => p && p.id && p.name && p.name !== 'undefined');
@@ -89,13 +150,10 @@ async function saveData() {
 async function refreshAppData() {
   try {
     console.log("جاري تحديث البيانات...");
-    await loadCloudData();
-    
     renderTabs();
     renderProducts();
     updateCartUI();
     renderAdminCustomersList();
-    
     alert('تم تحديث البيانات بنجاح!');
   } catch (err) {
     console.error("خطأ أثناء التحديث:", err);
@@ -154,7 +212,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const loaders = document.querySelectorAll('#loader, .loader, .spinner, .loading, [class*="loader"], [class*="spinner"]');
     loaders.forEach(el => { el.style.display = 'none'; el.remove(); });
 
-    loadCloudData();
+    // تشغيل نظام المزامنة والاتصال الحي الفوري
+    initRealtimeListeners();
 
     checkInitialSessionState();
     renderTabs();
@@ -365,17 +424,30 @@ async function handleCustomerMgmtSubmit(e) {
   }
 
   if (editFlag) {
-    const cust = customers.find(c => c && c.username === editFlag);
+    // إذا تم تغيير اسم المستخدم، يجب التأكد من حذف المستند القديم من سحابة فيربيس لتفادي بقائه بمعرف قديم
+    if (editFlag !== username) {
+      try {
+        await db.collection('customers').doc(String(editFlag)).delete();
+      } catch (err) {
+        console.error("فشل حذف الحساب القديم من السحابة:", err);
+      }
+      customers = customers.filter(c => c && c.username !== editFlag);
+    }
+
+    const cust = customers.find(c => c && c.username === editFlag || c && c.username === username);
     if (cust) {
       cust.username = username;
       cust.password = password;
       cust.fullname = fullname || username;
       cust.discount = discount;
-      await saveData();
-      renderAdminCustomersList();
-      resetCustomerMgmtForm();
-      alert('تم تحديث حساب الزبون بنجاح.');
+    } else {
+      customers.push({ username, password, fullname: fullname || username, discount });
     }
+
+    await saveData();
+    renderAdminCustomersList();
+    resetCustomerMgmtForm();
+    alert('تم تحديث حساب الزبون بنجاح.');
   } else {
     if (customers.some(c => c && c.username === username)) {
       alert('اسم المستخدم هذا موجود مسبقاً.');
@@ -918,52 +990,47 @@ function openInvoicesModal() {
 }
 
 function renderInvoicesList() {
-  const invoicesListContainer = document.getElementById('invoices-list');
-  const modalTitle = document.getElementById('invoices-modal-title');
-  if (!invoicesListContainer) return;
+  const listContainer = document.getElementById('invoices-list');
+  const titleContainer = document.getElementById('invoices-modal-title');
+  if (!listContainer) return;
 
-  invoicesListContainer.innerHTML = '';
-
+  listContainer.innerHTML = '';
+  
   let visibleInvoices = invoices;
   if (!isAdmin && loggedCustomer) {
-    visibleInvoices = invoices.filter(inv => inv.customer && inv.customer.username === loggedCustomer.username);
-    if (modalTitle) modalTitle.innerText = 'سجل فواتيرك السابقة';
-  } else {
-    if (modalTitle) modalTitle.innerText = 'سجل جميع فواتير الزبائن';
+    visibleInvoices = invoices.filter(inv => inv && inv.customer && inv.customer.username === loggedCustomer.username);
+    if (titleContainer) titleContainer.innerText = 'سجل فواتيري السابقة';
+  } else if (isAdmin) {
+    if (titleContainer) titleContainer.innerText = 'سجل جميع فواتير الزبائن';
   }
 
-  if (visibleInvoices.length === 0) {
-    invoicesListContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد فواتير سابقة مسجلة.</p>';
+  if (!visibleInvoices || visibleInvoices.length === 0) {
+    listContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد فواتير سابقة مسجلة.</p>';
     return;
   }
 
   visibleInvoices.forEach(inv => {
     const div = document.createElement('div');
-    div.style.cssText = 'background: var(--bg-surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;';
+    div.style.cssText = 'background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px; display:flex; justify-content:space-between; align-items:center; font-size:0.8rem;';
     
     div.innerHTML = `
       <div>
-        <div style="font-weight: 700; font-size: 0.85rem; color: var(--primary-dark);">فاتورة: ${inv.id}</div>
-        <div style="font-size: 0.75rem; color: var(--text-muted);">الزبون: ${inv.customer.name || 'غير محدد'} | التاريخ: ${inv.date}</div>
-        <div style="font-size: 0.8rem; font-weight: 800; margin-top: 4px;">المجموع: ${formatPrice(inv.total || 0)} د.ع</div>
+        <div style="font-weight:700; color:var(--primary-dark);">فاتورة: ${inv.id}</div>
+        <div style="color:var(--text-muted); font-size:0.75rem;">الزبون: ${inv.customer ? inv.customer.name : 'غير معروف'} | التاريخ: ${inv.date}</div>
+        <div style="font-weight:bold; margin-top:2px;">المجموع: ${formatPrice(inv.total || 0)} د.ع</div>
       </div>
-      <div style="display: flex; gap: 6px;">
-        <button type="button" class="btn" style="padding: 6px 10px; font-size: 0.75rem;" onclick="viewInvoiceDetails('${inv.id}')">عرض 📄</button>
-        ${isAdmin ? `<button type="button" class="btn btn-secondary btn-danger" style="padding: 6px 10px; font-size: 0.75rem;" onclick="deleteInvoice('${inv.id}')">حذف</button>` : ''}
+      <div style="display:flex; gap:6px;">
+        <button class="btn" style="padding:6px 10px; font-size:0.75rem;" onclick="viewSavedInvoice('${inv.id}')">عرض 👁️</button>
+        ${isAdmin ? `<button class="btn btn-secondary btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteInvoice('${inv.id}')">حذف 🗑️</button>` : ''}
       </div>
     `;
-    invoicesListContainer.appendChild(div);
+    listContainer.appendChild(div);
   });
 }
 
-function closeInvoicesModal() {
-  document.getElementById('invoices-modal').classList.add('hidden');
-}
-
-function viewInvoiceDetails(invoiceId) {
+function viewSavedInvoice(invoiceId) {
   const inv = invoices.find(i => i && i.id === invoiceId);
   if (!inv) return;
-
   closeInvoicesModal();
   renderReceiptHTML(inv);
   document.getElementById('receipt-modal').classList.remove('hidden');
@@ -982,11 +1049,6 @@ async function deleteInvoice(invoiceId) {
   }
 }
 
-function switchNavTab(tabName) {
-  const navItems = document.querySelectorAll('.bottom-nav .nav-item');
-  navItems.forEach(item => item.classList.remove('active'));
-  
-  if (tabName === 'store') {
-    event.currentTarget.classList.add('active');
-  }
+function closeInvoicesModal() {
+  document.getElementById('invoices-modal').classList.add('hidden');
 }
