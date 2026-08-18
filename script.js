@@ -98,7 +98,7 @@ function initRealtimeListeners() {
     console.error("خطأ في مزامنة الزبائن الفورية:", err);
   });
 
-  // 4. الاستماع للفواتير
+  // 4. الاستماع للفواتير وضمان تحديثها لدى المدير والزبون فوراً
   db.collection('invoices').onSnapshot(snapshot => {
     invoices = [];
     snapshot.forEach(doc => {
@@ -107,8 +107,13 @@ function initRealtimeListeners() {
         invoices.push(data);
       }
     });
+    // ترتيب الفواتير من الأحدث إلى الأقدم
+    invoices.sort((a, b) => b.id.localeCompare(a.id));
     localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
-    if (typeof renderInvoicesList === 'function' && document.getElementById('invoices-modal') && !document.getElementById('invoices-modal').classList.contains('hidden')) {
+    
+    // تحديث عرض قائمة الفواتير إذا كانت نافذة الفواتير مفتوحة
+    const invoicesModal = document.getElementById('invoices-modal');
+    if (invoicesModal && !invoicesModal.classList.contains('hidden')) {
       renderInvoicesList();
     }
   }, err => {
@@ -855,7 +860,7 @@ function renderCartModal() {
   if (totalPriceElem) totalPriceElem.innerText = formatPrice(total);
 }
 
-function handleCheckout(e) {
+async function handleCheckout(e) {
   e.preventDefault();
   if (cart.length === 0) {
     alert('السلة فارغة!');
@@ -882,8 +887,17 @@ function handleCheckout(e) {
     total: totalAmount
   };
 
+  // إضافة الفاتورة للقائمة المحلية وحفظها فوراً في سحابة فايربيس
   invoices.unshift(newInvoice);
-  saveData();
+  localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
+
+  try {
+    // حفظ الفاتورة مباشرة في مجموعة invoices بـ Firestore
+    await db.collection('invoices').doc(String(newInvoice.id)).set(newInvoice);
+  } catch (err) {
+    console.error("خطأ في حفظ الفاتورة بالسحابة:", err);
+  }
+
   renderReceiptHTML(newInvoice);
 
   cart = [];
