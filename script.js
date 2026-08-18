@@ -159,7 +159,6 @@ async function refreshAppData() {
     const btn = document.querySelector('header button[onclick="refreshAppData()"]');
     if(btn) btn.innerText = "⏳ جاري التحديث...";
 
-    // سحب البيانات المحدثة يدوياً من Firestore
     const [catSnap, prodSnap, custSnap, delSnap, invSnap] = await Promise.all([
       db.collection('categories').get(),
       db.collection('products').get(),
@@ -205,14 +204,12 @@ async function refreshAppData() {
     });
     invoices.sort((a, b) => b.id.localeCompare(a.id));
 
-    // تحديث التخزين المحلي
     localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
     localStorage.setItem('mustaqbal_products', JSON.stringify(products));
     localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
     localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
     localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
 
-    // إعادة رسم الواجهات
     renderTabs();
     renderProducts();
     populateCategorySelect();
@@ -655,17 +652,14 @@ async function handleDelegateClientSubmit(e) {
     loggedDelegate.clients.push({ id: Date.now(), name, phone, address });
   }
 
-  // تحديث التخزين المحلي فوراً
   localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
 
-  // تحديث مصفوفة المناديب الكلية وحفظها محلياً
   const delegateIndex = delegates.findIndex(d => d.username === loggedDelegate.username);
   if (delegateIndex !== -1) {
     delegates[delegateIndex] = loggedDelegate;
     localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
   }
 
-  // حفظ التغييرات مباشرة في السحابة
   try {
     await db.collection('delegates').doc(String(loggedDelegate.username)).set(loggedDelegate);
   } catch (err) {
@@ -674,7 +668,6 @@ async function handleDelegateClientSubmit(e) {
 
   renderDelegateClientsList();
   
-  // إعادة تعيين الحقول وإشعار المستخدم بالنجاح
   document.getElementById('delegate-client-form').reset();
   editIdInput.value = '';
   document.getElementById('save-client-btn').innerText = 'حفظ الزبون';
@@ -689,7 +682,6 @@ function renderDelegateClientsList() {
   
   let clients = loggedDelegate.clients || [];
   
-  // تطبيق البحث داخل قائمة زبائن المندوب
   const searchInput = document.getElementById('delegate-client-search-input');
   const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
   if (query) {
@@ -761,35 +753,73 @@ async function deleteDelegateClient(id) {
   }
 }
 
-// دالة لتعبئة بيانات الزبون في السلة تلقائياً إذا كان المستخدم مندوباً
+// الدوال الخاصة بنظام البحث التفاعلي لزبائن المندوب داخل السلة
 function prepareCartClientSelection() {
   const wrap = document.getElementById('delegate-client-select-wrap');
-  const select = document.getElementById('selected-delegate-client');
-  if (!wrap || !select) return;
+  const searchInput = document.getElementById('searchCustomerInput');
+  const dropdownResults = document.getElementById('customerDropdownResults');
+  
+  if (!wrap) return;
 
   if (loggedDelegate && loggedDelegate.clients && loggedDelegate.clients.length > 0) {
     wrap.classList.remove('hidden');
-    select.innerHTML = '<option value="">-- اختر من زبائني المحفوظين --</option>';
-    loggedDelegate.clients.forEach(c => {
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.innerText = c.name + ' (' + c.phone + ')';
-      select.appendChild(opt);
-    });
+    if (searchInput) searchInput.value = '';
+    if (dropdownResults) {
+      dropdownResults.style.display = 'none';
+      dropdownResults.innerHTML = '';
+    }
   } else {
     wrap.classList.add('hidden');
   }
 }
 
-function fillDelegateClientData() {
-  const selectId = document.getElementById('selected-delegate-client').value;
-  if (!loggedDelegate || !loggedDelegate.clients) return;
-  const client = loggedDelegate.clients.find(c => String(c.id) === String(selectId));
-  if (client) {
-    document.getElementById('cust-name').value = client.name;
-    document.getElementById('cust-phone').value = client.phone;
-    document.getElementById('cust-address').value = client.address;
+function filterDelegateDropdown() {
+  const input = document.getElementById('searchCustomerInput');
+  const dropdownResults = document.getElementById('customerDropdownResults');
+  if (!input || !dropdownResults || !loggedDelegate || !loggedDelegate.clients) return;
+
+  const query = input.value.toLowerCase().trim();
+  dropdownResults.innerHTML = '';
+
+  if (query === '') {
+    dropdownResults.style.display = 'none';
+    return;
   }
+
+  const filteredClients = loggedDelegate.clients.filter(c => 
+    (c.name && c.name.toLowerCase().includes(query)) || 
+    (c.phone && c.phone.toLowerCase().includes(query)) ||
+    (c.address && c.address.toLowerCase().includes(query))
+  );
+
+  if (filteredClients.length === 0) {
+    dropdownResults.style.display = 'block';
+    const li = document.createElement('li');
+    li.style.cssText = 'padding: 8px 12px; font-size: 0.75rem; color: var(--text-muted); text-align: center;';
+    li.innerText = 'لا توجد نتائج مطابقة';
+    dropdownResults.appendChild(li);
+    return;
+  }
+
+  dropdownResults.style.display = 'block';
+  filteredClients.forEach(c => {
+    const li = document.createElement('li');
+    li.style.cssText = 'padding: 8px 12px; font-size: 0.8rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;';
+    li.innerHTML = `<strong>${c.name}</strong> <span style="color:var(--text-muted); font-size:0.7rem;">(${c.phone})</span>`;
+    
+    li.onmouseover = () => li.style.background = '#f3f4f6';
+    li.onmouseout = () => li.style.background = '#fff';
+    
+    li.onclick = () => {
+      document.getElementById('cust-name').value = c.name || '';
+      document.getElementById('cust-phone').value = c.phone || '';
+      document.getElementById('cust-address').value = c.address || '';
+      input.value = c.name || '';
+      dropdownResults.style.display = 'none';
+    };
+
+    dropdownResults.appendChild(li);
+  });
 }
 
 // إدارة الزبائن الأساسية (للإدارة)
@@ -1181,7 +1211,6 @@ function renderCartModal() {
   cartItemsContainer.innerHTML = '';
   let total = 0;
 
-  // تصفية محتويات السلة بناءً على بحث السلة
   const searchInput = document.getElementById('cart-search-input');
   const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
   let itemsToDisplay = cart;
@@ -1228,7 +1257,6 @@ function renderCartModal() {
     cartItemsContainer.appendChild(div);
   });
 
-  // المجموع الكلي يظل إجمالي السلة بالكامل، أو حسب العناصر المفلترة إذا رغبت، والمفضل إجمالي السلة بالكامل
   const fullCartTotal = cart.reduce((acc, item) => acc + ((item.price || 0) * (item.qty || 0)), 0);
   document.getElementById('cart-total-price').innerText = formatPrice(fullCartTotal);
 }
