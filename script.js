@@ -10,7 +10,9 @@ const firebaseConfig = {
 };
 
 // تهيئة الاتصال بقاعدة البيانات
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
 const db = firebase.firestore();
 
 // توليد معرف فريد للجهاز/المتصفح الحالي وحفظه محلياً
@@ -149,6 +151,86 @@ function initRealtimeListeners() {
   }, err => {
     console.error("خطأ في مزامنة الفواتير:", err);
   });
+}
+
+// دالة التحديث اليدوي (الرفريش) المعدلة لجلب أحدث البيانات فوراً وإشعار المستخدم
+async function refreshAppData() {
+  try {
+    const btn = document.querySelector('header button[onclick="refreshAppData()"]');
+    if(btn) btn.innerText = "⏳ جاري التحديث...";
+
+    // سحب البيانات المحدثة يدوياً من Firestore
+    const [catSnap, prodSnap, custSnap, delSnap, invSnap] = await Promise.all([
+      db.collection('categories').get(),
+      db.collection('products').get(),
+      db.collection('customers').get(),
+      db.collection('delegates').get(),
+      db.collection('invoices').get()
+    ]);
+
+    categories = [{ id: 'all', name: 'جميع المنتجات' }];
+    catSnap.forEach(doc => {
+      const data = doc.data();
+      if (data && data.id && data.name && data.id !== 'all') categories.push(data);
+    });
+
+    products = [];
+    prodSnap.forEach(doc => {
+      const data = doc.data();
+      if (data && data.id) products.push(data);
+    });
+
+    customers = [];
+    custSnap.forEach(doc => {
+      const data = doc.data();
+      if (data && data.username) customers.push(data);
+    });
+
+    delegates = [];
+    delSnap.forEach(doc => {
+      const data = doc.data();
+      if (data && data.username) {
+        if(loggedDelegate && data.username === loggedDelegate.username) {
+          loggedDelegate = data;
+          localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
+        }
+        delegates.push(data);
+      }
+    });
+
+    invoices = [];
+    invSnap.forEach(doc => {
+      const data = doc.data();
+      if (data && data.id) invoices.push(data);
+    });
+    invoices.sort((a, b) => b.id.localeCompare(a.id));
+
+    // تحديث التخزين المحلي
+    localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
+    localStorage.setItem('mustaqbal_products', JSON.stringify(products));
+    localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
+    localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
+    localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
+
+    // إعادة رسم الواجهات
+    renderTabs();
+    renderProducts();
+    populateCategorySelect();
+    renderAdminCustomersList();
+    renderAdminDelegatesList();
+    if(!document.getElementById('cart-modal').classList.contains('hidden')) renderCartModal();
+    if(!document.getElementById('delegate-clients-modal').classList.contains('hidden')) renderDelegateClientsList();
+
+    if(btn) {
+      btn.innerText = "🔄 تم التحديث";
+      setTimeout(() => { btn.innerText = "🔄 تحديث"; }, 2000);
+    }
+  } catch (err) {
+    console.error("فشل التحديث اليدوي:", err);
+    alert("حدث خطأ أثناء الاتصال بالسحابة لتحديث البيانات.");
+    const btn = document.querySelector('header button[onclick="refreshAppData()"]');
+    if(btn) btn.innerText = "🔄 تحديث";
+  }
 }
 
 // دالة الحفظ اليدوي وإرسال التعديلات للسحابة
@@ -535,8 +617,10 @@ async function deleteDelegate(username) {
   }
 }
 
-// واجهة إدارة زبائن المندوب (خاصة بحساب المندوب)
+// واجهة إدارة زبائن المندوب (خاصة بحساب المندوب مع دعم البحث)
 function openDelegateClientsModal() {
+  const searchInput = document.getElementById('delegate-client-search-input');
+  if(searchInput) searchInput.value = '';
   renderDelegateClientsList();
   document.getElementById('delegate-clients-modal').classList.remove('hidden');
 }
@@ -602,10 +686,22 @@ function renderDelegateClientsList() {
   const container = document.getElementById('delegate-clients-list');
   if (!container || !loggedDelegate) return;
   container.innerHTML = '';
-  const clients = loggedDelegate.clients || [];
+  
+  let clients = loggedDelegate.clients || [];
+  
+  // تطبيق البحث داخل قائمة زبائن المندوب
+  const searchInput = document.getElementById('delegate-client-search-input');
+  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  if (query) {
+    clients = clients.filter(c => 
+      (c.name && c.name.toLowerCase().includes(query)) || 
+      (c.phone && c.phone.toLowerCase().includes(query)) ||
+      (c.address && c.address.toLowerCase().includes(query))
+    );
+  }
 
   if (clients.length === 0) {
-    container.innerHTML = '<small style="color:var(--text-muted); text-align:center;">لم تقم بإضافة أي زبون بعد.</small>';
+    container.innerHTML = '<small style="color:var(--text-muted); text-align:center;">لا توجد نتائج مطابقة لبيانات الزبائن.</small>';
     return;
   }
 
@@ -1067,6 +1163,8 @@ function updateCartUI() {
 
 function openCartModal() {
   prepareCartClientSelection();
+  const searchInput = document.getElementById('cart-search-input');
+  if(searchInput) searchInput.value = '';
   renderCartModal();
   document.getElementById('cart-modal').classList.remove('hidden');
 }
@@ -1083,6 +1181,17 @@ function renderCartModal() {
   cartItemsContainer.innerHTML = '';
   let total = 0;
 
+  // تصفية محتويات السلة بناءً على بحث السلة
+  const searchInput = document.getElementById('cart-search-input');
+  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  let itemsToDisplay = cart;
+  if (query) {
+    itemsToDisplay = cart.filter(item => 
+      item.name.toLowerCase().includes(query) || 
+      (item.desc && item.desc.toLowerCase().includes(query))
+    );
+  }
+
   if (cart.length === 0) {
     cartItemsContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">السلة فارغة حالياً</p>';
     document.getElementById('cart-total-price').innerText = '0';
@@ -1092,7 +1201,13 @@ function renderCartModal() {
 
   if (clearBtn) clearBtn.style.display = 'inline-block';
 
-  cart.forEach(item => {
+  if (itemsToDisplay.length === 0) {
+    cartItemsContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.8rem;">لا توجد منتجات مطابقة للبحث داخل السلة</p>';
+    document.getElementById('cart-total-price').innerText = formatPrice(cart.reduce((acc, item) => acc + ((item.price || 0) * (item.qty || 0)), 0));
+    return;
+  }
+
+  itemsToDisplay.forEach(item => {
     const itemTotal = (item.price || 0) * (item.qty || 0);
     total += itemTotal;
 
@@ -1113,7 +1228,9 @@ function renderCartModal() {
     cartItemsContainer.appendChild(div);
   });
 
-  document.getElementById('cart-total-price').innerText = formatPrice(total);
+  // المجموع الكلي يظل إجمالي السلة بالكامل، أو حسب العناصر المفلترة إذا رغبت، والمفضل إجمالي السلة بالكامل
+  const fullCartTotal = cart.reduce((acc, item) => acc + ((item.price || 0) * (item.qty || 0)), 0);
+  document.getElementById('cart-total-price').innerText = formatPrice(fullCartTotal);
 }
 
 async function handleCheckout(e) {

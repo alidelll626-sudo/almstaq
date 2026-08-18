@@ -1,535 +1,1439 @@
-:root {
-  --primary: #0284c7;
-  --primary-dark: #0369a1;
-  --primary-light: #e0f2fe;
-  --accent: #f59e0b;
-  --bg-surface: #f8fafc;
-  --card-bg: #ffffff;
-  --text-main: #0f172a;
-  --text-muted: #64748b;
-  --border-color: #e2e8f0;
-  --danger: #ef4444;
-  --success: #10b981;
-  --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
-  --safe-bottom: env(safe-area-inset-bottom, 12px);
+// إعدادات اتصال Firebase الخاصة بمشروعك السحابي
+const firebaseConfig = {
+  apiKey: "AIzaSyC60355aPCR1Ji6MRlyOXuYCEbjYTjZ9n0",
+  authDomain: "al-mustaqbal-stor.firebaseapp.com",
+  projectId: "al-mustaqbal-stor",
+  storageBucket: "al-mustaqbal-stor.firebasestorage.app",
+  messagingSenderId: "96965787019",
+  appId: "1:96965787019:web:4531931ae87c4b317e438e",
+  measurementId: "G-0JTB3KDKV4"
+};
+
+// تهيئة الاتصال بقاعدة البيانات
+if (!firebase.apps.length) {
+  firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.firestore();
+
+// توليد معرف فريد للجهاز/المتصفح الحالي وحفظه محلياً
+let deviceId = localStorage.getItem('mustaqbal_device_id');
+if (!deviceId) {
+  deviceId = 'dev_' + Math.random().toString(36).substring(2) + Date.now();
+  localStorage.setItem('mustaqbal_device_id', deviceId);
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  -webkit-tap-highlight-color: transparent;
+// ----------------------------------------------------
+// نظام المزامنة والاتصال الحي الفوري (Realtime Sync)
+// ----------------------------------------------------
+
+function initRealtimeListeners() {
+  db.collection('categories').onSnapshot(snapshot => {
+    categories = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data && data.id && data.name && data.name !== 'undefined') {
+        categories.push(data);
+      }
+    });
+
+    if (!categories.some(c => c.id === 'all')) {
+      categories.unshift({ id: 'all', name: 'جميع المنتجات' });
+    }
+
+    localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
+    
+    if (typeof renderTabs === 'function') renderTabs();
+    if (typeof populateCategorySelect === 'function') populateCategorySelect();
+  }, err => {
+    console.error("خطأ في مزامنة الأقسام الفورية:", err);
+  });
+
+  db.collection('products').onSnapshot(snapshot => {
+    products = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data && data.id && data.name && data.name !== 'undefined') {
+        products.push(data);
+      }
+    });
+
+    localStorage.setItem('mustaqbal_products', JSON.stringify(products));
+
+    if (typeof renderProducts === 'function') {
+      const searchInput = document.getElementById('search-input');
+      if (searchInput && searchInput.value.trim() !== '') {
+        handleSearch();
+      } else {
+        renderProducts();
+      }
+    }
+  }, err => {
+    console.error("خطأ في مزامنة المنتجات الفورية:", err);
+  });
+
+  db.collection('customers').onSnapshot(snapshot => {
+    customers = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data && data.username && data.username !== 'undefined') {
+        customers.push(data);
+      }
+    });
+
+    localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
+
+    if (loggedCustomer) {
+      const updatedMe = customers.find(c => c && c.username === loggedCustomer.username || (c && c.fullname === loggedCustomer.fullname));
+      if (!updatedMe || (updatedMe.password !== loggedCustomer.password) || (updatedMe.activeDeviceId && updatedMe.activeDeviceId !== deviceId)) {
+        if (updatedMe && updatedMe.activeDeviceId && updatedMe.activeDeviceId !== deviceId) {
+          alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر، سيتم إرجاعك للصفحة الرئيسية.');
+        } else {
+          alert('تم تغيير بيانات حسابك أو كلمة المرور من قبل الإدارة، يرجى تسجيل الدخول من جديد.');
+        }
+        handleLogout(false);
+      } else {
+        loggedCustomer = updatedMe;
+        localStorage.setItem('loggedCustomer', JSON.stringify(loggedCustomer));
+        if (typeof renderProducts === 'function') renderProducts();
+      }
+    }
+
+    if (typeof renderAdminCustomersList === 'function') renderAdminCustomersList();
+  }, err => {
+    console.error("خطأ في مزامنة الزبائن الفورية:", err);
+  });
+
+  db.collection('delegates').onSnapshot(snapshot => {
+    delegates = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data && data.username && data.username !== 'undefined') {
+        delegates.push(data);
+      }
+    });
+
+    localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
+
+    if (loggedDelegate) {
+      const updatedMe = delegates.find(d => d && d.username === loggedDelegate.username);
+      if (!updatedMe || updatedMe.password !== loggedDelegate.password) {
+        alert('تم تغيير بيانات حسابك أو كلمة المرور من قبل الإدارة.');
+        handleLogout(false);
+      } else {
+        loggedDelegate = updatedMe;
+        localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
+        if (typeof renderDelegateClientsList === 'function' && !document.getElementById('delegate-clients-modal').classList.contains('hidden')) {
+          renderDelegateClientsList();
+        }
+      }
+    }
+
+    if (typeof renderAdminDelegatesList === 'function') renderAdminDelegatesList();
+  }, err => {
+    console.error("خطأ في مزامنة المناديب الفورية:", err);
+  });
+
+  db.collection('invoices').onSnapshot(snapshot => {
+    invoices = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      if (data && data.id) {
+        invoices.push(data);
+      }
+    });
+    invoices.sort((a, b) => b.id.localeCompare(a.id));
+    localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
+    
+    const invoicesModal = document.getElementById('invoices-modal');
+    if (invoicesModal && !invoicesModal.classList.contains('hidden')) {
+      renderInvoicesList();
+    }
+  }, err => {
+    console.error("خطأ في مزامنة الفواتير:", err);
+  });
 }
 
-body {
-  background-color: var(--bg-surface);
-  color: var(--text-main);
-  height: 100vh;
-  height: 100dvh;
-  width: 100vw;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+// دالة التحديث اليدوي (الرفريش) المعدلة لجلب أحدث البيانات فوراً وإشعار المستخدم
+async function refreshAppData() {
+  try {
+    const btn = document.querySelector('header button[onclick="refreshAppData()"]');
+    if(btn) btn.innerText = "⏳ جاري التحديث...";
+
+    const [catSnap, prodSnap, custSnap, delSnap, invSnap] = await Promise.all([
+      db.collection('categories').get(),
+      db.collection('products').get(),
+      db.collection('customers').get(),
+      db.collection('delegates').get(),
+      db.collection('invoices').get()
+    ]);
+
+    categories = [{ id: 'all', name: 'جميع المنتجات' }];
+    catSnap.forEach(doc => {
+      const data = doc.data();
+      if (data && data.id && data.name && data.id !== 'all') categories.push(data);
+    });
+
+    products = [];
+    prodSnap.forEach(doc => {
+      const data = doc.data();
+      if (data && data.id) products.push(data);
+    });
+
+    customers = [];
+    custSnap.forEach(doc => {
+      const data = doc.data();
+      if (data && data.username) customers.push(data);
+    });
+
+    delegates = [];
+    delSnap.forEach(doc => {
+      const data = doc.data();
+      if (data && data.username) {
+        if(loggedDelegate && data.username === loggedDelegate.username) {
+          loggedDelegate = data;
+          localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
+        }
+        delegates.push(data);
+      }
+    });
+
+    invoices = [];
+    invSnap.forEach(doc => {
+      const data = doc.data();
+      if (data && data.id) invoices.push(data);
+    });
+    invoices.sort((a, b) => b.id.localeCompare(a.id));
+
+    localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
+    localStorage.setItem('mustaqbal_products', JSON.stringify(products));
+    localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
+    localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
+    localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
+
+    renderTabs();
+    renderProducts();
+    populateCategorySelect();
+    renderAdminCustomersList();
+    renderAdminDelegatesList();
+    if(!document.getElementById('cart-modal').classList.contains('hidden')) renderCartModal();
+    if(!document.getElementById('delegate-clients-modal').classList.contains('hidden')) renderDelegateClientsList();
+
+    if(btn) {
+      btn.innerText = "🔄 تم التحديث";
+      setTimeout(() => { btn.innerText = "🔄 تحديث"; }, 2000);
+    }
+  } catch (err) {
+    console.error("فشل التحديث اليدوي:", err);
+    alert("حدث خطأ أثناء الاتصال بالسحابة لتحديث البيانات.");
+    const btn = document.querySelector('header button[onclick="refreshAppData()"]');
+    if(btn) btn.innerText = "🔄 تحديث";
+  }
 }
 
-.app-viewport {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  background-color: var(--bg-surface);
+// دالة الحفظ اليدوي وإرسال التعديلات للسحابة
+async function saveData() {
+  categories = categories.filter(c => c && c.id && c.name && c.name !== 'undefined');
+  products = products.filter(p => p && p.id && p.name && p.name !== 'undefined');
+  customers = customers.filter(c => c && c.username && c.username !== 'undefined');
+  delegates = delegates.filter(d => d && d.username && d.username !== 'undefined');
+
+  localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
+  localStorage.setItem('mustaqbal_products', JSON.stringify(products));
+  localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
+  localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
+  localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
+
+  try {
+    for (let product of products) {
+      await db.collection('products').doc(String(product.id)).set(product);
+    }
+    for (let cat of categories) {
+      if (cat.id !== 'all') {
+        await db.collection('categories').doc(String(cat.id)).set(cat);
+      }
+    }
+    for (let cust of customers) {
+      await db.collection('customers').doc(String(cust.username)).set(cust);
+    }
+    for (let del of delegates) {
+      await db.collection('delegates').doc(String(del.username)).set(del);
+    }
+    for (let inv of invoices) {
+      await db.collection('invoices').doc(String(inv.id)).set(inv);
+    }
+  } catch (err) {
+    console.error("فشل الحفظ في السحابة:", err);
+  }
 }
 
-header {
-  background: var(--card-bg);
-  border-bottom: 1px solid var(--border-color);
-  padding: max(12px, env(safe-area-inset-top)) 16px 12px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.03);
-  z-index: 10;
-  flex-shrink: 0;
+function getCustomerProductPrice(productPrice) {
+  if (loggedCustomer && loggedCustomer.discount && Number(loggedCustomer.discount) > 0) {
+    const discountRate = Number(loggedCustomer.discount) / 100;
+    const discounted = productPrice - (productPrice * discountRate);
+    return Math.round(discounted);
+  }
+  return productPrice;
 }
 
-.logo-area {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+function formatPrice(amount) {
+  return Number(amount).toLocaleString('ar-IQ');
 }
 
-.logo-icon {
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  color: white;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.25);
+let categories = (JSON.parse(localStorage.getItem('mustaqbal_categories')) || [
+  { id: 'all', name: 'جميع المنتجات' },
+  { id: 'general', name: 'مواد عامة' },
+  { id: 'medical', name: 'مواد طبية' },
+  { id: 'cosmetics', name: 'مواد تجميل والشعر' },
+  { id: 'perfumes', name: 'العطور' },
+  { id: 'air_fresheners', name: 'المعطرات' },
+  { id: 'groceries', name: 'المواد الغذائية' },
+  { id: 'beverages', name: 'المشروبات الغازية والعصائر' }
+]).filter(c => c && c.id && c.name && c.name !== 'undefined');
+
+if (!categories.some(c => c.id === 'all')) {
+  categories.unshift({ id: 'all', name: 'جميع المنتجات' });
 }
 
-.logo-area h1 {
-  font-size: 1.15rem;
-  font-weight: 800;
-  color: var(--text-main);
-  letter-spacing: -0.3px;
+let products = (JSON.parse(localStorage.getItem('mustaqbal_products')) || [
+  { id: 1, name: 'سماعة لاسلكية (جملة)', category: 'general', price: 25000, desc: 'سماعة بلوتوث عالية الدقة', image: '' },
+  { id: 2, name: 'مادة طبية معقمة', category: 'medical', price: 15000, desc: 'معقم ومطهر أصلي', image: '' }
+]).filter(p => p && p.id && p.name && p.name !== 'undefined');
+
+let customers = (JSON.parse(localStorage.getItem('mustaqbal_customers')) || [
+  { username: 'cust1', password: '123', fullname: 'زبون تجريبي', discount: 0 }
+]).filter(c => c && c.username && c.username !== 'undefined');
+
+let delegates = (JSON.parse(localStorage.getItem('mustaqbal_delegates')) || []).filter(d => d && d.username && d.username !== 'undefined');
+
+let adminPassword = localStorage.getItem('mustaqbal_admin_pass') || '799673';
+let cart = JSON.parse(localStorage.getItem('mustaqbal_cart')) || [];
+let invoices = JSON.parse(localStorage.getItem('mustaqbal_invoices')) || [];
+let activeCategory = 'all';
+
+let isAdmin = localStorage.getItem('isAdmin') === 'true';
+let loggedCustomer = JSON.parse(localStorage.getItem('loggedCustomer')) || null;
+let loggedDelegate = JSON.parse(localStorage.getItem('loggedDelegate')) || null;
+let currentImageData = ""; 
+
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    const loaders = document.querySelectorAll('#loader, .loader, .spinner, .loading, [class*="loader"], [class*="spinner"]');
+    loaders.forEach(el => { el.style.display = 'none'; el.remove(); });
+
+    initRealtimeListeners();
+
+    checkInitialSessionState();
+    renderTabs();
+    renderProducts();
+    updateCartUI();
+    populateCategorySelect();
+    setupImageUploader();
+    renderAdminCustomersList();
+    renderAdminDelegatesList();
+  } catch (err) {
+    console.error(err);
+  }
+});
+
+function checkInitialSessionState() {
+  const displaySpan = document.getElementById('logged-user-display');
+  const logoutBtn = document.getElementById('logout-btn');
+  const loginSelectionBtn = document.getElementById('open-login-selection-btn');
+  const adminPanel = document.getElementById('admin-panel');
+  const adminTabCreator = document.getElementById('admin-tab-creator');
+  const mainSidebar = document.getElementById('main-sidebar');
+  const searchBarContainer = document.getElementById('search-bar-container');
+  const productsGrid = document.getElementById('products-grid');
+  const loggedOutWelcome = document.getElementById('logged-out-welcome');
+  const navInvoicesBtn = document.getElementById('nav-invoices-btn');
+  const navDelegatesClientsBtn = document.getElementById('nav-delegates-clients-btn');
+  const openCartBtn = document.getElementById('open-cart-btn');
+
+  const isLogged = isAdmin || loggedCustomer || loggedDelegate;
+
+  if (isLogged) {
+    if (logoutBtn) logoutBtn.classList.remove('hidden');
+    if (loginSelectionBtn) loginSelectionBtn.classList.add('hidden');
+    if (mainSidebar) mainSidebar.classList.remove('hidden');
+    if (searchBarContainer) searchBarContainer.classList.remove('hidden');
+    if (productsGrid) productsGrid.classList.remove('hidden');
+    if (loggedOutWelcome) loggedOutWelcome.classList.add('hidden');
+    if (navInvoicesBtn) navInvoicesBtn.classList.remove('hidden');
+
+    if (isAdmin) {
+      if (displaySpan) displaySpan.innerText = 'المدير';
+      if (adminPanel) adminPanel.classList.remove('hidden');
+      if (adminTabCreator) adminTabCreator.classList.remove('hidden');
+      if (openCartBtn) openCartBtn.classList.remove('hidden');
+      if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
+    } else if (loggedDelegate) {
+      if (displaySpan) displaySpan.innerText = `مندوب: ${loggedDelegate.fullname || loggedDelegate.username}`;
+      if (adminPanel) adminPanel.classList.add('hidden');
+      if (adminTabCreator) adminTabCreator.classList.add('hidden');
+      if (openCartBtn) openCartBtn.classList.remove('hidden');
+      if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.remove('hidden');
+    } else {
+      if (displaySpan && loggedCustomer) displaySpan.innerText = `${loggedCustomer.fullname || loggedCustomer.username}`;
+      if (adminPanel) adminPanel.classList.add('hidden');
+      if (adminTabCreator) adminTabCreator.classList.add('hidden');
+      if (openCartBtn) openCartBtn.classList.add('hidden');
+      if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
+      const custNameInput = document.getElementById('cust-name');
+      if (custNameInput && loggedCustomer) custNameInput.value = loggedCustomer.fullname || '';
+    }
+  } else {
+    if (displaySpan) displaySpan.innerText = '';
+    if (logoutBtn) logoutBtn.classList.add('hidden');
+    if (loginSelectionBtn) loginSelectionBtn.classList.remove('hidden');
+    if (mainSidebar) mainSidebar.classList.add('hidden');
+    if (searchBarContainer) searchBarContainer.classList.add('hidden');
+    if (adminPanel) adminPanel.classList.add('hidden');
+    if (adminTabCreator) adminTabCreator.classList.add('hidden');
+    if (productsGrid) productsGrid.classList.add('hidden');
+    if (loggedOutWelcome) loggedOutWelcome.classList.remove('hidden');
+
+    if (navInvoicesBtn) navInvoicesBtn.classList.add('hidden');
+    if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
+    if (openCartBtn) openCartBtn.classList.add('hidden');
+  }
 }
 
-.header-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+// نوافذ تسجيل الدخول
+function openLoginSelectionModal() { document.getElementById('login-selection-modal').classList.remove('hidden'); }
+function closeLoginSelectionModal() { document.getElementById('login-selection-modal').classList.add('hidden'); }
+
+function openCustomerLoginModal() { closeLoginSelectionModal(); document.getElementById('customer-login-modal').classList.remove('hidden'); }
+function closeCustomerLoginModal() { document.getElementById('customer-login-modal').classList.add('hidden'); }
+
+function openDelegateLoginModal() { closeLoginSelectionModal(); document.getElementById('delegate-login-modal').classList.remove('hidden'); }
+function closeDelegateLoginModal() { document.getElementById('delegate-login-modal').classList.add('hidden'); }
+
+function openAdminLoginModal() { closeLoginSelectionModal(); document.getElementById('admin-login-modal').classList.remove('hidden'); }
+function closeAdminLoginModal() { document.getElementById('admin-login-modal').classList.add('hidden'); }
+
+async function handleCustomerLogin(e) {
+  e.preventDefault();
+  const u = document.getElementById('cust-login-user').value.trim();
+  const p = document.getElementById('cust-login-pass').value.trim();
+
+  const found = customers.find(c => c && c.username === u && c.password === p);
+  if (found) {
+    if (found.activeDeviceId && found.activeDeviceId !== deviceId) {
+      alert('هذا الحساب مفتوح حالياً على جهاز أو متصفح آخر!');
+      return;
+    }
+
+    found.activeDeviceId = deviceId;
+    loggedCustomer = found;
+    loggedDelegate = null;
+    isAdmin = false;
+    
+    localStorage.setItem('loggedCustomer', JSON.stringify(loggedCustomer));
+    localStorage.removeItem('loggedDelegate');
+    localStorage.setItem('isAdmin', 'false');
+
+    try {
+      await db.collection('customers').doc(String(found.username)).update({ activeDeviceId: deviceId });
+    } catch (err) {
+      console.error(err);
+    }
+
+    closeCustomerLoginModal();
+    checkInitialSessionState();
+    renderTabs();
+    renderProducts();
+    updateCartUI();
+  } else {
+    alert('اسم المستخدم أو كلمة المرور غير صحيحة!');
+  }
 }
 
-.user-badge {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--primary-dark);
-  background: var(--primary-light);
-  padding: 4px 10px;
-  border-radius: 20px;
+async function handleDelegateLogin(e) {
+  e.preventDefault();
+  const u = document.getElementById('del-login-user').value.trim();
+  const p = document.getElementById('del-login-pass').value.trim();
+
+  const found = delegates.find(d => d && d.username === u && d.password === p);
+  if (found) {
+    loggedDelegate = found;
+    loggedCustomer = null;
+    isAdmin = false;
+
+    localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
+    localStorage.removeItem('loggedCustomer');
+    localStorage.setItem('isAdmin', 'false');
+
+    closeDelegateLoginModal();
+    checkInitialSessionState();
+    renderTabs();
+    renderProducts();
+    updateCartUI();
+  } else {
+    alert('اسم المستخدم أو كلمة المرور للمندوب غير صحيحة!');
+  }
 }
 
-.btn {
-  background: var(--primary);
-  color: white;
-  border: none;
-  padding: 8px 14px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+function handleAdminLogin(e) {
+  e.preventDefault();
+  const u = document.getElementById('admin-user-input').value.trim();
+  const p = document.getElementById('admin-pass-input').value.trim();
+
+  if (u === 'admin' && p === adminPassword) {
+    isAdmin = true;
+    loggedCustomer = null;
+    loggedDelegate = null;
+    localStorage.removeItem('loggedCustomer');
+    localStorage.removeItem('loggedDelegate');
+    localStorage.setItem('isAdmin', 'true');
+    closeAdminLoginModal();
+    checkInitialSessionState();
+    renderTabs();
+    renderProducts();
+    renderAdminCustomersList();
+    renderAdminDelegatesList();
+  } else {
+    alert('بيانات دخول المدير غير صحيحة!');
+  }
 }
 
-.btn:active {
-  transform: scale(0.96);
+async function handleLogout(updateCloud = true) {
+  if (updateCloud && loggedCustomer) {
+    try {
+      await db.collection('customers').doc(String(loggedCustomer.username)).update({
+        activeDeviceId: firebase.firestore.FieldValue.delete()
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  isAdmin = false;
+  loggedCustomer = null;
+  loggedDelegate = null;
+  localStorage.removeItem('loggedCustomer');
+  localStorage.removeItem('loggedDelegate');
+  localStorage.setItem('isAdmin', 'false');
+  checkInitialSessionState();
 }
 
-.btn-secondary {
-  background: #f1f5f9;
-  color: var(--text-main);
+function handleAdminPasswordChange(e) {
+  e.preventDefault();
+  const newPass = document.getElementById('new-admin-pass').value.trim();
+  if (newPass) {
+    adminPassword = newPass;
+    localStorage.setItem('mustaqbal_admin_pass', adminPassword);
+    alert('تم تغيير كلمة سر المدير بنجاح!');
+    document.getElementById('new-admin-pass').value = '';
+  }
 }
 
-.btn-danger {
-  background: #fef2f2;
-  color: var(--danger);
+// إدارة المناديب من قبل المدير
+async function handleDelegateMgmtSubmit(e) {
+  e.preventDefault();
+  const username = document.getElementById('new-del-username').value.trim();
+  const password = document.getElementById('new-del-password').value.trim();
+  const fullname = document.getElementById('new-del-fullname').value.trim();
+  const editFlag = document.getElementById('edit-del-username-flag').value;
+
+  if (!username) return;
+
+  if (editFlag) {
+    if (editFlag !== username) {
+      try { await db.collection('delegates').doc(String(editFlag)).delete(); } catch(err){}
+      delegates = delegates.filter(d => d.username !== editFlag);
+    }
+    const del = delegates.find(d => d.username === editFlag || d.username === username);
+    if (del) {
+      del.username = username;
+      del.password = password;
+      del.fullname = fullname;
+    } else {
+      delegates.push({ username, password, fullname, clients: [] });
+    }
+    await saveData();
+    renderAdminDelegatesList();
+    resetDelegateMgmtForm();
+    alert('تم تحديث حساب المندوب بنجاح.');
+  } else {
+    if (delegates.some(d => d.username === username)) {
+      alert('اسم المستخدم موجود مسبقاً.');
+      return;
+    }
+    delegates.push({ username, password, fullname, clients: [] });
+    await saveData();
+    renderAdminDelegatesList();
+    resetDelegateMgmtForm();
+    alert('تم إضافة حساب المندوب بنجاح.');
+  }
 }
 
-.main-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-bottom: calc(75px + var(--safe-bottom));
+function editDelegate(username) {
+  const del = delegates.find(d => d.username === username);
+  if (!del) return;
+  document.getElementById('edit-del-username-flag').value = del.username;
+  document.getElementById('new-del-username').value = del.username;
+  document.getElementById('new-del-password').value = del.password;
+  document.getElementById('new-del-fullname').value = del.fullname || '';
+  document.getElementById('save-delegate-btn').innerText = 'تحديث المندوب';
 }
 
-.search-box {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 4px 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
-  flex-shrink: 0;
+function resetDelegateMgmtForm() {
+  document.getElementById('delegate-mgmt-form').reset();
+  document.getElementById('edit-del-username-flag').value = '';
+  document.getElementById('save-delegate-btn').innerText = 'إضافة حساب مندوب';
 }
 
-.search-input {
-  border: none;
-  outline: none;
-  width: 100%;
-  padding: 8px 0;
-  font-size: 0.9rem;
-  background: transparent;
+function renderAdminDelegatesList() {
+  const container = document.getElementById('delegates-list-admin');
+  if (!container) return;
+  container.innerHTML = '';
+  if (delegates.length === 0) {
+    container.innerHTML = '<small style="color:var(--text-muted);">لا توجد حسابات مناديب مسجلة.</small>';
+    return;
+  }
+  delegates.forEach(del => {
+    const div = document.createElement('div');
+    div.style.cssText = 'display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.75rem;';
+    div.innerHTML = `
+      <div>${del.fullname} (${del.username})</div>
+      <div style="display: flex; gap: 4px;">
+        <button type="button" onclick="editDelegate('${del.username}')" style="background: #fef3c7; color: #d97706; border: none; padding: 3px 6px; border-radius: 4px; cursor: pointer;">تعديل</button>
+        <button type="button" onclick="deleteDelegate('${del.username}')" style="background: #fef2f2; color: #ef4444; border: none; padding: 3px 6px; border-radius: 4px; cursor: pointer;">حذف</button>
+      </div>
+    `;
+    container.appendChild(div);
+  });
 }
 
-.categories-bar {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 4px 0;
-  scrollbar-width: none;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 5;
+async function deleteDelegate(username) {
+  if (confirm('تأكيد حذف حساب المندوب؟')) {
+    delegates = delegates.filter(d => d.username !== username);
+    try { await db.collection('delegates').doc(String(username)).delete(); } catch(err){}
+    await saveData();
+    renderAdminDelegatesList();
+  }
 }
 
-.categories-bar::-webkit-scrollbar {
-  display: none;
+// واجهة إدارة زبائن المندوب (خاصة بحساب المندوب مع دعم البحث)
+function openDelegateClientsModal() {
+  const searchInput = document.getElementById('delegate-client-search-input');
+  if(searchInput) searchInput.value = '';
+  renderDelegateClientsList();
+  document.getElementById('delegate-clients-modal').classList.remove('hidden');
+}
+function closeDelegateClientsModal() {
+  document.getElementById('delegate-clients-modal').classList.add('hidden');
 }
 
-.category-chip {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+async function handleDelegateClientSubmit(e) {
+  e.preventDefault();
+  if (!loggedDelegate) return;
+
+  const nameInput = document.getElementById('client-name');
+  const phoneInput = document.getElementById('client-phone');
+  const addressInput = document.getElementById('client-address');
+  const editIdInput = document.getElementById('edit-client-id-flag');
+
+  const name = nameInput.value.trim();
+  const phone = phoneInput.value.trim();
+  const address = addressInput.value.trim();
+  const editId = editIdInput.value;
+
+  if (!loggedDelegate.clients) loggedDelegate.clients = [];
+
+  if (editId) {
+    const client = loggedDelegate.clients.find(c => String(c.id) === String(editId));
+    if (client) {
+      client.name = name;
+      client.phone = phone;
+      client.address = address;
+    }
+  } else {
+    loggedDelegate.clients.push({ id: Date.now(), name, phone, address });
+  }
+
+  localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
+
+  const delegateIndex = delegates.findIndex(d => d.username === loggedDelegate.username);
+  if (delegateIndex !== -1) {
+    delegates[delegateIndex] = loggedDelegate;
+    localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
+  }
+
+  try {
+    await db.collection('delegates').doc(String(loggedDelegate.username)).set(loggedDelegate);
+  } catch (err) {
+    console.error("خطأ أثناء مزامنة إضافة الزبون مع السحابة:", err);
+  }
+
+  renderDelegateClientsList();
+  
+  document.getElementById('delegate-client-form').reset();
+  editIdInput.value = '';
+  document.getElementById('save-client-btn').innerText = 'حفظ الزبون';
+  
+  alert('تم الإضافة بنجاح');
 }
 
-.category-chip.active {
-  background: var(--primary);
-  color: white;
-  border-color: var(--primary);
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+function renderDelegateClientsList() {
+  const container = document.getElementById('delegate-clients-list');
+  if (!container || !loggedDelegate) return;
+  container.innerHTML = '';
+  
+  let clients = loggedDelegate.clients || [];
+  
+  const searchInput = document.getElementById('delegate-client-search-input');
+  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  if (query) {
+    clients = clients.filter(c => 
+      (c.name && c.name.toLowerCase().includes(query)) || 
+      (c.phone && c.phone.toLowerCase().includes(query)) ||
+      (c.address && c.address.toLowerCase().includes(query))
+    );
+  }
+
+  if (clients.length === 0) {
+    container.innerHTML = '<small style="color:var(--text-muted); text-align:center;">لا توجد نتائج مطابقة لبيانات الزبائن.</small>';
+    return;
+  }
+
+  clients.forEach(c => {
+    const div = document.createElement('div');
+    div.style.cssText = 'background:#fff; padding:8px; border:1px solid var(--border-color); border-radius:6px; display:flex; justify-content:space-between; align-items:center; font-size:0.8rem;';
+    div.innerHTML = `
+      <div>
+        <strong>${c.name}</strong><br>
+        <span style="color:var(--text-muted);">هاتف: ${c.phone} | عنوان: ${c.address}</span>
+      </div>
+      <div style="display:flex; gap:4px;">
+        <button type="button" class="btn" style="padding:4px 8px; font-size:0.7rem;" onclick="editDelegateClient('${c.id}')">تعديل</button>
+        <button type="button" class="btn btn-danger" style="padding:4px 8px; font-size:0.7rem;" onclick="deleteDelegateClient('${c.id}')">حذف</button>
+      </div>
+    `;
+    container.appendChild(div);
+  });
 }
 
-.products-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+function editDelegateClient(id) {
+  if (!loggedDelegate || !loggedDelegate.clients) return;
+  const c = loggedDelegate.clients.find(item => String(item.id) === String(id));
+  if (!c) return;
+  document.getElementById('edit-client-id-flag').value = c.id;
+  document.getElementById('client-name').value = c.name;
+  document.getElementById('client-phone').value = c.phone;
+  document.getElementById('client-address').value = c.address;
+  document.getElementById('save-client-btn').innerText = 'تحديث الزبون';
 }
 
-.product-card {
-  background: var(--card-bg);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-  transition: transform 0.2s;
+async function deleteDelegateClient(id) {
+  if (!loggedDelegate || !loggedDelegate.clients) return;
+  
+  if (confirm('تأكيد حذف الزبون من قائمتك؟')) {
+    loggedDelegate.clients = loggedDelegate.clients.filter(c => String(c.id).trim() !== String(id).trim());
+    
+    localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
+    
+    const delegateIndex = delegates.findIndex(d => d.username === loggedDelegate.username);
+    if (delegateIndex !== -1) {
+      delegates[delegateIndex] = loggedDelegate;
+      localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
+    }
+
+    try {
+      await db.collection('delegates').doc(String(loggedDelegate.username)).set(loggedDelegate);
+    } catch (err) {
+      console.error("خطأ أثناء مزامنة الحذف مع السحابة:", err);
+    }
+    
+    renderDelegateClientsList();
+    
+    if (typeof prepareCartClientSelection === 'function') {
+      prepareCartClientSelection();
+    }
+  }
 }
 
-.product-image-wrap {
-  width: 100%;
-  height: 120px;
-  position: relative;
-  background: #f1f5f9;
+// الدوال الخاصة بنظام البحث التفاعلي لزبائن المندوب داخل السلة
+function prepareCartClientSelection() {
+  const wrap = document.getElementById('delegate-client-select-wrap');
+  const searchInput = document.getElementById('searchCustomerInput');
+  const dropdownResults = document.getElementById('customerDropdownResults');
+  
+  if (!wrap) return;
+
+  if (loggedDelegate && loggedDelegate.clients && loggedDelegate.clients.length > 0) {
+    wrap.classList.remove('hidden');
+    if (searchInput) searchInput.value = '';
+    if (dropdownResults) {
+      dropdownResults.style.display = 'none';
+      dropdownResults.innerHTML = '';
+    }
+  } else {
+    wrap.classList.add('hidden');
+  }
 }
 
-.product-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+function filterDelegateDropdown() {
+  const input = document.getElementById('searchCustomerInput');
+  const dropdownResults = document.getElementById('customerDropdownResults');
+  if (!input || !dropdownResults || !loggedDelegate || !loggedDelegate.clients) return;
+
+  const query = input.value.toLowerCase().trim();
+  dropdownResults.innerHTML = '';
+
+  if (query === '') {
+    dropdownResults.style.display = 'none';
+    return;
+  }
+
+  const filteredClients = loggedDelegate.clients.filter(c => 
+    (c.name && c.name.toLowerCase().includes(query)) || 
+    (c.phone && c.phone.toLowerCase().includes(query)) ||
+    (c.address && c.address.toLowerCase().includes(query))
+  );
+
+  if (filteredClients.length === 0) {
+    dropdownResults.style.display = 'block';
+    const li = document.createElement('li');
+    li.style.cssText = 'padding: 8px 12px; font-size: 0.75rem; color: var(--text-muted); text-align: center;';
+    li.innerText = 'لا توجد نتائج مطابقة';
+    dropdownResults.appendChild(li);
+    return;
+  }
+
+  dropdownResults.style.display = 'block';
+  filteredClients.forEach(c => {
+    const li = document.createElement('li');
+    li.style.cssText = 'padding: 8px 12px; font-size: 0.8rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;';
+    li.innerHTML = `<strong>${c.name}</strong> <span style="color:var(--text-muted); font-size:0.7rem;">(${c.phone})</span>`;
+    
+    li.onmouseover = () => li.style.background = '#f3f4f6';
+    li.onmouseout = () => li.style.background = '#fff';
+    
+    li.onclick = () => {
+      document.getElementById('cust-name').value = c.name || '';
+      document.getElementById('cust-phone').value = c.phone || '';
+      document.getElementById('cust-address').value = c.address || '';
+      input.value = c.name || '';
+      dropdownResults.style.display = 'none';
+    };
+
+    dropdownResults.appendChild(li);
+  });
 }
 
-.product-info {
-  padding: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
+// إدارة الزبائن الأساسية (للإدارة)
+async function handleCustomerMgmtSubmit(e) {
+  e.preventDefault();
+  const username = document.getElementById('new-cust-username').value.trim();
+  const password = document.getElementById('new-cust-password').value.trim();
+  const fullname = document.getElementById('new-cust-fullname').value.trim();
+  const discountInput = document.getElementById('new-cust-discount');
+  const discount = discountInput ? parseFloat(discountInput.value) || 0 : 0;
+  const editFlag = document.getElementById('edit-cust-username-flag').value;
+
+  if (!username) return;
+
+  if (editFlag) {
+    if (editFlag !== username) {
+      try { await db.collection('customers').doc(String(editFlag)).delete(); } catch(err){}
+      customers = customers.filter(c => c.username !== editFlag);
+    }
+    const cust = customers.find(c => c.username === editFlag || c.username === username);
+    if (cust) {
+      cust.username = username;
+      cust.password = password;
+      cust.fullname = fullname;
+      cust.discount = discount;
+    } else {
+      customers.push({ username, password, fullname, discount });
+    }
+    await saveData();
+    renderAdminCustomersList();
+    resetCustomerMgmtForm();
+    alert('تم تحديث حساب الزبون بنجاح.');
+  } else {
+    if (customers.some(c => c.username === username)) {
+      alert('اسم المستخدم موجود مسبقاً.');
+      return;
+    }
+    customers.push({ username, password, fullname, discount });
+    await saveData();
+    renderAdminCustomersList();
+    resetCustomerMgmtForm();
+    alert('تم إضافة حساب الزبون بنجاح.');
+  }
 }
 
-.product-title {
-  font-weight: 700;
-  font-size: 0.88rem;
-  line-height: 1.2;
-  color: var(--text-main);
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+function editCustomer(username) {
+  const cust = customers.find(c => c.username === username);
+  if (!cust) return;
+  document.getElementById('edit-cust-username-flag').value = cust.username;
+  document.getElementById('new-cust-username').value = cust.username;
+  document.getElementById('new-cust-password').value = cust.password;
+  document.getElementById('new-cust-fullname').value = cust.fullname || '';
+  document.getElementById('new-cust-discount').value = cust.discount || 0;
+  document.getElementById('save-customer-btn').innerText = 'تحديث الزبون';
 }
 
-.product-description {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  height: 2.2em;
+function resetCustomerMgmtForm() {
+  document.getElementById('customer-mgmt-form').reset();
+  document.getElementById('edit-cust-username-flag').value = '';
+  document.getElementById('save-customer-btn').innerText = 'إضافة حساب زبون';
 }
 
-.product-price {
-  font-weight: 800;
-  color: var(--primary-dark);
-  font-size: 0.95rem;
-  margin-top: auto;
+function renderAdminCustomersList() {
+  const listContainer = document.getElementById('customers-list-admin');
+  if (!listContainer) return;
+  listContainer.innerHTML = '';
+  if (customers.length === 0) {
+    listContainer.innerHTML = '<small style="color:var(--text-muted);">لا توجد حسابات زبائن مسجلة.</small>';
+    return;
+  }
+  customers.forEach(cust => {
+    const div = document.createElement('div');
+    div.style.cssText = 'display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.75rem;';
+    div.innerHTML = `
+      <div>${cust.fullname} (${cust.username}) - <span style="color: var(--success); font-weight: bold;">خصم: ${cust.discount || 0}%</span></div>
+      <div style="display: flex; gap: 4px;">
+        <button type="button" onclick="editCustomer('${cust.username}')" style="background: #fef3c7; color: #d97706; border: none; padding: 3px 6px; border-radius: 4px; cursor: pointer;">تعديل</button>
+        <button type="button" onclick="deleteCustomer('${cust.username}')" style="background: #fef2f2; color: #ef4444; border: none; padding: 3px 6px; border-radius: 4px; cursor: pointer;">حذف</button>
+      </div>
+    `;
+    listContainer.appendChild(div);
+  });
 }
 
-.add-btn {
-  background: var(--primary-light);
-  color: var(--primary-dark);
-  border: none;
-  padding: 8px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 0.8rem;
-  width: 100%;
-  margin-top: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+async function deleteCustomer(username) {
+  if (confirm('تأكيد حذف حساب الزبون؟')) {
+    customers = customers.filter(c => c.username !== username);
+    try { await db.collection('customers').doc(String(username)).delete(); } catch(err){}
+    await saveData();
+    renderAdminCustomersList();
+  }
 }
 
-.add-btn:active {
-  background: var(--primary);
-  color: white;
+function saveCart() { localStorage.setItem('mustaqbal_cart', JSON.stringify(cart)); }
+
+function setupImageUploader() {
+  const fileInput = document.getElementById('product-img-file');
+  if (fileInput) {
+    fileInput.addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (evt) {
+          const img = new Image();
+          img.onload = function () {
+            const canvas = document.createElement('canvas');
+            const maxDimension = 300;
+            let width = img.width;
+            let height = img.height;
+            if (width > height) {
+              if (width > maxDimension) { height = Math.round((height * maxDimension) / width); width = maxDimension; }
+            } else {
+              if (height > maxDimension) { width = Math.round((width * maxDimension) / height); height = maxDimension; }
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            currentImageData = canvas.toDataURL('image/jpeg', 0.7);
+          };
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
 }
 
-.card-admin-btns {
-  display: flex;
-  gap: 4px;
-  margin-top: 6px;
+function renderTabs() {
+  const tabsContainer = document.getElementById('vertical-tabs');
+  if (!tabsContainer) return;
+  tabsContainer.innerHTML = '';
+
+  if (!isAdmin && !loggedCustomer && !loggedDelegate) return;
+
+  categories.forEach(cat => {
+    const chip = document.createElement('div');
+    chip.className = `category-chip ${activeCategory === cat.id ? 'active' : ''}`;
+    chip.innerHTML = `
+      <span onclick="selectCategory('${cat.id}')">${cat.name}</span>
+      ${isAdmin && cat.id !== 'all' ? `
+        <span style="font-size:0.7rem; opacity:0.7;" onclick="editTab('${cat.id}')">✏️</span>
+        <span style="font-size:0.7rem; opacity:0.7;" onclick="deleteTab('${cat.id}')">🗑️</span>
+      ` : ''}
+    `;
+    tabsContainer.appendChild(chip);
+  });
 }
 
-.card-admin-btns button {
-  flex: 1;
-  padding: 4px;
-  font-size: 0.7rem;
-  border: none;
-  border-radius: 6px;
-  font-weight: 600;
+function selectCategory(catId) {
+  activeCategory = catId;
+  renderTabs();
+  renderProducts();
 }
 
-.edit-btn { background: #fef3c7; color: #d97706; }
-.delete-btn { background: #fef2f2; color: #ef4444; }
-
-.bottom-nav {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  border-top: 1px solid var(--border-color);
-  display: flex;
-  justify-content: space-around;
-  padding: 8px 12px calc(8px + var(--safe-bottom)) 12px;
-  z-index: 100;
+function populateCategorySelect() {
+  const select = document.getElementById('product-tab');
+  if (!select) return;
+  select.innerHTML = '';
+  categories.filter(c => c && c.id !== 'all').forEach(cat => {
+    const option = document.createElement('option');
+    option.value = cat.id;
+    option.innerText = cat.name;
+    select.appendChild(option);
+  });
 }
 
-.nav-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  font-weight: 600;
-  cursor: pointer;
-  position: relative;
+async function handleAddTab(e) {
+  e.preventDefault();
+  const input = document.getElementById('tab-name-input');
+  const name = input.value.trim();
+  if (!name) return;
+
+  const id = 'cat_' + Date.now();
+  categories.push({ id, name });
+  await saveData();
+  input.value = '';
+  renderTabs();
+  populateCategorySelect();
 }
 
-.nav-item.active {
-  color: var(--primary);
+async function editTab(catId) {
+  const cat = categories.find(c => c.id === catId);
+  if (!cat) return;
+  const newName = prompt('تعديل اسم القسم:', cat.name);
+  if (newName && newName.trim() !== '') {
+    cat.name = newName.trim();
+    await saveData();
+    renderTabs();
+    populateCategorySelect();
+  }
 }
 
-.nav-icon {
-  font-size: 1.25rem;
+async function deleteTab(catId) {
+  if (confirm('تأكيد حذف القسم وجميع منتجاته؟')) {
+    categories = categories.filter(c => c.id !== catId);
+    products = products.filter(p => p.category !== catId);
+    try { await db.collection('categories').doc(String(catId)).delete(); } catch(err){}
+    await saveData();
+    if (activeCategory === catId) activeCategory = 'all';
+    renderTabs();
+    populateCategorySelect();
+    renderProducts();
+  }
 }
 
-.cart-badge {
-  position: absolute;
-  top: -2px;
-  right: 12px;
-  background: var(--danger);
-  color: white;
-  font-size: 0.65rem;
-  font-weight: bold;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid white;
+async function handleProductSubmit(e) {
+  e.preventDefault();
+  const id = document.getElementById('product-id').value;
+  const name = document.getElementById('product-name').value.trim();
+  const category = document.getElementById('product-tab').value;
+  const price = parseFloat(document.getElementById('product-price').value);
+  const desc = document.getElementById('product-desc').value.trim();
+
+  if (!name) return;
+
+  if (id) {
+    const index = products.findIndex(p => p.id == id);
+    if (index !== -1) {
+      products[index] = {
+        id: Number(id),
+        name,
+        category,
+        price,
+        desc,
+        image: currentImageData || products[index].image
+      };
+    }
+  } else {
+    products.push({ id: Date.now(), name, category, price, desc, image: currentImageData || '' });
+  }
+
+  await saveData();
+  resetProductForm();
+  renderProducts();
+  alert('تم حفظ المنتج بنجاح!');
 }
 
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(4px);
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  z-index: 1000;
-  opacity: 1;
-  transition: opacity 0.2s ease;
+function editProduct(id) {
+  const product = products.find(p => p.id === id);
+  if (!product) return;
+  document.getElementById('product-id').value = product.id;
+  document.getElementById('product-name').value = product.name || '';
+  document.getElementById('product-tab').value = product.category || '';
+  document.getElementById('product-price').value = product.price || 0;
+  document.getElementById('product-desc').value = product.desc || '';
+  currentImageData = product.image || '';
+  document.getElementById('save-product-btn').innerText = 'تحديث المنتج';
 }
 
-.modal.hidden {
-  display: none;
-  opacity: 0;
+async function deleteProduct(id) {
+  if (confirm('تأكيد حذف المنتج؟')) {
+    products = products.filter(p => p.id !== id);
+    try { await db.collection('products').doc(String(id)).delete(); } catch(err){}
+    await saveData();
+    renderProducts();
+  }
 }
 
-.modal-content {
-  background: var(--card-bg);
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  width: 100%;
-  max-height: 88vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  padding-bottom: var(--safe-bottom);
+function resetProductForm() {
+  document.getElementById('product-form').reset();
+  document.getElementById('product-id').value = '';
+  currentImageData = "";
+  document.getElementById('save-product-btn').innerText = 'حفظ المنتج';
 }
 
-@keyframes slideUp {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+function renderProducts(itemsToRender = null) {
+  const grid = document.getElementById('products-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+
+  if (!isAdmin && !loggedCustomer && !loggedDelegate) return;
+
+  let list = itemsToRender || (activeCategory === 'all' ? products : products.filter(p => p.category === activeCategory));
+
+  if (!list || list.length === 0) {
+    grid.innerHTML = '<p style="padding:15px; color:var(--text-muted); grid-column: 1 / -1; font-size:0.85rem; text-align:center;">لا توجد منتجات متاحة.</p>';
+    return;
+  }
+
+  list.forEach(product => {
+    const card = document.createElement('div');
+    card.className = 'product-card';
+    const imgSrc = product.image || 'https://via.placeholder.com/220x140?text=لا+توجد+صورة';
+    const effectivePrice = getCustomerProductPrice(product.price || 0);
+
+    card.innerHTML = `
+      <div class="product-image-wrap">
+        <img src="${imgSrc}" alt="${product.name}" class="product-image">
+      </div>
+      <div class="product-info">
+        <div class="product-title">${product.name}</div>
+        <div class="product-description">${product.desc || ''}</div>
+        <div class="product-price">${formatPrice(effectivePrice)} د.ع</div>
+        <button class="add-btn" onclick="addToCart(${product.id})">إضافة للسلة 🛒</button>
+        ${isAdmin ? `
+          <div class="card-admin-btns">
+            <button class="edit-btn" onclick="editProduct(${product.id})">تعديل</button>
+            <button class="delete-btn" onclick="deleteProduct(${product.id})">حذف</button>
+          </div>
+        ` : ''}
+      </div>
+    `;
+    grid.appendChild(card);
+  });
 }
 
-.modal-header {
-  padding: 16px;
-  background: var(--card-bg);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--border-color);
+function handleSearch() {
+  const searchInput = document.getElementById('search-input');
+  if (!searchInput) return;
+  const query = searchInput.value.toLowerCase().trim();
+  const filtered = products.filter(p =>
+    p.name && (activeCategory === 'all' || p.category === activeCategory) &&
+    (p.name.toLowerCase().includes(query) || (p.desc && p.desc.toLowerCase().includes(query)))
+  );
+  renderProducts(filtered);
 }
 
-.modal-header h3 {
-  font-size: 1rem;
-  font-weight: 700;
+function addToCart(productId) {
+  const product = products.find(p => p.id === productId);
+  if (!product) return;
+
+  const effectivePrice = getCustomerProductPrice(product.price || 0);
+  const cartItem = cart.find(item => item.id === productId);
+  if (cartItem) {
+    cartItem.qty += 1;
+    cartItem.price = effectivePrice;
+  } else {
+    cart.push({ ...product, price: effectivePrice, qty: 1 });
+  }
+
+  saveCart();
+  updateCartUI();
 }
 
-.modal-body {
-  padding: 16px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+function updateQty(id, change) {
+  const item = cart.find(i => i.id === id);
+  if (!item) return;
+
+  item.qty += change;
+  if (item.qty <= 0) {
+    cart = cart.filter(i => i.id !== id);
+  }
+  saveCart();
+  updateCartUI();
+  renderCartModal();
 }
 
-.close-modal {
-  background: #f1f5f9;
-  border: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  font-size: 1rem;
-  cursor: pointer;
-  color: var(--text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+function removeFromCart(productId) {
+  cart = cart.filter(item => item.id !== productId);
+  saveCart();
+  updateCartUI();
+  renderCartModal();
 }
 
-.compact-input {
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  font-size: 0.9rem;
-  background: var(--bg-surface);
-  outline: none;
+function clearCart() {
+  if (cart.length === 0) return;
+  if (confirm('تأكيد إفراغ السلة؟')) {
+    cart = [];
+    saveCart();
+    updateCartUI();
+    renderCartModal();
+  }
 }
 
-.compact-input:focus {
-  border-color: var(--primary);
-  background: white;
+function updateCartUI() {
+  const totalItems = cart.reduce((acc, item) => acc + (item.qty || 0), 0);
+  const cartCountElem = document.getElementById('cart-count');
+  if (cartCountElem) cartCountElem.innerText = totalItems;
 }
 
-.admin-panel {
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+function openCartModal() {
+  prepareCartClientSelection();
+  const searchInput = document.getElementById('cart-search-input');
+  if(searchInput) searchInput.value = '';
+  renderCartModal();
+  document.getElementById('cart-modal').classList.remove('hidden');
 }
 
-.admin-panel h2 {
-  font-size: 0.95rem;
-  color: var(--primary-dark);
+function closeCartModal() {
+  document.getElementById('cart-modal').classList.add('hidden');
 }
 
-.form-row {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+function renderCartModal() {
+  const cartItemsContainer = document.getElementById('cart-items');
+  const clearBtn = document.getElementById('clear-cart-btn');
+  if (!cartItemsContainer) return;
+  
+  cartItemsContainer.innerHTML = '';
+  let total = 0;
+
+  const searchInput = document.getElementById('cart-search-input');
+  const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  let itemsToDisplay = cart;
+  if (query) {
+    itemsToDisplay = cart.filter(item => 
+      item.name.toLowerCase().includes(query) || 
+      (item.desc && item.desc.toLowerCase().includes(query))
+    );
+  }
+
+  if (cart.length === 0) {
+    cartItemsContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">السلة فارغة حالياً</p>';
+    document.getElementById('cart-total-price').innerText = '0';
+    if (clearBtn) clearBtn.style.display = 'none';
+    return;
+  }
+
+  if (clearBtn) clearBtn.style.display = 'inline-block';
+
+  if (itemsToDisplay.length === 0) {
+    cartItemsContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:10px; font-size:0.8rem;">لا توجد منتجات مطابقة للبحث داخل السلة</p>';
+    document.getElementById('cart-total-price').innerText = formatPrice(cart.reduce((acc, item) => acc + ((item.price || 0) * (item.qty || 0)), 0));
+    return;
+  }
+
+  itemsToDisplay.forEach(item => {
+    const itemTotal = (item.price || 0) * (item.qty || 0);
+    total += itemTotal;
+
+    const div = document.createElement('div');
+    div.className = 'cart-item';
+    div.innerHTML = `
+      <div>
+        <div style="font-weight:700; font-size:0.85rem;">${item.name}</div>
+        <div style="font-size:0.75rem; color:var(--text-muted);">${formatPrice(item.price)} × ${item.qty} = <strong>${formatPrice(itemTotal)} د.ع</strong></div>
+      </div>
+      <div class="qty-controls">
+        <button type="button" class="qty-btn" onclick="updateQty(${item.id}, -1)">-</button>
+        <span style="font-weight:bold; font-size:0.85rem;">${item.qty}</span>
+        <button type="button" class="qty-btn" onclick="updateQty(${item.id}, 1)">+</button>
+        <button type="button" style="background:none; border:none; cursor:pointer; color:var(--danger); font-size:0.9rem;" onclick="removeFromCart(${item.id})">🗑️</button>
+      </div>
+    `;
+    cartItemsContainer.appendChild(div);
+  });
+
+  const fullCartTotal = cart.reduce((acc, item) => acc + ((item.price || 0) * (item.qty || 0)), 0);
+  document.getElementById('cart-total-price').innerText = formatPrice(fullCartTotal);
 }
 
-.cart-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px;
-  background: var(--bg-surface);
-  border-radius: var(--radius-sm);
+async function handleCheckout(e) {
+  e.preventDefault();
+  if (cart.length === 0) {
+    alert('السلة فارغة!');
+    return;
+  }
+
+  const custName = document.getElementById('cust-name').value.trim();
+  const custPhone = document.getElementById('cust-phone').value.trim();
+  const custAddress = document.getElementById('cust-address').value.trim();
+
+  let accountSource = 'غير محدد';
+  if (loggedCustomer) accountSource = 'زبون: ' + loggedCustomer.username;
+  else if (loggedDelegate) accountSource = 'مندوب: ' + loggedDelegate.username;
+  else if (isAdmin) accountSource = 'المدير';
+
+  const totalAmount = cart.reduce((acc, item) => acc + ((item.price || 0) * (item.qty || 0)), 0);
+
+  const newInvoice = {
+    id: 'INV-' + Date.now(),
+    date: new Date().toLocaleString('ar-IQ'),
+    customer: { 
+      name: custName, 
+      phone: custPhone, 
+      address: custAddress, 
+      username: accountSource,
+      discountApplied: loggedCustomer ? loggedCustomer.discount : 0
+    },
+    items: [...cart],
+    total: totalAmount
+  };
+
+  invoices.unshift(newInvoice);
+  localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
+
+  try {
+    await db.collection('invoices').doc(String(newInvoice.id)).set(newInvoice);
+  } catch (err) {
+    console.error(err);
+  }
+
+  renderReceiptHTML(newInvoice);
+
+  cart = [];
+  saveCart();
+  updateCartUI();
+  document.getElementById('checkout-form').reset();
+  closeCartModal();
+  document.getElementById('receipt-modal').classList.remove('hidden');
 }
 
-.qty-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+function renderReceiptHTML(invoice) {
+  const area = document.getElementById('receipt-area');
+  if (!area) return;
+  
+  let itemsRows = invoice.items.map(i => `
+    <tr>
+      <td>${i.name}</td>
+      <td style="text-align:center;">${i.qty}</td>
+      <td style="text-align:left;">${formatPrice(i.price)}</td>
+      <td style="text-align:left;">${formatPrice(i.price * i.qty)}</td>
+    </tr>
+  `).join('');
+
+  area.innerHTML = `
+    <div class="receipt-header">
+      <h2 style="font-size:1.1rem; color:var(--primary-dark);">متجر المستقبل للجملة</h2>
+      <p style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">رقم: ${invoice.id} | التاريخ: ${invoice.date}</p>
+    </div>
+
+    <div style="font-size:0.8rem; margin-bottom:12px; line-height:1.6;">
+      <strong>الحساب/الجهة:</strong> ${invoice.customer.username}<br>
+      <strong>الزبون:</strong> ${invoice.customer.name}<br>
+      <strong>الهاتف:</strong> ${invoice.customer.phone}<br>
+      <strong>العنوان:</strong> ${invoice.customer.address}
+    </div>
+
+    <table class="receipt-table">
+      <thead>
+        <tr>
+          <th>المنتج</th>
+          <th style="text-align:center;">كمية</th>
+          <th style="text-align:left;">السعر</th>
+          <th style="text-align:left;">المجموع</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsRows}
+      </tbody>
+    </table>
+
+    <div class="receipt-total-box">
+      المجموع الكلي: ${formatPrice(invoice.total)} د.ع
+    </div>
+  `;
 }
 
-.qty-btn {
-  background: white;
-  border: 1px solid var(--border-color);
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: bold;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+function downloadInvoiceAsImage(invoiceElementId) {
+  const invoiceElement = document.getElementById(invoiceElementId);
+  if (!invoiceElement) return;
+
+  html2canvas(invoiceElement, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
+    const imageUrl = canvas.toDataURL("image/png");
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = 'invoice.png';
+    link.click();
+  });
 }
 
-.receipt-area {
-  background: #ffffff;
-  padding: 16px;
-  border: 1px dashed var(--border-color);
-  border-radius: var(--radius-md);
+function closeReceiptModal() { document.getElementById('receipt-modal').classList.add('hidden'); }
+
+function openInvoicesModal() {
+  renderInvoicesList();
+  document.getElementById('invoices-modal').classList.remove('hidden');
 }
 
-.receipt-header {
-  text-align: center;
-  margin-bottom: 12px;
-  border-bottom: 2px solid var(--bg-surface);
-  padding-bottom: 10px;
+function renderInvoicesList() {
+  const listContainer = document.getElementById('invoices-list');
+  const titleContainer = document.getElementById('invoices-modal-title');
+  if (!listContainer) return;
+
+  listContainer.innerHTML = '';
+  let visibleInvoices = invoices;
+
+  if (loggedCustomer) {
+    visibleInvoices = invoices.filter(inv => inv.customer && inv.customer.username.includes(loggedCustomer.username));
+    if (titleContainer) titleContainer.innerText = 'سجل فواتيري السابقة';
+  } else if (loggedDelegate) {
+    visibleInvoices = invoices.filter(inv => inv.customer && inv.customer.username.includes(loggedDelegate.username));
+    if (titleContainer) titleContainer.innerText = 'سجل فواتير الزبائن الخاصة بي';
+  } else if (isAdmin) {
+    if (titleContainer) titleContainer.innerText = 'سجل جميع الفواتير';
+  }
+
+  if (visibleInvoices.length === 0) {
+    listContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد فواتير مسجلة.</p>';
+    return;
+  }
+
+  visibleInvoices.forEach(inv => {
+    const div = document.createElement('div');
+    div.style.cssText = 'background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px; display:flex; justify-content:space-between; align-items:center; font-size:0.8rem;';
+    div.innerHTML = `
+      <div>
+        <div style="font-weight:700; color:var(--primary-dark);">فاتورة: ${inv.id}</div>
+        <div style="color:var(--text-muted); font-size:0.75rem;">الزبون: ${inv.customer.name} | التاريخ: ${inv.date}</div>
+        <div style="font-weight:bold; margin-top:2px;">المجموع: ${formatPrice(inv.total)} د.ع</div>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn" style="padding:6px 10px; font-size:0.75rem;" onclick="viewSavedInvoice('${inv.id}')">عرض 👁️</button>
+        ${isAdmin ? `<button class="btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteInvoice('${inv.id}')">حذف 🗑️</button>` : ''}
+      </div>
+    `;
+    listContainer.appendChild(div);
+  });
 }
 
-.receipt-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 12px;
-  font-size: 0.8rem;
+function viewSavedInvoice(invoiceId) {
+  const inv = invoices.find(i => i.id === invoiceId);
+  if (!inv) return;
+  closeInvoicesModal();
+  renderReceiptHTML(inv);
+  document.getElementById('receipt-modal').classList.remove('hidden');
 }
 
-.receipt-table th, .receipt-table td {
-  border: 1px solid var(--border-color);
-  padding: 6px 8px;
-  text-align: right;
+async function deleteInvoice(invoiceId) {
+  if (confirm('تأكيد حذف هذه الفاتورة؟')) {
+    invoices = invoices.filter(i => i.id !== invoiceId);
+    try { await db.collection('invoices').doc(String(invoiceId)).delete(); } catch(err){}
+    saveData();
+    renderInvoicesList();
+  }
 }
 
-.receipt-total-box {
-  text-align: left;
-  font-size: 0.95rem;
-  font-weight: 800;
-  color: var(--primary-dark);
-  background: var(--primary-light);
-  padding: 10px;
-  border-radius: var(--radius-sm);
-}
-
-.hidden { display: none !important; }
+function closeInvoicesModal() { document.getElementById('invoices-modal').classList.add('hidden'); }

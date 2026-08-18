@@ -44,7 +44,7 @@
       <div class="header-actions">
         <span id="logged-user-display" class="user-badge"></span>
         
-        <!-- زر تحديث البيانات اليدوي -->
+        <!-- زر تحديث البيانات اليدوي المعدل -->
         <button class="btn btn-secondary" onclick="refreshAppData()" style="padding: 6px 10px; font-size: 0.75rem; background: var(--success); color: #fff;" title="تحديث البيانات من السحابة">🔄 تحديث</button>
         
         <button class="btn btn-secondary hidden" id="logout-btn" onclick="handleLogout()" style="padding: 6px 10px; font-size: 0.75rem;">خروج</button>
@@ -234,7 +234,7 @@
       </div>
     </div>
 
-    <!-- نافذة إدارة زبائن المندوب (خاصة بحساب المندوب) -->
+    <!-- نافذة إدارة زبائن المندوب (خاصة بحساب المندوب مع شريط بحث) -->
     <div id="delegate-clients-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -242,6 +242,12 @@
           <button class="close-modal" onclick="closeDelegateClientsModal()">✕</button>
         </div>
         <div class="modal-body">
+          <!-- شريط بحث زبائن المندوب -->
+          <div class="search-box" style="margin-bottom: 4px;">
+            <span style="color: var(--text-muted);">🔍</span>
+            <input type="text" id="delegate-client-search-input" class="search-input" placeholder="ابحث عن اسم زبون أو هاتف..." oninput="renderDelegateClientsList()">
+          </div>
+
           <form id="delegate-client-form" onsubmit="handleDelegateClientSubmit(event)" class="form-row">
             <input type="hidden" id="edit-client-id-flag">
             <input type="text" id="client-name" placeholder="اسم الزبون / المحل" required class="compact-input">
@@ -255,7 +261,7 @@
       </div>
     </div>
 
-    <!-- نافذة سلة المشتريات وإتمام الطلب -->
+    <!-- نافذة سلة المشتريات وإتمام الطلب (مع نظام البحث التفاعلي الجديد للزبائن المحفوظين) -->
     <div id="cart-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -263,6 +269,12 @@
           <button class="close-modal" onclick="closeCartModal()">✕</button>
         </div>
         <div class="modal-body">
+          <!-- شريط بحث داخل السلة -->
+          <div class="search-box" style="margin-bottom: 4px;">
+            <span style="color: var(--text-muted);">🔍</span>
+            <input type="text" id="cart-search-input" class="search-input" placeholder="ابحث داخل السلة..." oninput="renderCartModal()">
+          </div>
+
           <div id="cart-items"></div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
@@ -274,18 +286,23 @@
 
           <hr style="border: 0; border-top: 1px solid var(--border-color);">
 
-          <h4 style="font-size: 0.85rem; color: var(--text-muted);">بيانات المستلم:</h4>
+          <!-- حقل اختيار زبائن المندوب المحفوظين مع قائمة منسدلة بحثية تفاعلية -->
           <div id="delegate-client-select-wrap" class="form-row hidden" style="margin-bottom: 8px;">
-            <label style="font-size: 0.75rem; color: var(--text-muted);">اختر من زبائني المحفوظين:</label>
-            <select id="selected-delegate-client" class="compact-input" onchange="fillDelegateClientData()">
-              <option value="">-- اختر زبون --</option>
-            </select>
+            <div class="customer-selection-container" style="position: relative;">
+              <label for="searchCustomerInput" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">اختر من زبائني المحفوظين:</label>
+              <input type="text" id="searchCustomerInput" placeholder="ابحث باسم الزبون..." class="compact-input" autocomplete="off" oninput="filterDelegateDropdown()">
+              
+              <!-- قائمة منسدلة تظهر النتائج المطابقة للبحث -->
+              <ul id="customerDropdownResults" class="dropdown-list" style="display: none; position: absolute; background: white; border: 1px solid var(--border-color); width: 100%; max-height: 150px; overflow-y: auto; z-index: 1000; list-style: none; padding: 0; margin: 0; border-radius: 0 0 6px 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
+              </ul>
+            </div>
           </div>
           
-          <form id="checkout-form" onsubmit="handleCheckout(event)" style="display: flex; flex-direction: column; gap: 8px;">
-            <input type="text" id="cust-name" placeholder="اسم الزبون / المحل" required class="compact-input">
+          <h4 style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">بيانات المستلم:</h4>
+          <form id="checkout-form" onsubmit="handleCheckout(event)" style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+            <input type="text" id="cust-name" placeholder="اسم الزبون" required class="compact-input">
             <input type="text" id="cust-phone" placeholder="رقم الهاتف" required class="compact-input">
-            <input type="text" id="cust-address" placeholder="العنوان بالتفصيل" required class="compact-input">
+            <input type="text" id="cust-address" placeholder="العنوان" required class="compact-input">
 
             <button type="submit" class="btn" style="background: var(--success); width: 100%; padding: 12px; margin-top: 4px;">تأكيد وإصدار الفاتورة 🧾</button>
           </form>
