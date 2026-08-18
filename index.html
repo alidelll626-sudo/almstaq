@@ -76,7 +76,7 @@
 
       <!-- لوحة التحكم للمدير -->
       <div id="admin-panel" class="admin-panel hidden">
-        <h2>لوحة إدارة المنتجات والزبائن</h2>
+        <h2>لوحة إدارة المنتجات والزبائن والمندوبين</h2>
         
         <form id="product-form" onsubmit="handleProductSubmit(event)" class="form-row">
           <input type="hidden" id="product-id">
@@ -103,6 +103,7 @@
 
         <hr style="border: 0; border-top: 1px solid var(--border-color);">
 
+        <!-- إدارة الزبائن -->
         <div>
           <h2 style="font-size: 0.85rem; margin-bottom: 6px;">إدارة حسابات الزبائن</h2>
           <form id="customer-mgmt-form" onsubmit="handleCustomerMgmtSubmit(event)" class="form-row">
@@ -114,6 +115,21 @@
             <button type="submit" class="btn" id="save-customer-btn">إضافة حساب زبون</button>
           </form>
           <div id="customers-list-admin" style="margin-top: 8px; display: flex; flex-direction: column; gap: 4px; max-height: 120px; overflow-y: auto;"></div>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid var(--border-color);">
+
+        <!-- إدارة المندوبين -->
+        <div>
+          <h2 style="font-size: 0.85rem; margin-bottom: 6px;">إدارة حسابات المناديب</h2>
+          <form id="delegate-mgmt-form" onsubmit="handleDelegateMgmtSubmit(event)" class="form-row">
+            <input type="hidden" id="edit-del-username-flag">
+            <input type="text" id="new-del-username" placeholder="اسم المستخدم للمندوب" required class="compact-input">
+            <input type="text" id="new-del-password" placeholder="كلمة المرور" required class="compact-input">
+            <input type="text" id="new-del-fullname" placeholder="اسم المندوب الكامل" required class="compact-input">
+            <button type="submit" class="btn" style="background: var(--accent);" id="save-delegate-btn">إضافة حساب مندوب</button>
+          </form>
+          <div id="delegates-list-admin" style="margin-top: 8px; display: flex; flex-direction: column; gap: 4px; max-height: 120px; overflow-y: auto;"></div>
         </div>
 
         <hr style="border: 0; border-top: 1px solid var(--border-color);">
@@ -146,6 +162,10 @@
         <span class="nav-icon">📄</span>
         <span>الفواتير</span>
       </button>
+      <button class="nav-item hidden" id="nav-delegates-clients-btn" onclick="openDelegateClientsModal()">
+        <span class="nav-icon">👥</span>
+        <span>زبائني</span>
+      </button>
     </nav>
 
     <!-- نافذة اختيار نوع تسجيل الدخول -->
@@ -157,6 +177,7 @@
         </div>
         <div class="modal-body" style="text-align: center; gap: 10px;">
           <button class="btn" style="width: 100%; padding: 12px;" onclick="openCustomerLoginModal()">دخول الزبائن 🛒</button>
+          <button class="btn" style="width: 100%; padding: 12px; background: var(--accent);" onclick="openDelegateLoginModal()">دخول المندوب 🛵</button>
           <button class="btn btn-secondary" style="width: 100%; padding: 12px;" onclick="openAdminLoginModal()">دخول المدير 🔒</button>
         </div>
       </div>
@@ -179,6 +200,23 @@
       </div>
     </div>
 
+    <!-- نافذة تسجيل دخول المندوب -->
+    <div id="delegate-login-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>تسجيل دخول المندوب</h3>
+          <button class="close-modal" onclick="closeDelegateLoginModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <form onsubmit="handleDelegateLogin(event)" style="display: flex; flex-direction: column; gap: 10px;">
+            <input type="text" id="del-login-user" placeholder="اسم المستخدم" required class="compact-input">
+            <input type="password" id="del-login-pass" placeholder="كلمة المرور" required class="compact-input">
+            <button type="submit" class="btn" style="width: 100%; padding: 12px; background: var(--accent);">دخول المندوب</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <!-- نافذة تسجيل دخول المدير -->
     <div id="admin-login-modal" class="modal hidden">
       <div class="modal-content">
@@ -196,7 +234,28 @@
       </div>
     </div>
 
-    <!-- نافذة سلة المشتريات -->
+    <!-- نافذة إدارة زبائن المندوب (خاصة بحساب المندوب) -->
+    <div id="delegate-clients-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>إدارة الزبائن الخاصين بالمندوب</h3>
+          <button class="close-modal" onclick="closeDelegateClientsModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <form id="delegate-client-form" onsubmit="handleDelegateClientSubmit(event)" class="form-row">
+            <input type="hidden" id="edit-client-id-flag">
+            <input type="text" id="client-name" placeholder="اسم الزبون / المحل" required class="compact-input">
+            <input type="text" id="client-phone" placeholder="رقم الهاتف" required class="compact-input">
+            <input type="text" id="client-address" placeholder="العنوان" required class="compact-input">
+            <button type="submit" class="btn" style="background: var(--accent);" id="save-client-btn">حفظ الزبون</button>
+          </form>
+          <hr style="border: 0; border-top: 1px solid var(--border-color);">
+          <div id="delegate-clients-list" style="display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- نافذة سلة المشتريات وإتمام الطلب -->
     <div id="cart-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -216,6 +275,13 @@
           <hr style="border: 0; border-top: 1px solid var(--border-color);">
 
           <h4 style="font-size: 0.85rem; color: var(--text-muted);">بيانات المستلم:</h4>
+          <div id="delegate-client-select-wrap" class="form-row hidden" style="margin-bottom: 8px;">
+            <label style="font-size: 0.75rem; color: var(--text-muted);">اختر من زبائني المحفوظين:</label>
+            <select id="selected-delegate-client" class="compact-input" onchange="fillDelegateClientData()">
+              <option value="">-- اختر زبون --</option>
+            </select>
+          </div>
+          
           <form id="checkout-form" onsubmit="handleCheckout(event)" style="display: flex; flex-direction: column; gap: 8px;">
             <input type="text" id="cust-name" placeholder="اسم الزبون / المحل" required class="compact-input">
             <input type="text" id="cust-phone" placeholder="رقم الهاتف" required class="compact-input">
