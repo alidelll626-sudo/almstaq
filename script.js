@@ -103,6 +103,7 @@ function initRealtimeListeners() {
     console.error("خطأ في مزامنة الزبائن الفورية:", err);
   });
 
+  // مزامنة حسابات المناديب مع فحص فتح الحساب من جهاز آخر حصراً
   db.collection('delegates').onSnapshot(snapshot => {
     delegates = [];
     snapshot.forEach(doc => {
@@ -116,8 +117,13 @@ function initRealtimeListeners() {
 
     if (loggedDelegate) {
       const updatedMe = delegates.find(d => d && d.username === loggedDelegate.username);
-      if (!updatedMe || updatedMe.password !== loggedDelegate.password) {
-        alert('تم تغيير بيانات حسابك أو كلمة المرور من قبل الإدارة.');
+      // فحص إذا تم تغيير كلمة المرور أو إذا فُتح الحساب من جهاز آخر مختلف
+      if (!updatedMe || updatedMe.password !== loggedDelegate.password || (updatedMe.activeDeviceId && updatedMe.activeDeviceId !== deviceId)) {
+        if (updatedMe && updatedMe.activeDeviceId && updatedMe.activeDeviceId !== deviceId) {
+          alert('تم تسجيل الدخول إلى حساب المندوب هذا من جهاز أو متصفح آخر! لا يمكن فتح الحساب في أكثر من مكان بنفس الوقت.');
+        } else {
+          alert('تم تغيير بيانات حسابك أو كلمة المرور من قبل الإدارة.');
+        }
         handleLogout(false);
       } else {
         loggedDelegate = updatedMe;
@@ -448,6 +454,7 @@ async function handleCustomerLogin(e) {
   }
 }
 
+// تسجيل دخول المندوب مع التحقق من عدم فتحه في جهاز آخر وحفظ الـ DeviceID
 async function handleDelegateLogin(e) {
   e.preventDefault();
   const u = document.getElementById('del-login-user').value.trim();
@@ -455,6 +462,13 @@ async function handleDelegateLogin(e) {
 
   const found = delegates.find(d => d && d.username === u && d.password === p);
   if (found) {
+    // التحقق إذا كان الحساب مسجل دخول مسبقاً في جهاز آخر ولم يسجل خروج
+    if (found.activeDeviceId && found.activeDeviceId !== deviceId) {
+      alert('عذراً، حساب هذا المندوب مفتوح حالياً على متصفح أو جهاز آخر! يجب تسجيل الخروج من الجهاز الآخر أولاً.');
+      return;
+    }
+
+    found.activeDeviceId = deviceId;
     loggedDelegate = found;
     loggedCustomer = null;
     isAdmin = false;
@@ -462,6 +476,12 @@ async function handleDelegateLogin(e) {
     localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
     localStorage.removeItem('loggedCustomer');
     localStorage.setItem('isAdmin', 'false');
+
+    try {
+      await db.collection('delegates').doc(String(found.username)).update({ activeDeviceId: deviceId });
+    } catch (err) {
+      console.error(err);
+    }
 
     closeDelegateLoginModal();
     checkInitialSessionState();
@@ -496,14 +516,25 @@ function handleAdminLogin(e) {
   }
 }
 
+// دالة تسجيل الخروج وحذف الـ activeDeviceId من قاعدة البيانات للسماح بفتحه لاحقاً
 async function handleLogout(updateCloud = true) {
-  if (updateCloud && loggedCustomer) {
-    try {
-      await db.collection('customers').doc(String(loggedCustomer.username)).update({
-        activeDeviceId: firebase.firestore.FieldValue.delete()
-      });
-    } catch (err) {
-      console.error(err);
+  if (updateCloud) {
+    if (loggedCustomer) {
+      try {
+        await db.collection('customers').doc(String(loggedCustomer.username)).update({
+          activeDeviceId: firebase.firestore.FieldValue.delete()
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    } else if (loggedDelegate) {
+      try {
+        await db.collection('delegates').doc(String(loggedDelegate.username)).update({
+          activeDeviceId: firebase.firestore.FieldValue.delete()
+        });
+      } catch (err) {
+        console.error(err);
+      }
     }
   }
 
@@ -559,7 +590,7 @@ async function handleDelegateMgmtSubmit(e) {
       alert('اسم المستخدم موجود مسبقاً.');
       return;
     }
-    delegates.push({ username, password, fullname, clients: [] });
+    delegates.push({ username, password, fullname, clients: [], activeDeviceId: null });
     await saveData();
     renderAdminDelegatesList();
     resetDelegateMgmtForm();
@@ -614,7 +645,7 @@ async function deleteDelegate(username) {
   }
 }
 
-// واجهة إدارة زبائن المندوب (خاصة بحساب المندوب مع دعم البحث)
+// واجهة إدارة زبائن المندوب
 function openDelegateClientsModal() {
   const searchInput = document.getElementById('delegate-client-search-input');
   if(searchInput) searchInput.value = '';
@@ -753,7 +784,6 @@ async function deleteDelegateClient(id) {
   }
 }
 
-// الدوال الخاصة بنظام البحث التفاعلي لزبائن المندوب داخل السلة
 function prepareCartClientSelection() {
   const wrap = document.getElementById('delegate-client-select-wrap');
   const searchInput = document.getElementById('searchCustomerInput');
