@@ -1,4 +1,4 @@
-// إعدادات اتصال Firebase الخاصة بمشروعك السحابي
+// إعدادات اتصال Firebase الخاصة بمشروعك السحابي[cite: 4]
 const firebaseConfig = {
   apiKey: "AIzaSyC60355aPCR1Ji6MRlyOXuYCEbjYTjZ9n0",
   authDomain: "al-mustaqbal-stor.firebaseapp.com",
@@ -9,16 +9,23 @@ const firebaseConfig = {
   measurementId: "G-0JTB3KDKV4"
 };
 
-// تهيئة الاتصال بقاعدة البيانات
+// تهيئة الاتصال بقاعدة البيانات[cite: 4]
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+
+// توليد معرف فريد للجهاز/المتصفح الحالي وحفظه محلياً
+let deviceId = localStorage.getItem('mustaqbal_device_id');
+if (!deviceId) {
+  deviceId = 'dev_' + Math.random().toString(36).substring(2) + Date.now();
+  localStorage.setItem('mustaqbal_device_id', deviceId);
+}
 
 // ----------------------------------------------------
 // نظام المزامنة والاتصال الحي الفوري (Realtime Sync)
 // ----------------------------------------------------
 
 function initRealtimeListeners() {
-  // 1. الاستماع لتغييرات الأقسام (التبويبات) فوراً
+  // 1. الاستماع لتغييرات الأقسام (التبويبات) فوراً[cite: 4]
   db.collection('categories').onSnapshot(snapshot => {
     categories = [];
     snapshot.forEach(doc => {
@@ -40,7 +47,7 @@ function initRealtimeListeners() {
     console.error("خطأ في مزامنة الأقسام الفورية:", err);
   });
 
-  // 2. الاستماع لتغييرات المنتجات فوراً (الأسعار، الأسماء، الإضافات، الحذف)
+  // 2. الاستماع لتغييرات المنتجات فوراً (الأسعار، الأسماء، الإضافات، الحذف)[cite: 4]
   db.collection('products').onSnapshot(snapshot => {
     products = [];
     snapshot.forEach(doc => {
@@ -64,7 +71,7 @@ function initRealtimeListeners() {
     console.error("خطأ في مزامنة المنتجات الفورية:", err);
   });
 
-  // 3. الاستماع لتغييرات الزبائن (الخصومات، الحسابات، وتغيير البيانات)
+  // 3. الاستماع لتغييرات الزبائن (مع مراقبة جهاز الدخول النشط لمنع الاستخدام المتعدد)[cite: 4]
   db.collection('customers').onSnapshot(snapshot => {
     customers = [];
     snapshot.forEach(doc => {
@@ -78,15 +85,17 @@ function initRealtimeListeners() {
 
     // فحص ما إذا كان الزبون مسجلاً دخوله حالياً
     if (loggedCustomer) {
-      // البحث عن النسخة المحدثة لهذا الزبون في قاعدة البيانات بناءً على هويته القديمة أو اسمه
       const updatedMe = customers.find(c => c && c.username === loggedCustomer.username || (c && c.fullname === loggedCustomer.fullname));
       
-      // إذا قام المدير بتغيير اسم المستخدم أو كلمة المرور أو حذف الحساب بالكامل
-      if (!updatedMe || (updatedMe.password !== loggedCustomer.password)) {
-        alert('تم تغيير بيانات حسابك أو كلمة المرور من قبل الإدارة، يرجى تسجيل الدخول من جديد.');
-        handleLogout();
+      // إذا تم حذف الحساب، تغيير كلمة المرور، أو فتح الحساب من جهاز آخر
+      if (!updatedMe || (updatedMe.password !== loggedCustomer.password) || (updatedMe.activeDeviceId && updatedMe.activeDeviceId !== deviceId)) {
+        if (updatedMe && updatedMe.activeDeviceId && updatedMe.activeDeviceId !== deviceId) {
+          alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر، سيتم إرجاعك للصفحة الرئيسية.');
+        } else {
+          alert('تم تغيير بيانات حسابك أو كلمة المرور من قبل الإدارة، يرجى تسجيل الدخول من جديد.');
+        }
+        handleLogout(false); // تسجيل خروج صامت بدون مسح السحابة لأن الجلسة استولى عليها جهاز آخر
       } else {
-        // إذا تغيرت الخصومات أو البيانات الأخرى فقط
         loggedCustomer = updatedMe;
         localStorage.setItem('loggedCustomer', JSON.stringify(loggedCustomer));
         if (typeof renderProducts === 'function') renderProducts();
@@ -98,7 +107,7 @@ function initRealtimeListeners() {
     console.error("خطأ في مزامنة الزبائن الفورية:", err);
   });
 
-  // 4. الاستماع للفواتير وضمان تحديثها لدى المدير والزبون فوراً
+  // 4. الاستماع للفواتير وضمان تحديثها لدى المدير والزبون فوراً[cite: 4]
   db.collection('invoices').onSnapshot(snapshot => {
     invoices = [];
     snapshot.forEach(doc => {
@@ -107,11 +116,9 @@ function initRealtimeListeners() {
         invoices.push(data);
       }
     });
-    // ترتيب الفواتير من الأحدث إلى الأقدم
     invoices.sort((a, b) => b.id.localeCompare(a.id));
     localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
     
-    // تحديث عرض قائمة الفواتير إذا كانت نافذة الفواتير مفتوحة
     const invoicesModal = document.getElementById('invoices-modal');
     if (invoicesModal && !invoicesModal.classList.contains('hidden')) {
       renderInvoicesList();
@@ -121,7 +128,7 @@ function initRealtimeListeners() {
   });
 }
 
-// دالة الحفظ اليدوي وإرسال التعديلات للسحابة
+// دالة الحفظ اليدوي وإرسال التعديلات للسحابة[cite: 4]
 async function saveData() {
   categories = categories.filter(c => c && c.id && c.name && c.name !== 'undefined');
   products = products.filter(p => p && p.id && p.name && p.name !== 'undefined');
@@ -217,7 +224,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const loaders = document.querySelectorAll('#loader, .loader, .spinner, .loading, [class*="loader"], [class*="spinner"]');
     loaders.forEach(el => { el.style.display = 'none'; el.remove(); });
 
-    // تشغيل نظام المزامنة والاتصال الحي الفوري
     initRealtimeListeners();
 
     checkInitialSessionState();
@@ -265,7 +271,7 @@ function checkInitialSessionState() {
       if (displaySpan && loggedCustomer) displaySpan.innerText = `${loggedCustomer.fullname || loggedCustomer.username}`;
       if (adminPanel) adminPanel.classList.add('hidden');
       if (adminTabCreator) adminTabCreator.classList.add('hidden');
-      if (openCartBtn) openCartBtn.classList.remove('hidden');
+      if (openCartBtn) openCartBtn.classList.add('hidden'); // إخفاء سلة الشراء للزبون بناءً على طلبك السابق أو إظهارها
       const custNameInput = document.getElementById('cust-name');
       if (custNameInput && loggedCustomer) custNameInput.value = loggedCustomer.fullname || '';
     }
@@ -308,17 +314,35 @@ function closeAdminLoginModal() {
   document.getElementById('admin-login-modal').classList.add('hidden');
 }
 
-function handleCustomerLogin(e) {
+async function handleCustomerLogin(e) {
   e.preventDefault();
   const u = document.getElementById('cust-login-user').value.trim();
   const p = document.getElementById('cust-login-pass').value.trim();
 
   const found = customers.find(c => c && c.username === u && c.password === p);
   if (found) {
+    // التحقق مما إذا كان الحساب مفتوحاً على جهاز آخر حالياً
+    if (found.activeDeviceId && found.activeDeviceId !== deviceId) {
+      alert('هذا الحساب مفتوح حالياً على جهاز أو متصفح آخر! يرجى تسجيل الخروج من الجهاز الآخر أولاً لتتمكن من فتحه هنا.');
+      return;
+    }
+
+    // ربط الحساب بمعرف الجهاز الحالي وتحديثه في السحابة
+    found.activeDeviceId = deviceId;
     loggedCustomer = found;
     isAdmin = false;
+    
     localStorage.setItem('loggedCustomer', JSON.stringify(loggedCustomer));
     localStorage.setItem('isAdmin', 'false');
+
+    try {
+      await db.collection('customers').doc(String(found.username)).update({
+        activeDeviceId: deviceId
+      });
+    } catch (err) {
+      console.error("خطأ في تحديث معرف الجلسة بالسحابة:", err);
+    }
+
     closeCustomerLoginModal();
     checkInitialSessionState();
     renderTabs();
@@ -351,7 +375,18 @@ function handleAdminLogin(e) {
   }
 }
 
-function handleLogout() {
+async function handleLogout(updateCloud = true) {
+  // تفريغ معرف الجهاز من قاعدة البيانات عند تسجيل الخروج ليتاح فتحه في مكان آخر
+  if (updateCloud && loggedCustomer) {
+    try {
+      await db.collection('customers').doc(String(loggedCustomer.username)).update({
+        activeDeviceId: firebase.firestore.FieldValue.delete()
+      });
+    } catch (err) {
+      console.error("فشل إزالة معرف الجلسة من السحابة:", err);
+    }
+  }
+
   isAdmin = false;
   loggedCustomer = null;
   localStorage.removeItem('loggedCustomer');
@@ -429,7 +464,6 @@ async function handleCustomerMgmtSubmit(e) {
   }
 
   if (editFlag) {
-    // إذا تم تغيير اسم المستخدم، يجب التأكد من حذف المستند القديم من سحابة فيربيس لتفادي بقائه بمعرف قديم
     if (editFlag !== username) {
       try {
         await db.collection('customers').doc(String(editFlag)).delete();
@@ -887,12 +921,10 @@ async function handleCheckout(e) {
     total: totalAmount
   };
 
-  // إضافة الفاتورة للقائمة المحلية وحفظها فوراً في سحابة فايربيس
   invoices.unshift(newInvoice);
   localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
 
   try {
-    // حفظ الفاتورة مباشرة في مجموعة invoices بـ Firestore
     await db.collection('invoices').doc(String(newInvoice.id)).set(newInvoice);
   } catch (err) {
     console.error("خطأ في حفظ الفاتورة بالسحابة:", err);
