@@ -103,7 +103,6 @@ function initRealtimeListeners() {
     console.error("خطأ في مزامنة الزبائن الفورية:", err);
   });
 
-  // مزامنة حسابات المناديب مع فحص فتح الحساب من جهاز آخر حصراً
   db.collection('delegates').onSnapshot(snapshot => {
     delegates = [];
     snapshot.forEach(doc => {
@@ -117,7 +116,6 @@ function initRealtimeListeners() {
 
     if (loggedDelegate) {
       const updatedMe = delegates.find(d => d && d.username === loggedDelegate.username);
-      // فحص إذا تم تغيير كلمة المرور أو إذا فُتح الحساب من جهاز آخر مختلف
       if (!updatedMe || updatedMe.password !== loggedDelegate.password || (updatedMe.activeDeviceId && updatedMe.activeDeviceId !== deviceId)) {
         if (updatedMe && updatedMe.activeDeviceId && updatedMe.activeDeviceId !== deviceId) {
           alert('تم تسجيل الدخول إلى حساب المندوب هذا من جهاز أو متصفح آخر! لا يمكن فتح الحساب في أكثر من مكان بنفس الوقت.');
@@ -236,9 +234,6 @@ async function refreshAppData() {
   }
 }
 
-// ==========================================
-// ⚡ دالة الحفظ المحلي
-// ==========================================
 function saveData() {
   categories = categories.filter(c => c && c.id && c.name && c.name !== 'undefined');
   products = products.filter(p => p && p.id && p.name && p.name !== 'undefined');
@@ -315,7 +310,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(hideLoaders, 500);
 
     initRealtimeListeners();
-
     checkInitialSessionState();
     renderTabs();
     renderProducts();
@@ -370,10 +364,7 @@ function checkInitialSessionState() {
       if (displaySpan && loggedCustomer) displaySpan.innerText = `${loggedCustomer.fullname || loggedCustomer.username}`;
       if (adminPanel) adminPanel.classList.add('hidden');
       if (adminTabCreator) adminTabCreator.classList.add('hidden');
-      
-      // 🟢 إظهار زر/أيقونة السلة للزبون بشكل مؤكد عند تسجيل الدخول
       if (openCartBtn) openCartBtn.classList.remove('hidden');
-      
       if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
       const custNameInput = document.getElementById('cust-name');
       if (custNameInput && loggedCustomer) custNameInput.value = loggedCustomer.fullname || '';
@@ -388,7 +379,6 @@ function checkInitialSessionState() {
     if (adminTabCreator) adminTabCreator.classList.add('hidden');
     if (productsGrid) productsGrid.classList.add('hidden');
     if (loggedOutWelcome) loggedOutWelcome.classList.remove('hidden');
-
     if (navInvoicesBtn) navInvoicesBtn.classList.add('hidden');
     if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
     if (openCartBtn) openCartBtn.classList.add('hidden');
@@ -397,13 +387,10 @@ function checkInitialSessionState() {
 
 function openLoginSelectionModal() { document.getElementById('login-selection-modal').classList.remove('hidden'); }
 function closeLoginSelectionModal() { document.getElementById('login-selection-modal').classList.add('hidden'); }
-
 function openCustomerLoginModal() { closeLoginSelectionModal(); document.getElementById('customer-login-modal').classList.remove('hidden'); }
 function closeCustomerLoginModal() { document.getElementById('customer-login-modal').classList.add('hidden'); }
-
 function openDelegateLoginModal() { closeLoginSelectionModal(); document.getElementById('delegate-login-modal').classList.remove('hidden'); }
 function closeDelegateLoginModal() { document.getElementById('delegate-login-modal').classList.add('hidden'); }
-
 function openAdminLoginModal() { closeLoginSelectionModal(); document.getElementById('admin-login-modal').classList.remove('hidden'); }
 function closeAdminLoginModal() { document.getElementById('admin-login-modal').classList.add('hidden'); }
 
@@ -418,7 +405,6 @@ async function handleCustomerLogin(e) {
       alert('هذا الحساب مفتوح حالياً على جهاز أو متصفح آخر!');
       return;
     }
-
     found.activeDeviceId = deviceId;
     loggedCustomer = found;
     loggedDelegate = null;
@@ -428,11 +414,7 @@ async function handleCustomerLogin(e) {
     localStorage.removeItem('loggedDelegate');
     localStorage.setItem('isAdmin', 'false');
 
-    try {
-      await db.collection('customers').doc(String(found.username)).update({ activeDeviceId: deviceId });
-    } catch (err) {
-      console.error(err);
-    }
+    try { await db.collection('customers').doc(String(found.username)).update({ activeDeviceId: deviceId }); } catch (err) {}
 
     closeCustomerLoginModal();
     checkInitialSessionState();
@@ -452,10 +434,9 @@ async function handleDelegateLogin(e) {
   const found = delegates.find(d => d && d.username === u && d.password === p);
   if (found) {
     if (found.activeDeviceId && found.activeDeviceId !== deviceId) {
-      alert('عذراً، حساب هذا المندوب مفتوح حالياً على متصفح أو جهاز آخر! يجب تسجيل الخروج من الجهاز الآخر أولاً.');
+      alert('عذراً، حساب هذا المندوب مفتوح حالياً على متصفح أو جهاز آخر!');
       return;
     }
-
     found.activeDeviceId = deviceId;
     loggedDelegate = found;
     loggedCustomer = null;
@@ -465,11 +446,7 @@ async function handleDelegateLogin(e) {
     localStorage.removeItem('loggedCustomer');
     localStorage.setItem('isAdmin', 'false');
 
-    try {
-      await db.collection('delegates').doc(String(found.username)).update({ activeDeviceId: deviceId });
-    } catch (err) {
-      console.error(err);
-    }
+    try { await db.collection('delegates').doc(String(found.username)).update({ activeDeviceId: deviceId }); } catch (err) {}
 
     closeDelegateLoginModal();
     checkInitialSessionState();
@@ -507,21 +484,9 @@ function handleAdminLogin(e) {
 async function handleLogout(updateCloud = true) {
   if (updateCloud) {
     if (loggedCustomer) {
-      try {
-        await db.collection('customers').doc(String(loggedCustomer.username)).update({
-          activeDeviceId: firebase.firestore.FieldValue.delete()
-        });
-      } catch (err) {
-        console.error(err);
-      }
+      try { await db.collection('customers').doc(String(loggedCustomer.username)).update({ activeDeviceId: firebase.firestore.FieldValue.delete() }); } catch (err) {}
     } else if (loggedDelegate) {
-      try {
-        await db.collection('delegates').doc(String(loggedDelegate.username)).update({
-          activeDeviceId: firebase.firestore.FieldValue.delete()
-        });
-      } catch (err) {
-        console.error(err);
-      }
+      try { await db.collection('delegates').doc(String(loggedDelegate.username)).update({ activeDeviceId: firebase.firestore.FieldValue.delete() }); } catch (err) {}
     }
   }
 
@@ -553,7 +518,6 @@ async function handleDelegateMgmtSubmit(e) {
   const editFlag = document.getElementById('edit-del-username-flag').value;
 
   if (!username) return;
-
   const delData = { username, password, fullname, clients: [], activeDeviceId: null };
 
   if (editFlag) {
@@ -586,9 +550,7 @@ async function handleDelegateMgmtSubmit(e) {
   try {
     await db.collection('delegates').doc(String(username)).set(delData);
     alert(editFlag ? 'تم تحديث حساب المندوب بنجاح.' : 'تم إضافة حساب المندوب بنجاح.');
-  } catch(err) {
-    console.error("خطأ أثناء الحفظ بالسحابة:", err);
-  }
+  } catch(err) {}
 }
 
 function editDelegate(username) {
@@ -677,25 +639,18 @@ async function handleDelegateClientSubmit(e) {
   }
 
   localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
-
   const delegateIndex = delegates.findIndex(d => d.username === loggedDelegate.username);
   if (delegateIndex !== -1) {
     delegates[delegateIndex] = loggedDelegate;
     localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
   }
 
-  try {
-    await db.collection('delegates').doc(String(loggedDelegate.username)).set(loggedDelegate);
-  } catch (err) {
-    console.error("خطأ أثناء مزامنة إضافة الزبون مع السحابة:", err);
-  }
+  try { await db.collection('delegates').doc(String(loggedDelegate.username)).set(loggedDelegate); } catch (err) {}
 
   renderDelegateClientsList();
-  
   document.getElementById('delegate-client-form').reset();
   editIdInput.value = '';
   document.getElementById('save-client-btn').innerText = 'حفظ الزبون';
-  
   alert('تم الإضافة بنجاح');
 }
 
@@ -705,7 +660,6 @@ function renderDelegateClientsList() {
   container.innerHTML = '';
   
   let clients = loggedDelegate.clients || [];
-  
   const searchInput = document.getElementById('delegate-client-search-input');
   const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
   if (query) {
@@ -751,10 +705,8 @@ function editDelegateClient(id) {
 
 async function deleteDelegateClient(id) {
   if (!loggedDelegate || !loggedDelegate.clients) return;
-  
   if (confirm('تأكيد حذف الزبون من قائمتك؟')) {
     loggedDelegate.clients = loggedDelegate.clients.filter(c => String(c.id).trim() !== String(id).trim());
-    
     localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
     
     const delegateIndex = delegates.findIndex(d => d.username === loggedDelegate.username);
@@ -762,18 +714,8 @@ async function deleteDelegateClient(id) {
       delegates[delegateIndex] = loggedDelegate;
       localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
     }
-
-    try {
-      await db.collection('delegates').doc(String(loggedDelegate.username)).set(loggedDelegate);
-    } catch (err) {
-      console.error("خطأ أثناء مزامنة الحذف مع السحابة:", err);
-    }
-    
+    try { await db.collection('delegates').doc(String(loggedDelegate.username)).set(loggedDelegate); } catch (err) {}
     renderDelegateClientsList();
-    
-    if (typeof prepareCartClientSelection === 'function') {
-      prepareCartClientSelection();
-    }
   }
 }
 
@@ -781,7 +723,6 @@ function prepareCartClientSelection() {
   const wrap = document.getElementById('delegate-client-select-wrap');
   const searchInput = document.getElementById('searchCustomerInput');
   const dropdownResults = document.getElementById('customerDropdownResults');
-  
   if (!wrap) return;
 
   if (loggedDelegate && loggedDelegate.clients && loggedDelegate.clients.length > 0) {
@@ -829,10 +770,6 @@ function filterDelegateDropdown() {
     const li = document.createElement('li');
     li.style.cssText = 'padding: 8px 12px; font-size: 0.8rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s;';
     li.innerHTML = `<strong>${c.name}</strong> <span style="color:var(--text-muted); font-size:0.7rem;">(${c.phone})</span>`;
-    
-    li.onmouseover = () => li.style.background = '#f3f4f6';
-    li.onmouseout = () => li.style.background = '#fff';
-    
     li.onclick = () => {
       document.getElementById('cust-name').value = c.name || '';
       document.getElementById('cust-phone').value = c.phone || '';
@@ -840,7 +777,6 @@ function filterDelegateDropdown() {
       input.value = c.name || '';
       dropdownResults.style.display = 'none';
     };
-
     dropdownResults.appendChild(li);
   });
 }
@@ -855,7 +791,6 @@ async function handleCustomerMgmtSubmit(e) {
   const editFlag = document.getElementById('edit-cust-username-flag').value;
 
   if (!username) return;
-
   const custData = { username, password, fullname, discount };
 
   if (editFlag) {
@@ -887,9 +822,7 @@ async function handleCustomerMgmtSubmit(e) {
   try {
     await db.collection('customers').doc(String(username)).set(custData);
     alert(editFlag ? 'تم تحديث حساب الزبون بنجاح.' : 'تم إضافة حساب الزبون بنجاح.');
-  } catch(err) {
-    console.error("خطأ أثناء الحفظ بالسحابة:", err);
-  }
+  } catch(err) {}
 }
 
 function editCustomer(username) {
@@ -979,7 +912,6 @@ function renderTabs() {
   const tabsContainer = document.getElementById('vertical-tabs');
   if (!tabsContainer) return;
   tabsContainer.innerHTML = '';
-
   if (!isAdmin && !loggedCustomer && !loggedDelegate) return;
 
   categories.forEach(cat => {
@@ -1026,12 +958,7 @@ async function handleAddTab(e) {
   input.value = '';
   renderTabs();
   populateCategorySelect();
-
-  try {
-    await db.collection('categories').doc(String(catData.id)).set(catData);
-  } catch(err) {
-    console.error("خطأ في حفظ القسم بالسحابة:", err);
-  }
+  try { await db.collection('categories').doc(String(catData.id)).set(catData); } catch(err){}
 }
 
 async function editTab(catId) {
@@ -1043,12 +970,7 @@ async function editTab(catId) {
     saveData();
     renderTabs();
     populateCategorySelect();
-
-    try {
-      await db.collection('categories').doc(String(catId)).set(cat);
-    } catch(err) {
-      console.error("خطأ في تحديث القسم بالسحابة:", err);
-    }
+    try { await db.collection('categories').doc(String(catId)).set(cat); } catch(err){}
   }
 }
 
@@ -1101,9 +1023,7 @@ async function handleProductSubmit(e) {
   try {
     await db.collection('products').doc(String(productData.id)).set(productData);
     alert('تم حفظ المنتج بنجاح!');
-  } catch (err) {
-    console.error("خطأ في حفظ المنتج بالسحابة:", err);
-  }
+  } catch (err) {}
 }
 
 function editProduct(id) {
@@ -1138,7 +1058,6 @@ function renderProducts(itemsToRender = null) {
   const grid = document.getElementById('products-grid');
   if (!grid) return;
   grid.innerHTML = '';
-
   if (!isAdmin && !loggedCustomer && !loggedDelegate) return;
 
   let list = itemsToRender || (activeCategory === 'all' ? products : products.filter(p => p.category === activeCategory));
@@ -1196,7 +1115,7 @@ function addToCart(productId) {
     cartItem.qty += 1;
     cartItem.price = effectivePrice;
   } else {
-    cart.push({ ...product, price: effectivePrice, qty: 1 });
+    cart.push({ ...product, price: effectivePrice, qty: 1, note: '' });
   }
 
   saveCart();
@@ -1214,6 +1133,14 @@ function updateQty(id, change) {
   saveCart();
   updateCartUI();
   renderCartModal();
+}
+
+function updateCartItemNote(id, val) {
+  const item = cart.find(i => i.id === id);
+  if (item) {
+    item.note = val;
+    saveCart();
+  }
 }
 
 function removeFromCart(productId) {
@@ -1265,7 +1192,8 @@ function renderCartModal() {
   if (query) {
     itemsToDisplay = cart.filter(item => 
       item.name.toLowerCase().includes(query) || 
-      (item.desc && item.desc.toLowerCase().includes(query))
+      (item.desc && item.desc.toLowerCase().includes(query)) ||
+      (item.note && item.note.toLowerCase().includes(query))
     );
   }
 
@@ -1290,16 +1218,22 @@ function renderCartModal() {
 
     const div = document.createElement('div');
     div.className = 'cart-item';
+    div.style.cssText = 'display:flex; flex-direction:column; gap:6px; padding:10px; background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border-color);';
     div.innerHTML = `
-      <div>
-        <div style="font-weight:700; font-size:0.85rem;">${item.name}</div>
-        <div style="font-size:0.75rem; color:var(--text-muted);">${formatPrice(item.price)} × ${item.qty} = <strong>${formatPrice(itemTotal)} د.ع</strong></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+        <div>
+          <div style="font-weight:700; font-size:0.85rem;">${item.name}</div>
+          <div style="font-size:0.75rem; color:var(--text-muted);">${formatPrice(item.price)} × ${item.qty} = <strong>${formatPrice(itemTotal)} د.ع</strong></div>
+        </div>
+        <div class="qty-controls">
+          <button type="button" class="qty-btn" onclick="updateQty(${item.id}, -1)">-</button>
+          <span style="font-weight:bold; font-size:0.85rem;">${item.qty}</span>
+          <button type="button" class="qty-btn" onclick="updateQty(${item.id}, 1)">+</button>
+          <button type="button" style="background:none; border:none; cursor:pointer; color:var(--danger); font-size:0.9rem;" onclick="removeFromCart(${item.id})">🗑️</button>
+        </div>
       </div>
-      <div class="qty-controls">
-        <button type="button" class="qty-btn" onclick="updateQty(${item.id}, -1)">-</button>
-        <span style="font-weight:bold; font-size:0.85rem;">${item.qty}</span>
-        <button type="button" class="qty-btn" onclick="updateQty(${item.id}, 1)">+</button>
-        <button type="button" style="background:none; border:none; cursor:pointer; color:var(--danger); font-size:0.9rem;" onclick="removeFromCart(${item.id})">🗑️</button>
+      <div>
+        <input type="text" class="compact-input" placeholder="ملاحظة حول هذا المنتج..." value="${item.note || ''}" oninput="updateCartItemNote(${item.id}, this.value)" style="font-size:0.75rem; padding:6px 10px;">
       </div>
     `;
     cartItemsContainer.appendChild(div);
@@ -1319,6 +1253,7 @@ async function handleCheckout(e) {
   const custName = document.getElementById('cust-name').value.trim();
   const custPhone = document.getElementById('cust-phone').value.trim();
   const custAddress = document.getElementById('cust-address').value.trim();
+  const generalNote = document.getElementById('general-invoice-note').value.trim();
 
   let accountSource = 'غير محدد';
   if (loggedCustomer) accountSource = 'زبون: ' + loggedCustomer.username;
@@ -1337,18 +1272,15 @@ async function handleCheckout(e) {
       username: accountSource,
       discountApplied: loggedCustomer ? loggedCustomer.discount : 0
     },
-    items: [...cart],
+    items: cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, note: i.note || '' })),
+    generalNote: generalNote,
     total: totalAmount
   };
 
   invoices.unshift(newInvoice);
   localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
 
-  try {
-    await db.collection('invoices').doc(String(newInvoice.id)).set(newInvoice);
-  } catch (err) {
-    console.error(err);
-  }
+  try { await db.collection('invoices').doc(String(newInvoice.id)).set(newInvoice); } catch (err) {}
 
   renderReceiptHTML(newInvoice);
 
@@ -1366,7 +1298,10 @@ function renderReceiptHTML(invoice) {
   
   let itemsRows = invoice.items.map(i => `
     <tr>
-      <td>${i.name}</td>
+      <td>
+        <strong>${i.name}</strong>
+        ${i.note ? `<div style="font-size:0.65rem; color:#d97706; margin-top:2px;">ملاحظة: ${i.note}</div>` : ''}
+      </td>
       <td style="text-align:center;">${i.qty}</td>
       <td style="text-align:left;">${formatPrice(i.price)}</td>
       <td style="text-align:left;">${formatPrice(i.price * i.qty)}</td>
@@ -1384,12 +1319,13 @@ function renderReceiptHTML(invoice) {
       <strong>الزبون:</strong> ${invoice.customer.name}<br>
       <strong>الهاتف:</strong> ${invoice.customer.phone}<br>
       <strong>العنوان:</strong> ${invoice.customer.address}
+      ${invoice.generalNote ? `<br><strong>ملاحظات عامة:</strong> <span style="color:#d97706;">${invoice.generalNote}</span>` : ''}
     </div>
 
     <table class="receipt-table">
       <thead>
         <tr>
-          <th>المنتج</th>
+          <th>المنتج والملاحظات</th>
           <th style="text-align:center;">كمية</th>
           <th style="text-align:left;">السعر</th>
           <th style="text-align:left;">المجموع</th>

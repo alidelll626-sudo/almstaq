@@ -227,7 +227,7 @@
     <div id="cart-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>سلة المشتريات</h3>
+          <h3>سلة المشتريات والملاحظات</h3>
           <button class="close-modal" onclick="closeCartModal()">✕</button>
         </div>
         <div class="modal-body">
@@ -256,11 +256,12 @@
             </div>
           </div>
           
-          <h4 style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">بيانات المستلم:</h4>
+          <h4 style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">بيانات المستلم والملاحظات:</h4>
           <form id="checkout-form" onsubmit="handleCheckout(event)" style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
             <input type="text" id="cust-name" placeholder="اسم الزبون" required class="compact-input">
             <input type="text" id="cust-phone" placeholder="رقم الهاتف" required class="compact-input">
             <input type="text" id="cust-address" placeholder="العنوان" required class="compact-input">
+            <textarea id="general-invoice-note" placeholder="ملاحظات عامة حول الفاتورة (اختياري)..." class="compact-input" style="resize: vertical; min-height: 50px;"></textarea>
             <button type="submit" class="btn" style="background: var(--success); width: 100%; padding: 12px; margin-top: 4px;">تأكيد وإصدار الفاتورة 🧾</button>
           </form>
         </div>
