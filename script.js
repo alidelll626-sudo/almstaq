@@ -159,7 +159,7 @@ function initRealtimeListeners() {
   });
 }
 
-// دالة التحديث اليدوي (الرفريش) المعدلة لجلب أحدث البيانات فوراً وإشعار المستخدم
+// دالة التحديث اليدوي (الرفريش)
 async function refreshAppData() {
   try {
     const btn = document.querySelector('header button[onclick="refreshAppData()"]');
@@ -236,8 +236,10 @@ async function refreshAppData() {
   }
 }
 
-// دالة الحفظ اليدوي وإرسال التعديلات للسحابة
-async function saveData() {
+// ==========================================
+// ⚡ دالة الحفظ المحلي
+// ==========================================
+function saveData() {
   categories = categories.filter(c => c && c.id && c.name && c.name !== 'undefined');
   products = products.filter(p => p && p.id && p.name && p.name !== 'undefined');
   customers = customers.filter(c => c && c.username && c.username !== 'undefined');
@@ -248,28 +250,6 @@ async function saveData() {
   localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
   localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
   localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
-
-  try {
-    for (let product of products) {
-      await db.collection('products').doc(String(product.id)).set(product);
-    }
-    for (let cat of categories) {
-      if (cat.id !== 'all') {
-        await db.collection('categories').doc(String(cat.id)).set(cat);
-      }
-    }
-    for (let cust of customers) {
-      await db.collection('customers').doc(String(cust.username)).set(cust);
-    }
-    for (let del of delegates) {
-      await db.collection('delegates').doc(String(del.username)).set(del);
-    }
-    for (let inv of invoices) {
-      await db.collection('invoices').doc(String(inv.id)).set(inv);
-    }
-  } catch (err) {
-    console.error("فشل الحفظ في السحابة:", err);
-  }
 }
 
 function getCustomerProductPrice(productPrice) {
@@ -323,8 +303,16 @@ let currentImageData = "";
 
 document.addEventListener('DOMContentLoaded', () => {
   try {
-    const loaders = document.querySelectorAll('#loader, .loader, .spinner, .loading, [class*="loader"], [class*="spinner"]');
-    loaders.forEach(el => { el.style.display = 'none'; el.remove(); });
+    const hideLoaders = () => {
+      const elements = document.querySelectorAll('#loader, .loader, .spinner, .loading, [class*="loader"], [class*="spinner"]');
+      elements.forEach(el => {
+        el.style.display = 'none';
+        el.remove();
+      });
+    };
+    hideLoaders();
+    setTimeout(hideLoaders, 100);
+    setTimeout(hideLoaders, 500);
 
     initRealtimeListeners();
 
@@ -404,7 +392,6 @@ function checkInitialSessionState() {
   }
 }
 
-// نوافذ تسجيل الدخول
 function openLoginSelectionModal() { document.getElementById('login-selection-modal').classList.remove('hidden'); }
 function closeLoginSelectionModal() { document.getElementById('login-selection-modal').classList.add('hidden'); }
 
@@ -454,7 +441,6 @@ async function handleCustomerLogin(e) {
   }
 }
 
-// تسجيل دخول المندوب مع التحقق من عدم فتحه في جهاز آخر وحفظ الـ DeviceID
 async function handleDelegateLogin(e) {
   e.preventDefault();
   const u = document.getElementById('del-login-user').value.trim();
@@ -462,7 +448,6 @@ async function handleDelegateLogin(e) {
 
   const found = delegates.find(d => d && d.username === u && d.password === p);
   if (found) {
-    // التحقق إذا كان الحساب مسجل دخول مسبقاً في جهاز آخر ولم يسجل خروج
     if (found.activeDeviceId && found.activeDeviceId !== deviceId) {
       alert('عذراً، حساب هذا المندوب مفتوح حالياً على متصفح أو جهاز آخر! يجب تسجيل الخروج من الجهاز الآخر أولاً.');
       return;
@@ -516,7 +501,6 @@ function handleAdminLogin(e) {
   }
 }
 
-// دالة تسجيل الخروج وحذف الـ activeDeviceId من قاعدة البيانات للسماح بفتحه لاحقاً
 async function handleLogout(updateCloud = true) {
   if (updateCloud) {
     if (loggedCustomer) {
@@ -558,7 +542,6 @@ function handleAdminPasswordChange(e) {
   }
 }
 
-// إدارة المناديب من قبل المدير
 async function handleDelegateMgmtSubmit(e) {
   e.preventDefault();
   const username = document.getElementById('new-del-username').value.trim();
@@ -567,6 +550,8 @@ async function handleDelegateMgmtSubmit(e) {
   const editFlag = document.getElementById('edit-del-username-flag').value;
 
   if (!username) return;
+
+  const delData = { username, password, fullname, clients: [], activeDeviceId: null };
 
   if (editFlag) {
     if (editFlag !== username) {
@@ -578,23 +563,28 @@ async function handleDelegateMgmtSubmit(e) {
       del.username = username;
       del.password = password;
       del.fullname = fullname;
+      delData.clients = del.clients || [];
+      delData.activeDeviceId = del.activeDeviceId || null;
     } else {
-      delegates.push({ username, password, fullname, clients: [] });
+      delegates.push(delData);
     }
-    await saveData();
-    renderAdminDelegatesList();
-    resetDelegateMgmtForm();
-    alert('تم تحديث حساب المندوب بنجاح.');
   } else {
     if (delegates.some(d => d.username === username)) {
       alert('اسم المستخدم موجود مسبقاً.');
       return;
     }
-    delegates.push({ username, password, fullname, clients: [], activeDeviceId: null });
-    await saveData();
-    renderAdminDelegatesList();
-    resetDelegateMgmtForm();
-    alert('تم إضافة حساب المندوب بنجاح.');
+    delegates.push(delData);
+  }
+
+  saveData();
+  renderAdminDelegatesList();
+  resetDelegateMgmtForm();
+
+  try {
+    await db.collection('delegates').doc(String(username)).set(delData);
+    alert(editFlag ? 'تم تحديث حساب المندوب بنجاح.' : 'تم إضافة حساب المندوب بنجاح.');
+  } catch(err) {
+    console.error("خطأ أثناء الحفظ بالسحابة:", err);
   }
 }
 
@@ -640,18 +630,18 @@ async function deleteDelegate(username) {
   if (confirm('تأكيد حذف حساب المندوب؟')) {
     delegates = delegates.filter(d => d.username !== username);
     try { await db.collection('delegates').doc(String(username)).delete(); } catch(err){}
-    await saveData();
+    saveData();
     renderAdminDelegatesList();
   }
 }
 
-// واجهة إدارة زبائن المندوب
 function openDelegateClientsModal() {
   const searchInput = document.getElementById('delegate-client-search-input');
   if(searchInput) searchInput.value = '';
   renderDelegateClientsList();
   document.getElementById('delegate-clients-modal').classList.remove('hidden');
 }
+
 function closeDelegateClientsModal() {
   document.getElementById('delegate-clients-modal').classList.add('hidden');
 }
@@ -852,7 +842,6 @@ function filterDelegateDropdown() {
   });
 }
 
-// إدارة الزبائن الأساسية (للإدارة)
 async function handleCustomerMgmtSubmit(e) {
   e.preventDefault();
   const username = document.getElementById('new-cust-username').value.trim();
@@ -863,6 +852,8 @@ async function handleCustomerMgmtSubmit(e) {
   const editFlag = document.getElementById('edit-cust-username-flag').value;
 
   if (!username) return;
+
+  const custData = { username, password, fullname, discount };
 
   if (editFlag) {
     if (editFlag !== username) {
@@ -876,22 +867,25 @@ async function handleCustomerMgmtSubmit(e) {
       cust.fullname = fullname;
       cust.discount = discount;
     } else {
-      customers.push({ username, password, fullname, discount });
+      customers.push(custData);
     }
-    await saveData();
-    renderAdminCustomersList();
-    resetCustomerMgmtForm();
-    alert('تم تحديث حساب الزبون بنجاح.');
   } else {
     if (customers.some(c => c.username === username)) {
       alert('اسم المستخدم موجود مسبقاً.');
       return;
     }
-    customers.push({ username, password, fullname, discount });
-    await saveData();
-    renderAdminCustomersList();
-    resetCustomerMgmtForm();
-    alert('تم إضافة حساب الزبون بنجاح.');
+    customers.push(custData);
+  }
+
+  saveData();
+  renderAdminCustomersList();
+  resetCustomerMgmtForm();
+
+  try {
+    await db.collection('customers').doc(String(username)).set(custData);
+    alert(editFlag ? 'تم تحديث حساب الزبون بنجاح.' : 'تم إضافة حساب الزبون بنجاح.');
+  } catch(err) {
+    console.error("خطأ أثناء الحفظ بالسحابة:", err);
   }
 }
 
@@ -938,7 +932,7 @@ async function deleteCustomer(username) {
   if (confirm('تأكيد حذف حساب الزبون؟')) {
     customers = customers.filter(c => c.username !== username);
     try { await db.collection('customers').doc(String(username)).delete(); } catch(err){}
-    await saveData();
+    saveData();
     renderAdminCustomersList();
   }
 }
@@ -1023,12 +1017,18 @@ async function handleAddTab(e) {
   const name = input.value.trim();
   if (!name) return;
 
-  const id = 'cat_' + Date.now();
-  categories.push({ id, name });
-  await saveData();
+  const catData = { id: 'cat_' + Date.now(), name };
+  categories.push(catData);
+  saveData();
   input.value = '';
   renderTabs();
   populateCategorySelect();
+
+  try {
+    await db.collection('categories').doc(String(catData.id)).set(catData);
+  } catch(err) {
+    console.error("خطأ في حفظ القسم بالسحابة:", err);
+  }
 }
 
 async function editTab(catId) {
@@ -1037,9 +1037,15 @@ async function editTab(catId) {
   const newName = prompt('تعديل اسم القسم:', cat.name);
   if (newName && newName.trim() !== '') {
     cat.name = newName.trim();
-    await saveData();
+    saveData();
     renderTabs();
     populateCategorySelect();
+
+    try {
+      await db.collection('categories').doc(String(catId)).set(cat);
+    } catch(err) {
+      console.error("خطأ في تحديث القسم بالسحابة:", err);
+    }
   }
 }
 
@@ -1048,7 +1054,7 @@ async function deleteTab(catId) {
     categories = categories.filter(c => c.id !== catId);
     products = products.filter(p => p.category !== catId);
     try { await db.collection('categories').doc(String(catId)).delete(); } catch(err){}
-    await saveData();
+    saveData();
     if (activeCategory === catId) activeCategory = 'all';
     renderTabs();
     populateCategorySelect();
@@ -1066,26 +1072,35 @@ async function handleProductSubmit(e) {
 
   if (!name) return;
 
+  const productData = {
+    id: id ? Number(id) : Date.now(),
+    name,
+    category,
+    price,
+    desc,
+    image: currentImageData || ''
+  };
+
   if (id) {
     const index = products.findIndex(p => p.id == id);
     if (index !== -1) {
-      products[index] = {
-        id: Number(id),
-        name,
-        category,
-        price,
-        desc,
-        image: currentImageData || products[index].image
-      };
+      if (!currentImageData) productData.image = products[index].image;
+      products[index] = productData;
     }
   } else {
-    products.push({ id: Date.now(), name, category, price, desc, image: currentImageData || '' });
+    products.push(productData);
   }
 
-  await saveData();
+  saveData();
   resetProductForm();
   renderProducts();
-  alert('تم حفظ المنتج بنجاح!');
+
+  try {
+    await db.collection('products').doc(String(productData.id)).set(productData);
+    alert('تم حفظ المنتج بنجاح!');
+  } catch (err) {
+    console.error("خطأ في حفظ المنتج بالسحابة:", err);
+  }
 }
 
 function editProduct(id) {
@@ -1104,7 +1119,7 @@ async function deleteProduct(id) {
   if (confirm('تأكيد حذف المنتج؟')) {
     products = products.filter(p => p.id !== id);
     try { await db.collection('products').doc(String(id)).delete(); } catch(err){}
-    await saveData();
+    saveData();
     renderProducts();
   }
 }

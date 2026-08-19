@@ -12,30 +12,13 @@
   <!-- مكتبة html2canvas لتحويل الفاتورة إلى صورة -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   
+  <!-- ملف التنسيقات الخارجية -->
   <link rel="stylesheet" href="style.css">
-  
-  <!-- سكريبت فوري لإخفاء أي دائرة تحميل أو مؤشر يعلق عند فتح التطبيق -->
-  <script>
-    window.addEventListener('DOMContentLoaded', () => {
-      const hideLoaders = () => {
-        const elements = document.querySelectorAll('#loader, .loader, .spinner, .loading, [class*="loader"], [class*="spinner"]');
-        elements.forEach(el => {
-          el.style.display = 'none';
-          el.remove();
-        });
-      };
-      hideLoaders();
-      setTimeout(hideLoaders, 100);
-      setTimeout(hideLoaders, 500);
-    });
-  </script>
 </head>
 <body>
 
-  <!-- حاوية شاشة التطبيق الكاملة -->
   <div class="app-viewport">
 
-    <!-- الهيدر العلوي -->
     <header>
       <div class="logo-area">
         <div class="logo-icon">🛍️</div>
@@ -43,19 +26,13 @@
       </div>
       <div class="header-actions">
         <span id="logged-user-display" class="user-badge"></span>
-        
-        <!-- زر تحديث البيانات اليدوي المعدل -->
         <button class="btn btn-secondary" onclick="refreshAppData()" style="padding: 6px 10px; font-size: 0.75rem; background: var(--success); color: #fff;" title="تحديث البيانات من السحابة">🔄 تحديث</button>
-        
         <button class="btn btn-secondary hidden" id="logout-btn" onclick="handleLogout()" style="padding: 6px 10px; font-size: 0.75rem;">خروج</button>
         <button class="btn" id="open-login-selection-btn" onclick="openLoginSelectionModal()">دخول 🔑</button>
       </div>
     </header>
 
-    <!-- المحتوى الأساسي -->
     <div class="main-container">
-      
-      <!-- شاشة الترحيب لغير المسجلين -->
       <div id="logged-out-welcome" style="background: white; border-radius: var(--radius-lg); padding: 35px 20px; text-align: center; display: flex; flex-direction: column; gap: 14px; align-items: center; margin-top: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.03);">
         <div style="width: 64px; height: 64px; background: var(--primary-light); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; color: var(--primary);">👤</div>
         <h2 style="color: var(--text-main); font-size: 1.2rem; font-weight: 800;">أهلاً بك في متجر المستقبل</h2>
@@ -63,18 +40,15 @@
         <button class="btn" style="width: 100%; padding: 12px; font-size: 0.95rem; margin-top: 10px;" onclick="openLoginSelectionModal()">تسجيل الدخول</button>
       </div>
 
-      <!-- شريط البحث -->
       <div class="search-box hidden" id="search-bar-container">
         <span style="color: var(--text-muted);">🔍</span>
         <input type="text" id="search-input" class="search-input" placeholder="ابحث عن منتج..." oninput="handleSearch()">
       </div>
 
-      <!-- الأقسام والتصنيفات (أفقي) -->
       <div class="categories-bar hidden" id="main-sidebar">
         <div id="vertical-tabs" style="display: flex; gap: 8px;"></div>
       </div>
 
-      <!-- لوحة التحكم للمدير -->
       <div id="admin-panel" class="admin-panel hidden">
         <h2>لوحة إدارة المنتجات والزبائن والمندوبين</h2>
         
@@ -103,7 +77,6 @@
 
         <hr style="border: 0; border-top: 1px solid var(--border-color);">
 
-        <!-- إدارة الزبائن -->
         <div>
           <h2 style="font-size: 0.85rem; margin-bottom: 6px;">إدارة حسابات الزبائن</h2>
           <form id="customer-mgmt-form" onsubmit="handleCustomerMgmtSubmit(event)" class="form-row">
@@ -119,7 +92,6 @@
 
         <hr style="border: 0; border-top: 1px solid var(--border-color);">
 
-        <!-- إدارة المندوبين -->
         <div>
           <h2 style="font-size: 0.85rem; margin-bottom: 6px;">إدارة حسابات المناديب</h2>
           <form id="delegate-mgmt-form" onsubmit="handleDelegateMgmtSubmit(event)" class="form-row">
@@ -143,11 +115,9 @@
         </div>
       </div>
 
-      <!-- شبكة المنتجات -->
       <div class="products-grid hidden" id="products-grid"></div>
     </div>
 
-    <!-- شريط التنقل السفلي للهواتف -->
     <nav class="bottom-nav">
       <button class="nav-item active" onclick="switchNavTab('store')">
         <span class="nav-icon">🏪</span>
@@ -168,7 +138,6 @@
       </button>
     </nav>
 
-    <!-- نافذة اختيار نوع تسجيل الدخول -->
     <div id="login-selection-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -183,7 +152,6 @@
       </div>
     </div>
 
-    <!-- نافذة تسجيل دخول الزبون -->
     <div id="customer-login-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -200,7 +168,6 @@
       </div>
     </div>
 
-    <!-- نافذة تسجيل دخول المندوب -->
     <div id="delegate-login-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -217,7 +184,6 @@
       </div>
     </div>
 
-    <!-- نافذة تسجيل دخول المدير -->
     <div id="admin-login-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -234,7 +200,6 @@
       </div>
     </div>
 
-    <!-- نافذة إدارة زبائن المندوب (خاصة بحساب المندوب مع شريط بحث) -->
     <div id="delegate-clients-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -242,12 +207,10 @@
           <button class="close-modal" onclick="closeDelegateClientsModal()">✕</button>
         </div>
         <div class="modal-body">
-          <!-- شريط بحث زبائن المندوب -->
           <div class="search-box" style="margin-bottom: 4px;">
             <span style="color: var(--text-muted);">🔍</span>
             <input type="text" id="delegate-client-search-input" class="search-input" placeholder="ابحث عن اسم زبون أو هاتف..." oninput="renderDelegateClientsList()">
           </div>
-
           <form id="delegate-client-form" onsubmit="handleDelegateClientSubmit(event)" class="form-row">
             <input type="hidden" id="edit-client-id-flag">
             <input type="text" id="client-name" placeholder="اسم الزبون / المحل" required class="compact-input">
@@ -261,7 +224,6 @@
       </div>
     </div>
 
-    <!-- نافذة سلة المشتريات وإتمام الطلب -->
     <div id="cart-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -269,7 +231,6 @@
           <button class="close-modal" onclick="closeCartModal()">✕</button>
         </div>
         <div class="modal-body">
-          <!-- شريط بحث داخل السلة -->
           <div class="search-box" style="margin-bottom: 4px;">
             <span style="color: var(--text-muted);">🔍</span>
             <input type="text" id="cart-search-input" class="search-input" placeholder="ابحث داخل السلة..." oninput="renderCartModal()">
@@ -286,13 +247,10 @@
 
           <hr style="border: 0; border-top: 1px solid var(--border-color);">
 
-          <!-- حقل اختيار زبائن المندوب المحفوظين مع قائمة منسدلة بحثية تفاعلية -->
           <div id="delegate-client-select-wrap" class="form-row hidden" style="margin-bottom: 8px;">
             <div class="customer-selection-container" style="position: relative;">
               <label for="searchCustomerInput" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 4px;">اختر من زبائني المحفوظين:</label>
               <input type="text" id="searchCustomerInput" placeholder="ابحث باسم الزبون..." class="compact-input" autocomplete="off" oninput="filterDelegateDropdown()">
-              
-              <!-- قائمة منسدلة تظهر النتائج المطابقة للبحث -->
               <ul id="customerDropdownResults" class="dropdown-list" style="display: none; position: absolute; background: white; border: 1px solid var(--border-color); width: 100%; max-height: 150px; overflow-y: auto; z-index: 1000; list-style: none; padding: 0; margin: 0; border-radius: 0 0 6px 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);">
               </ul>
             </div>
@@ -303,14 +261,12 @@
             <input type="text" id="cust-name" placeholder="اسم الزبون" required class="compact-input">
             <input type="text" id="cust-phone" placeholder="رقم الهاتف" required class="compact-input">
             <input type="text" id="cust-address" placeholder="العنوان" required class="compact-input">
-
             <button type="submit" class="btn" style="background: var(--success); width: 100%; padding: 12px; margin-top: 4px;">تأكيد وإصدار الفاتورة 🧾</button>
           </form>
         </div>
       </div>
     </div>
 
-    <!-- نافذة عرض الفاتورة -->
     <div id="receipt-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -327,7 +283,6 @@
       </div>
     </div>
 
-    <!-- نافذة سجل الفواتير -->
     <div id="invoices-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -340,6 +295,7 @@
 
   </div>
 
+  <!-- ملف البرمجة والتفاعلات الخارجية -->
   <script src="script.js"></script>
 </body>
 </html>
