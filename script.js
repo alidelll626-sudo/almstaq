@@ -370,7 +370,10 @@ function checkInitialSessionState() {
       if (displaySpan && loggedCustomer) displaySpan.innerText = `${loggedCustomer.fullname || loggedCustomer.username}`;
       if (adminPanel) adminPanel.classList.add('hidden');
       if (adminTabCreator) adminTabCreator.classList.add('hidden');
-      if (openCartBtn) openCartBtn.classList.add('hidden');
+      
+      // 🟢 إظهار زر/أيقونة السلة للزبون بشكل مؤكد عند تسجيل الدخول
+      if (openCartBtn) openCartBtn.classList.remove('hidden');
+      
       if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
       const custNameInput = document.getElementById('cust-name');
       if (custNameInput && loggedCustomer) custNameInput.value = loggedCustomer.fullname || '';
