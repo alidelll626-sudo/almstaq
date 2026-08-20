@@ -1084,13 +1084,15 @@
     }
 
     function ensureDefaultCategories() {
-      if (!categories.some(c => c.id === 'all')) {
-        categories.unshift({ id: 'all', name: 'جميع المنتجات' });
-      }
-      if (!categories.some(c => c.id === 'new_arrivals')) {
-        const allIndex = categories.findIndex(c => c.id === 'all');
-        categories.splice(allIndex + 1, 0, { id: 'new_arrivals', name: 'أُضيفت حديثاً' });
-      }
+      // 1. التأكد من وجود التبويبات الأساسية أو إنشائها
+      let allTab = categories.find(c => c.id === 'all') || { id: 'all', name: 'جميع المنتجات' };
+      let newArrivalsTab = categories.find(c => c.id === 'new_arrivals') || { id: 'new_arrivals', name: 'أُضيفت حديثاً' };
+
+      // 2. تصفية القائمة الحالية من التبويبات الثابتة لمنع التكرار
+      const otherCategories = categories.filter(c => c.id !== 'all' && c.id !== 'new_arrivals');
+
+      // 3. إعادة بناء القائمة بحيث يكون "جميع المنتجات" و "أُضيفت حديثاً" في المقدمة دائماً
+      categories = [allTab, newArrivalsTab, ...otherCategories];
     }
 
     function getCustomerProductPrice(productPrice) {
