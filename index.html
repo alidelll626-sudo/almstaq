@@ -716,10 +716,17 @@
         <span>السلة</span>
         <span class="cart-badge" id="cart-count">0</span>
       </button>
+      
+      <!-- الأيقونة المتغيرة حسب نوع المستخدم: الزبائن الأكثر نشاطاً للمدير، والفواتير السابقة للزبون والمندوب -->
       <button class="nav-item hidden" id="nav-active-customers-btn" onclick="openTopCustomersModal()">
         <span class="nav-icon">🔥</span>
         <span>الزبائن الأكثر نشاطاً</span>
       </button>
+      <button class="nav-item hidden" id="nav-invoices-btn" onclick="openInvoicesModal()">
+        <span class="nav-icon">📄</span>
+        <span>الفواتير السابقة</span>
+      </button>
+
       <button class="nav-item hidden" id="nav-delegates-clients-btn" onclick="openDelegateClientsModal()">
         <span class="nav-icon">👥</span>
         <span>زبائني</span>
@@ -1139,6 +1146,7 @@
       const productsGrid = document.getElementById('products-grid');
       const loggedOutWelcome = document.getElementById('logged-out-welcome');
       const navActiveCustomersBtn = document.getElementById('nav-active-customers-btn');
+      const navInvoicesBtn = document.getElementById('nav-invoices-btn');
       const navDelegatesClientsBtn = document.getElementById('nav-delegates-clients-btn');
       const openCartBtn = document.getElementById('open-cart-btn');
 
@@ -1151,25 +1159,30 @@
         if (searchBarContainer) searchBarContainer.classList.remove('hidden');
         if (productsGrid) productsGrid.classList.remove('hidden');
         if (loggedOutWelcome) loggedOutWelcome.classList.add('hidden');
-        if (navActiveCustomersBtn) navActiveCustomersBtn.classList.remove('hidden');
 
         if (isAdmin) {
           if (displaySpan) displaySpan.innerText = 'المدير';
           if (adminPanel) adminPanel.classList.remove('hidden');
           if (adminTabCreator) adminTabCreator.classList.remove('hidden');
           if (openCartBtn) openCartBtn.classList.add('hidden');
+          if (navActiveCustomersBtn) navActiveCustomersBtn.classList.remove('hidden'); // إبقاء أيقونة الزبائن الأكثر نشاطاً للمدير
+          if (navInvoicesBtn) navInvoicesBtn.classList.add('hidden'); // إخفاء الفواتير السابقة من شريط التصفح السفلي للمدير لوجودها في لوحة التحكم
           if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
         } else if (loggedDelegate) {
           if (displaySpan) displaySpan.innerText = `مندوب: ${loggedDelegate.fullname || loggedDelegate.username}`;
           if (adminPanel) adminPanel.classList.add('hidden');
           if (adminTabCreator) adminTabCreator.classList.add('hidden');
           if (openCartBtn) openCartBtn.classList.remove('hidden');
+          if (navActiveCustomersBtn) navActiveCustomersBtn.classList.add('hidden'); // إخفاء الزبائن الأكثر نشاطاً للمندوب
+          if (navInvoicesBtn) navInvoicesBtn.classList.remove('hidden'); // إظهار الفواتير السابقة للمندوب
           if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.remove('hidden');
         } else {
           if (displaySpan && loggedCustomer) displaySpan.innerText = `${loggedCustomer.fullname || loggedCustomer.username}`;
           if (adminPanel) adminPanel.classList.add('hidden');
           if (adminTabCreator) adminTabCreator.classList.add('hidden');
           if (openCartBtn) openCartBtn.classList.remove('hidden');
+          if (navActiveCustomersBtn) navActiveCustomersBtn.classList.add('hidden'); // إخفاء الزبائن الأكثر نشاطاً للزبون
+          if (navInvoicesBtn) navInvoicesBtn.classList.remove('hidden'); // إظهار الفواتير السابقة للزبون
           if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
         }
       } else {
@@ -1183,6 +1196,7 @@
         if (productsGrid) productsGrid.classList.add('hidden');
         if (loggedOutWelcome) loggedOutWelcome.classList.remove('hidden');
         if (navActiveCustomersBtn) navActiveCustomersBtn.classList.add('hidden');
+        if (navInvoicesBtn) navInvoicesBtn.classList.add('hidden');
         if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
         if (openCartBtn) openCartBtn.classList.add('hidden');
       }
@@ -1673,7 +1687,6 @@
         chip.className = `category-chip ${activeCategory === cat.id ? 'active' : ''}`;
         
         let moveButtonsHTML = '';
-        // السماح للمدير بتحريك الأقسام التي تقع بعد أول تبويبين (all و new_arrivals)
         if (isAdmin && index >= 2) {
           moveButtonsHTML = `
             <span style="font-size:0.7rem; cursor:pointer; opacity:0.8; margin-right:2px;" onclick="moveTab(${index}, -1)" title="تحريك لليمين">◀️</span>
@@ -1693,13 +1706,10 @@
       });
     }
 
-    // دالة تحريك التبويبات مع الحفاظ على بقاء جميع المنتجات وأضيفت حديثاً بالبداية
     async function moveTab(index, direction) {
       const targetIndex = index + direction;
-      // منع تحريك العناصر لتكون مكان الأول أو الثاني، أو الخروج عن الحدود
       if (targetIndex < 2 || targetIndex >= categories.length) return;
 
-      // تبديل الأماكن في مصفوفة الفئات
       const temp = categories[index];
       categories[index] = categories[targetIndex];
       categories[targetIndex] = temp;
@@ -1707,7 +1717,6 @@
       saveData();
       renderTabs();
 
-      // حفظ الترتيب الجديد في قاعدة البيانات (اختياري عبر تحديث الأقسام)
       try {
         for (let i = 0; i < categories.length; i++) {
           await db.collection('categories').doc(String(categories[i].id)).set(categories[i], { merge: true });
