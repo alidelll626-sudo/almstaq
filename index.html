@@ -717,7 +717,6 @@
         <span class="cart-badge" id="cart-count">0</span>
       </button>
       
-      <!-- الأيقونة المتغيرة حسب نوع المستخدم: الزبائن الأكثر نشاطاً للمدير، والفواتير السابقة للزبون والمندوب -->
       <button class="nav-item hidden" id="nav-active-customers-btn" onclick="openTopCustomersModal()">
         <span class="nav-icon">🔥</span>
         <span>الزبائن الأكثر نشاطاً</span>
@@ -939,7 +938,6 @@
             categories.push(data);
           }
         });
-        // ترتيب الأقسام بناءً على خاصية order إن وجدت لضمان ثبات الترتيب
         categories.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
         ensureDefaultCategories();
         localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
@@ -1709,21 +1707,17 @@
       });
     }
 
-    // دالة moveTab المحدثة باستخدام batch وسجل التسلسل (order)
     async function moveTab(index, direction) {
       const targetIndex = index + direction;
       if (targetIndex < 2 || targetIndex >= categories.length) return;
 
-      // تبديل الأماكن في المصفوفة المحلية
       const temp = categories[index];
       categories[index] = categories[targetIndex];
       categories[targetIndex] = temp;
 
-      // حفظ الترتيب الجديد محلياً
       saveData();
       renderTabs();
 
-      // حفظ الترتيب الجديد مع رقم تسلسلي (order) في قاعدة بيانات فايربيز لضمان بقائه عند الخروج والرجوع
       try {
         const batch = db.batch();
         categories.forEach((cat, idx) => {
@@ -2090,10 +2084,12 @@
       let accountSource = loggedCustomer ? 'زبون: ' + loggedCustomer.username : 'مندوب: ' + loggedDelegate.username;
       const totalAmount = currentCart.reduce((acc, item) => acc + ((item.price || 0) * (item.qty || 0)), 0);
 
+      // حفظ اسم المستخدم الخاص بالمندوب كـ delegateUsername بشكل منفصل لسهولة التصفية بدقة
       const newInvoice = {
         id: 'INV-' + Date.now(),
         date: new Date().toLocaleString('ar-IQ'),
         customer: { name: custName, phone: custPhone, address: custAddress, username: accountSource },
+        delegateUsername: loggedDelegate ? loggedDelegate.username : null,
         items: currentCart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, note: i.note || '' })),
         generalNote: generalNote,
         total: totalAmount
@@ -2174,20 +2170,25 @@
       document.getElementById('invoices-modal').classList.remove('hidden');
     }
 
+    // تم تحديث الدالة لضمان فصل فواتير المناديب وعدم التداخل بين حساباتهم
     function renderInvoicesList() {
       const listContainer = document.getElementById('invoices-list');
       const titleContainer = document.getElementById('invoices-modal-title');
       if (!listContainer) return;
       listContainer.innerHTML = '';
       
-      let visibleInvoices = invoices;
+      let visibleInvoices = [];
       if (loggedCustomer) {
-        visibleInvoices = invoices.filter(inv => inv.customer && inv.customer.username.includes(loggedCustomer.username));
+        visibleInvoices = invoices.filter(inv => inv.customer && inv.customer.username === 'زبون: ' + loggedCustomer.username);
         if (titleContainer) titleContainer.innerText = 'سجل فواتيري السابقة';
       } else if (loggedDelegate) {
-        visibleInvoices = invoices.filter(inv => inv.customer && inv.customer.username.includes(loggedDelegate.username));
+        visibleInvoices = invoices.filter(inv => 
+          inv.delegateUsername === loggedDelegate.username || 
+          (inv.customer && inv.customer.username === 'مندوب: ' + loggedDelegate.username)
+        );
         if (titleContainer) titleContainer.innerText = 'سجل فواتير الزبائن الخاصة بي';
       } else if (isAdmin) {
+        visibleInvoices = invoices;
         if (titleContainer) titleContainer.innerText = 'سجل جميع الفواتير السابقة للزبائن والمندوبين';
       }
 
@@ -2245,7 +2246,7 @@
     function renderTopCustomersList() {
       const container = document.getElementById('top-customers-list');
       if (!container) return;
-      container.innerHTML = ';';
+      container.innerHTML = '';
 
       const statsMap = {};
       invoices.forEach(inv => {
