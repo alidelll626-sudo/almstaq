@@ -481,7 +481,7 @@
 
     .admin-dashboard-cards {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: 10px;
       margin-bottom: 10px;
     }
@@ -490,11 +490,11 @@
       background: var(--primary-light);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
-      padding: 16px 10px;
+      padding: 14px 8px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       cursor: pointer;
       transition: all 0.2s ease;
       text-align: center;
@@ -505,11 +505,11 @@
     }
 
     .admin-card-btn span:first-child {
-      font-size: 1.8rem;
+      font-size: 1.6rem;
     }
 
     .admin-card-btn span:last-child {
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       font-weight: 700;
       color: var(--primary-dark);
     }
@@ -649,7 +649,7 @@
         <div id="vertical-tabs" style="display: flex; gap: 8px;"></div>
       </div>
 
-      <!-- واجهة المدير الرئيسية بالأيقونات الثلاث -->
+      <!-- واجهة المدير الرئيسية بالأيقونات الاربع -->
       <div id="admin-panel" class="admin-panel hidden">
         <h2>لوحة تحكم المدير</h2>
         
@@ -665,6 +665,10 @@
           <div class="admin-card-btn" onclick="openInvoicesModal()">
             <span>📄</span>
             <span>الفواتير السابقة</span>
+          </div>
+          <div class="admin-card-btn" onclick="openProductStatsModal()">
+            <span>📊</span>
+            <span>إحصائيات المنتجات</span>
           </div>
         </div>
 
@@ -904,6 +908,23 @@
       </div>
     </div>
 
+    <!-- نافذة إحصائيات المنتجات للمدير (فاتورة إجمالي الطلبات) -->
+    <div id="product-stats-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>فاتورة إحصائيات المنتجات المطلوبة</h3>
+          <button class="close-modal" onclick="closeProductStatsModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="product-stats-receipt-area" class="receipt-area"></div>
+          <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px;">
+            <button class="btn btn-secondary" onclick="closeProductStatsModal()">إغلاق</button>
+            <button class="btn" style="background: var(--success);" onclick="downloadInvoiceAsImage('product-stats-receipt-area')">📥 حفظ الفاتورة كصورة</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- سكربتات التطبيق والمنطق (JavaScript) المدمجة -->
@@ -1015,6 +1036,10 @@
         if (topCustomersModal && !topCustomersModal.classList.contains('hidden')) {
           renderTopCustomersList();
         }
+        const productStatsModal = document.getElementById('product-stats-modal');
+        if (productStatsModal && !productStatsModal.classList.contains('hidden')) {
+          renderProductStatsReceipt();
+        }
       });
     }
 
@@ -1028,13 +1053,11 @@
         activeSessionUnsubscribe = db.collection('customers').doc(String(loggedCustomer.username)).onSnapshot(doc => {
           if (doc.exists) {
             const data = doc.data();
-            // 1. التحقق من الدخول من جهاز آخر
             if (data.deviceId && data.deviceId !== deviceId) {
               alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر!');
               handleLogout();
               return;
             }
-            // 2. التحقق من تغير بيانات الحساب (كلمة السر أو نسبة الخصم أو الاسم)
             if (
               data.password !== loggedCustomer.password || 
               data.discount !== loggedCustomer.discount || 
@@ -1045,7 +1068,6 @@
               return;
             }
           } else {
-            // في حال تم حذف الحساب
             alert('تم حذف هذا الحساب من قبل إدارة المتجر.');
             handleLogout();
           }
@@ -1054,13 +1076,11 @@
         activeSessionUnsubscribe = db.collection('delegates').doc(String(loggedDelegate.username)).onSnapshot(doc => {
           if (doc.exists) {
             const data = doc.data();
-            // 1. التحقق من الدخول من جهاز آخر
             if (data.deviceId && data.deviceId !== deviceId) {
               alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر!');
               handleLogout();
               return;
             }
-            // 2. التحقق من تغير بيانات المندوب (كلمة السر أو الاسم)
             if (
               data.password !== loggedDelegate.password || 
               data.fullname !== loggedDelegate.fullname
@@ -1070,7 +1090,6 @@
               return;
             }
           } else {
-            // في حال تم حذف الحساب
             alert('تم حذف هذا الحساب من قبل إدارة المتجر.');
             handleLogout();
           }
@@ -1290,7 +1309,6 @@
         return;
       }
 
-      // التحقق من المناديب
       try {
         const delDoc = await db.collection('delegates').doc(u).get();
         if (delDoc.exists) {
@@ -1317,7 +1335,6 @@
         console.error("خطأ أثناء تسجيل الدخول كـ مندوب:", err);
       }
 
-      // التحقق من الزبائن
       try {
         const custDoc = await db.collection('customers').doc(u).get();
         if (custDoc.exists) {
@@ -1410,7 +1427,6 @@
           if (oldDel.deviceId) existingDeviceId = oldDel.deviceId;
         }
         delegates = delegates.filter(d => d.username !== editFlag);
-        // في حال تم تغيير اسم المستخدم القديم نحدف المستند القديم
         if (editFlag !== username) {
           try { await db.collection('delegates').doc(String(editFlag)).delete(); } catch(err){}
         }
@@ -1671,7 +1687,6 @@
         const oldCust = customers.find(c => c.username === editFlag);
         if (oldCust && oldCust.deviceId) existingDeviceId = oldCust.deviceId;
         customers = customers.filter(c => c.username !== editFlag);
-        // في حال تم تغيير اسم المستخدم القديم نحدف المستند القديم
         if (editFlag !== username) {
           try { await db.collection('customers').doc(String(editFlag)).delete(); } catch(err){}
         }
@@ -2410,6 +2425,86 @@
         `;
         container.appendChild(div);
       });
+    }
+
+    /* --- وظائف إحصائيات المنتجات للمدير --- */
+    function openProductStatsModal() {
+      renderProductStatsReceipt();
+      document.getElementById('product-stats-modal').classList.remove('hidden');
+    }
+
+    function closeProductStatsModal() {
+      document.getElementById('product-stats-modal').classList.add('hidden');
+    }
+
+    function renderProductStatsReceipt() {
+      const area = document.getElementById('product-stats-receipt-area');
+      if (!area) return;
+
+      const productTotalsMap = {};
+      let overallQuantity = 0;
+
+      invoices.forEach(inv => {
+        if (inv.items && Array.isArray(inv.items)) {
+          inv.items.forEach(item => {
+            const pName = item.name ? item.name.trim() : 'منتج غير معروف';
+            const qty = Number(item.qty) || 0;
+            if (!productTotalsMap[pName]) {
+              productTotalsMap[pName] = 0;
+            }
+            productTotalsMap[pName] += qty;
+            overallQuantity += qty;
+          });
+        }
+      });
+
+      const itemsList = Object.keys(productTotalsMap).map(pName => ({
+        name: pName,
+        totalQty: productTotalsMap[pName]
+      }));
+
+      itemsList.sort((a, b) => b.totalQty - a.totalQty);
+
+      if (itemsList.length === 0) {
+        area.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد أي طلبات سابقة للمنتجات حتى الآن.</p>';
+        return;
+      }
+
+      let rowsHTML = itemsList.map((item, index) => `
+        <tr>
+          <td style="text-align:center; width: 40px;">${index + 1}</td>
+          <td><strong>${item.name}</strong></td>
+          <td style="text-align:center; font-weight: bold; color: var(--primary-dark); font-size: 0.9rem;">${formatPrice(item.totalQty)}</td>
+        </tr>
+      `).join('');
+
+      const currentDate = new Date().toLocaleString('ar-IQ');
+
+      area.innerHTML = `
+        <div class="receipt-header">
+          <h2 style="font-size:1.1rem; color:var(--primary-dark);">متجر المستقبل للجملة</h2>
+          <h3 style="font-size:0.9rem; color:var(--text-main); margin-top:4px;">فاتورة الإحصائيات الشاملة للمنتجات المطلوبة</h3>
+          <p style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">التاريخ: ${currentDate}</p>
+        </div>
+        <div style="font-size:0.8rem; margin-bottom:12px; line-height:1.6; background: var(--primary-light); padding: 8px; border-radius: var(--radius-sm);">
+          <strong>جهة التقرير:</strong> إدارة المتجر<br>
+          <strong>إجمالي الفواتير المحللة:</strong> ${invoices.length} فاتورة
+        </div>
+        <table class="receipt-table">
+          <thead>
+            <tr>
+              <th style="text-align:center; width: 40px;">#</th>
+              <th>اسم المنتج</th>
+              <th style="text-align:center;">العدد الكلي المطلوب</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHTML}</tbody>
+        </table>
+        <div class="receipt-total-box" style="display: flex; justify-content: space-between; align-items: center;">
+          <span>إجمالي القطع والكميات المطلوبة:</span>
+          <span>${formatPrice(overallQuantity)} قطعة</span>
+        </div>
+      `;
     }
   </script>
 </body>
