@@ -939,6 +939,8 @@
             categories.push(data);
           }
         });
+        // ترتيب الأقسام بناءً على خاصية order إن وجدت لضمان ثبات الترتيب
+        categories.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
         ensureDefaultCategories();
         localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
         if (typeof renderTabs === 'function') renderTabs();
@@ -1031,6 +1033,7 @@
 
         categories = [];
         catSnap.forEach(doc => { if (doc.data().id) categories.push(doc.data()); });
+        categories.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
         ensureDefaultCategories();
 
         products = [];
@@ -1080,8 +1083,8 @@
     }
 
     function ensureDefaultCategories() {
-      let allTab = categories.find(c => c.id === 'all') || { id: 'all', name: 'جميع المنتجات' };
-      let newArrivalsTab = categories.find(c => c.id === 'new_arrivals') || { id: 'new_arrivals', name: 'أُضيفت حديثاً' };
+      let allTab = categories.find(c => c.id === 'all') || { id: 'all', name: 'جميع المنتجات', order: 0 };
+      let newArrivalsTab = categories.find(c => c.id === 'new_arrivals') || { id: 'new_arrivals', name: 'أُضيفت حديثاً', order: 1 };
       const otherCategories = categories.filter(c => c.id !== 'all' && c.id !== 'new_arrivals');
       categories = [allTab, newArrivalsTab, ...otherCategories];
     }
@@ -1099,10 +1102,10 @@
     }
 
     let categories = JSON.parse(localStorage.getItem('mustaqbal_categories')) || [
-      { id: 'all', name: 'جميع المنتجات' },
-      { id: 'new_arrivals', name: 'أُضيفت حديثاً' },
-      { id: 'general', name: 'مواد عامة' },
-      { id: 'medical', name: 'مواد طبية' }
+      { id: 'all', name: 'جميع المنتجات', order: 0 },
+      { id: 'new_arrivals', name: 'أُضيفت حديثاً', order: 1 },
+      { id: 'general', name: 'مواد عامة', order: 2 },
+      { id: 'medical', name: 'مواد طبية', order: 3 }
     ];
     ensureDefaultCategories();
 
@@ -1165,24 +1168,24 @@
           if (adminPanel) adminPanel.classList.remove('hidden');
           if (adminTabCreator) adminTabCreator.classList.remove('hidden');
           if (openCartBtn) openCartBtn.classList.add('hidden');
-          if (navActiveCustomersBtn) navActiveCustomersBtn.classList.remove('hidden'); // إبقاء أيقونة الزبائن الأكثر نشاطاً للمدير
-          if (navInvoicesBtn) navInvoicesBtn.classList.add('hidden'); // إخفاء الفواتير السابقة من شريط التصفح السفلي للمدير لوجودها في لوحة التحكم
+          if (navActiveCustomersBtn) navActiveCustomersBtn.classList.remove('hidden');
+          if (navInvoicesBtn) navInvoicesBtn.classList.add('hidden');
           if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
         } else if (loggedDelegate) {
           if (displaySpan) displaySpan.innerText = `مندوب: ${loggedDelegate.fullname || loggedDelegate.username}`;
           if (adminPanel) adminPanel.classList.add('hidden');
           if (adminTabCreator) adminTabCreator.classList.add('hidden');
           if (openCartBtn) openCartBtn.classList.remove('hidden');
-          if (navActiveCustomersBtn) navActiveCustomersBtn.classList.add('hidden'); // إخفاء الزبائن الأكثر نشاطاً للمندوب
-          if (navInvoicesBtn) navInvoicesBtn.classList.remove('hidden'); // إظهار الفواتير السابقة للمندوب
+          if (navActiveCustomersBtn) navActiveCustomersBtn.classList.add('hidden');
+          if (navInvoicesBtn) navInvoicesBtn.classList.remove('hidden');
           if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.remove('hidden');
         } else {
           if (displaySpan && loggedCustomer) displaySpan.innerText = `${loggedCustomer.fullname || loggedCustomer.username}`;
           if (adminPanel) adminPanel.classList.add('hidden');
           if (adminTabCreator) adminTabCreator.classList.add('hidden');
           if (openCartBtn) openCartBtn.classList.remove('hidden');
-          if (navActiveCustomersBtn) navActiveCustomersBtn.classList.add('hidden'); // إخفاء الزبائن الأكثر نشاطاً للزبون
-          if (navInvoicesBtn) navInvoicesBtn.classList.remove('hidden'); // إظهار الفواتير السابقة للزبون
+          if (navActiveCustomersBtn) navActiveCustomersBtn.classList.add('hidden');
+          if (navInvoicesBtn) navInvoicesBtn.classList.remove('hidden');
           if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
         }
       } else {
@@ -1706,22 +1709,31 @@
       });
     }
 
+    // دالة moveTab المحدثة باستخدام batch وسجل التسلسل (order)
     async function moveTab(index, direction) {
       const targetIndex = index + direction;
       if (targetIndex < 2 || targetIndex >= categories.length) return;
 
+      // تبديل الأماكن في المصفوفة المحلية
       const temp = categories[index];
       categories[index] = categories[targetIndex];
       categories[targetIndex] = temp;
 
+      // حفظ الترتيب الجديد محلياً
       saveData();
       renderTabs();
 
+      // حفظ الترتيب الجديد مع رقم تسلسلي (order) في قاعدة بيانات فايربيز لضمان بقائه عند الخروج والرجوع
       try {
-        for (let i = 0; i < categories.length; i++) {
-          await db.collection('categories').doc(String(categories[i].id)).set(categories[i], { merge: true });
-        }
-      } catch (err) {}
+        const batch = db.batch();
+        categories.forEach((cat, idx) => {
+          const docRef = db.collection('categories').doc(String(cat.id));
+          batch.set(docRef, { ...cat, order: idx }, { merge: true });
+        });
+        await batch.commit();
+      } catch (err) {
+        console.error("خطأ أثناء حفظ الترتيب في السحابة:", err);
+      }
     }
 
     function selectCategory(catId) {
@@ -1747,7 +1759,7 @@
       const input = document.getElementById('tab-name-input');
       const name = input.value.trim();
       if (!name) return;
-      const catData = { id: 'cat_' + Date.now(), name };
+      const catData = { id: 'cat_' + Date.now(), name, order: categories.length };
       categories.push(catData);
       saveData();
       input.value = '';
@@ -1765,7 +1777,7 @@
         saveData();
         renderTabs();
         populateCategorySelect();
-        try { await db.collection('categories').doc(String(catId)).set(cat); } catch(err){}
+        try { await db.collection('categories').doc(String(catId)).set(cat, { merge: true }); } catch(err){}
       }
     }
 
@@ -2233,7 +2245,7 @@
     function renderTopCustomersList() {
       const container = document.getElementById('top-customers-list');
       if (!container) return;
-      container.innerHTML = '';
+      container.innerHTML = ';';
 
       const statsMap = {};
       invoices.forEach(inv => {
