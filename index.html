@@ -929,6 +929,8 @@
       localStorage.setItem('mustaqbal_device_id', deviceId);
     }
 
+    let activeSessionUnsubscribe = null;
+
     function initRealtimeListeners() {
       db.collection('categories').onSnapshot(snapshot => {
         categories = [];
@@ -1014,6 +1016,35 @@
           renderTopCustomersList();
         }
       });
+    }
+
+    function monitorActiveSession() {
+      if (activeSessionUnsubscribe) {
+        activeSessionUnsubscribe();
+        activeSessionUnsubscribe = null;
+      }
+
+      if (loggedCustomer) {
+        activeSessionUnsubscribe = db.collection('customers').doc(String(loggedCustomer.username)).onSnapshot(doc => {
+          if (doc.exists) {
+            const data = doc.data();
+            if (data.deviceId && data.deviceId !== deviceId) {
+              alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر!');
+              handleLogout();
+            }
+          }
+        });
+      } else if (loggedDelegate) {
+        activeSessionUnsubscribe = db.collection('delegates').doc(String(loggedDelegate.username)).onSnapshot(doc => {
+          if (doc.exists) {
+            const data = doc.data();
+            if (data.deviceId && data.deviceId !== deviceId) {
+              alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر!');
+              handleLogout();
+            }
+          }
+        });
+      }
     }
 
     async function refreshAppData() {
@@ -1134,6 +1165,7 @@
       renderAdminCustomersList();
       renderAdminDelegatesList();
       renderDelegateClientsList();
+      monitorActiveSession();
     });
 
     function checkInitialSessionState() {
@@ -1211,7 +1243,7 @@
     function openAdminDelegatesModal() { document.getElementById('admin-delegates-modal').classList.remove('hidden'); }
     function closeAdminDelegatesModal() { document.getElementById('admin-delegates-modal').classList.add('hidden'); }
 
-    function handleUnifiedLogin(e) {
+    async function handleUnifiedLogin(e) {
       e.preventDefault();
       const u = document.getElementById('login-username').value.trim();
       const p = document.getElementById('login-password').value.trim();
@@ -1227,28 +1259,58 @@
         return;
       }
 
-      const foundDelegate = delegates.find(d => d && d.username === u && d.password === p);
-      if (foundDelegate) {
-        loggedDelegate = foundDelegate;
-        loggedCustomer = null;
-        isAdmin = false;
-        localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
-        localStorage.removeItem('loggedCustomer');
-        localStorage.setItem('isAdmin', 'false');
-        finishLoginProcess();
-        return;
+      // التحقق من المناديب
+      try {
+        const delDoc = await db.collection('delegates').doc(u).get();
+        if (delDoc.exists) {
+          const foundDelegate = delDoc.data();
+          if (foundDelegate.password === p) {
+            if (foundDelegate.deviceId && foundDelegate.deviceId !== deviceId) {
+              alert('هذا الحساب مفتوح حالياً في جهاز أو متصفح آخر! يرجى تسجيل الخروج منه أولاً.');
+              return;
+            }
+            loggedDelegate = foundDelegate;
+            loggedDelegate.deviceId = deviceId;
+            await db.collection('delegates').doc(u).update({ deviceId: deviceId });
+
+            loggedCustomer = null;
+            isAdmin = false;
+            localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
+            localStorage.removeItem('loggedCustomer');
+            localStorage.setItem('isAdmin', 'false');
+            finishLoginProcess();
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("خطأ أثناء تسجيل الدخول كـ مندوب:", err);
       }
 
-      const foundCustomer = customers.find(c => c && c.username === u && c.password === p);
-      if (foundCustomer) {
-        loggedCustomer = foundCustomer;
-        loggedDelegate = null;
-        isAdmin = false;
-        localStorage.setItem('loggedCustomer', JSON.stringify(loggedCustomer));
-        localStorage.removeItem('loggedDelegate');
-        localStorage.setItem('isAdmin', 'false');
-        finishLoginProcess();
-        return;
+      // التحقق من الزبائن
+      try {
+        const custDoc = await db.collection('customers').doc(u).get();
+        if (custDoc.exists) {
+          const foundCustomer = custDoc.data();
+          if (foundCustomer.password === p) {
+            if (foundCustomer.deviceId && foundCustomer.deviceId !== deviceId) {
+              alert('هذا الحساب مفتوح حالياً في جهاز أو متصفح آخر! يرجى تسجيل الخروج منه أولاً.');
+              return;
+            }
+            loggedCustomer = foundCustomer;
+            loggedCustomer.deviceId = deviceId;
+            await db.collection('customers').doc(u).update({ deviceId: deviceId });
+
+            loggedDelegate = null;
+            isAdmin = false;
+            localStorage.setItem('loggedCustomer', JSON.stringify(loggedCustomer));
+            localStorage.removeItem('loggedDelegate');
+            localStorage.setItem('isAdmin', 'false');
+            finishLoginProcess();
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("خطأ أثناء تسجيل الدخول كـ زبون:", err);
       }
 
       alert('اسم المستخدم أو كلمة المرور غير صحيحة!');
@@ -1262,9 +1324,23 @@
       renderTabs();
       renderProducts();
       updateCartUI();
+      monitorActiveSession();
     }
 
-    function handleLogout() {
+    async function handleLogout() {
+      if (activeSessionUnsubscribe) {
+        activeSessionUnsubscribe();
+        activeSessionUnsubscribe = null;
+      }
+
+      try {
+        if (loggedCustomer) {
+          await db.collection('customers').doc(String(loggedCustomer.username)).update({ deviceId: "" });
+        } else if (loggedDelegate) {
+          await db.collection('delegates').doc(String(loggedDelegate.username)).update({ deviceId: "" });
+        }
+      } catch(err) {}
+
       isAdmin = false;
       loggedCustomer = null;
       loggedDelegate = null;
@@ -1295,13 +1371,17 @@
       if (!username) return;
       
       let existingClients = [];
+      let existingDeviceId = "";
       if (editFlag) {
         const oldDel = delegates.find(d => d.username === editFlag);
-        if (oldDel && oldDel.clients) existingClients = oldDel.clients;
+        if (oldDel) {
+          if (oldDel.clients) existingClients = oldDel.clients;
+          if (oldDel.deviceId) existingDeviceId = oldDel.deviceId;
+        }
         delegates = delegates.filter(d => d.username !== editFlag);
       }
       
-      const delData = { username, password, fullname, clients: existingClients };
+      const delData = { username, password, fullname, clients: existingClients, deviceId: existingDeviceId };
       delegates.push(delData);
       saveData();
       renderAdminDelegatesList();
@@ -1550,18 +1630,22 @@
       const editFlag = document.getElementById('edit-cust-username-flag').value;
 
       if (!username) return;
-      const custData = { username, password, fullname, discount };
 
+      let existingDeviceId = "";
       if (editFlag) {
+        const oldCust = customers.find(c => c.username === editFlag);
+        if (oldCust && oldCust.deviceId) existingDeviceId = oldCust.deviceId;
         customers = customers.filter(c => c.username !== editFlag);
       }
+      const custData = { username, password, fullname, discount, deviceId: existingDeviceId };
+
       customers.push(custData);
       saveData();
       renderAdminCustomersList();
       resetCustomerMgmtForm();
 
       try {
-        await db.collection('customers').doc(String(username)).set(custData);
+        await db.collection('customers').doc(String(username)).set(custData, { merge: true });
         alert('تم حفظ حساب الزبون بنجاح.');
       } catch(err) {}
     }
@@ -2084,7 +2168,6 @@
       let accountSource = loggedCustomer ? 'زبون: ' + loggedCustomer.username : 'مندوب: ' + loggedDelegate.username;
       const totalAmount = currentCart.reduce((acc, item) => acc + ((item.price || 0) * (item.qty || 0)), 0);
 
-      // حفظ اسم المستخدم الخاص بالمندوب كـ delegateUsername بشكل منفصل لسهولة التصفية بدقة
       const newInvoice = {
         id: 'INV-' + Date.now(),
         date: new Date().toLocaleString('ar-IQ'),
@@ -2170,7 +2253,6 @@
       document.getElementById('invoices-modal').classList.remove('hidden');
     }
 
-    // تم تحديث الدالة لضمان فصل فواتير المناديب وعدم التداخل بين حساباتهم
     function renderInvoicesList() {
       const listContainer = document.getElementById('invoices-list');
       const titleContainer = document.getElementById('invoices-modal-title');
