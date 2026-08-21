@@ -1028,20 +1028,51 @@
         activeSessionUnsubscribe = db.collection('customers').doc(String(loggedCustomer.username)).onSnapshot(doc => {
           if (doc.exists) {
             const data = doc.data();
+            // 1. التحقق من الدخول من جهاز آخر
             if (data.deviceId && data.deviceId !== deviceId) {
               alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر!');
               handleLogout();
+              return;
             }
+            // 2. التحقق من تغير بيانات الحساب (كلمة السر أو نسبة الخصم أو الاسم)
+            if (
+              data.password !== loggedCustomer.password || 
+              data.discount !== loggedCustomer.discount || 
+              data.fullname !== loggedCustomer.fullname
+            ) {
+              alert('تم تحديث معلومات حسابك من قبل إدارة المتجر. يرجى إعادة تسجيل الدخول لمتابعة الاستخدام.');
+              handleLogout();
+              return;
+            }
+          } else {
+            // في حال تم حذف الحساب
+            alert('تم حذف هذا الحساب من قبل إدارة المتجر.');
+            handleLogout();
           }
         });
       } else if (loggedDelegate) {
         activeSessionUnsubscribe = db.collection('delegates').doc(String(loggedDelegate.username)).onSnapshot(doc => {
           if (doc.exists) {
             const data = doc.data();
+            // 1. التحقق من الدخول من جهاز آخر
             if (data.deviceId && data.deviceId !== deviceId) {
               alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر!');
               handleLogout();
+              return;
             }
+            // 2. التحقق من تغير بيانات المندوب (كلمة السر أو الاسم)
+            if (
+              data.password !== loggedDelegate.password || 
+              data.fullname !== loggedDelegate.fullname
+            ) {
+              alert('تم تحديث معلومات حسابك من قبل إدارة المتجر. يرجى إعادة تسجيل الدخول لمتابعة الاستخدام.');
+              handleLogout();
+              return;
+            }
+          } else {
+            // في حال تم حذف الحساب
+            alert('تم حذف هذا الحساب من قبل إدارة المتجر.');
+            handleLogout();
           }
         });
       }
@@ -1379,6 +1410,10 @@
           if (oldDel.deviceId) existingDeviceId = oldDel.deviceId;
         }
         delegates = delegates.filter(d => d.username !== editFlag);
+        // في حال تم تغيير اسم المستخدم القديم نحدف المستند القديم
+        if (editFlag !== username) {
+          try { await db.collection('delegates').doc(String(editFlag)).delete(); } catch(err){}
+        }
       }
       
       const delData = { username, password, fullname, clients: existingClients, deviceId: existingDeviceId };
@@ -1636,6 +1671,10 @@
         const oldCust = customers.find(c => c.username === editFlag);
         if (oldCust && oldCust.deviceId) existingDeviceId = oldCust.deviceId;
         customers = customers.filter(c => c.username !== editFlag);
+        // في حال تم تغيير اسم المستخدم القديم نحدف المستند القديم
+        if (editFlag !== username) {
+          try { await db.collection('customers').doc(String(editFlag)).delete(); } catch(err){}
+        }
       }
       const custData = { username, password, fullname, discount, deviceId: existingDeviceId };
 
