@@ -638,7 +638,54 @@
       }
     }
 
+
+
+    /* ===== نظام الإشعارات العصري ===== */
+    .notification-bell-wrap { position: relative; display:inline-flex; }
+    .notification-badge {
+      position:absolute; top:-5px; right:-7px; min-width:18px; height:18px; padding:0 5px;
+      border-radius:999px; background:#ef4444; color:#fff; border:2px solid #fff;
+      font-size:.62rem; font-weight:800; display:flex; align-items:center; justify-content:center;
+      box-shadow:0 3px 8px rgba(239,68,68,.25);
+    }
+    .notification-composer { background:linear-gradient(135deg,#f8fbff,#eef8ff); border:1px solid #dbeafe; border-radius:20px; padding:14px; }
+    .notification-composer .field-label { display:block; font-size:.74rem; font-weight:800; color:#475569; margin-bottom:6px; }
+    .notification-card {
+      position:relative; background:#fff; border:1px solid var(--border-color); border-radius:18px;
+      padding:14px; box-shadow:0 8px 24px rgba(15,23,42,.05); overflow:hidden;
+    }
+    .notification-card::before { content:""; position:absolute; right:0; top:0; bottom:0; width:4px; background:linear-gradient(180deg,var(--primary),#38bdf8); }
+    .notification-card.unread { background:linear-gradient(135deg,#fff,#f0f9ff); border-color:#bae6fd; }
+    .notification-card .notification-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+    .notification-icon { width:42px; height:42px; flex:0 0 42px; border-radius:14px; background:linear-gradient(135deg,#e0f2fe,#dbeafe); display:flex; align-items:center; justify-content:center; font-size:1.25rem; }
+    .notification-title { font-size:.95rem; font-weight:850; color:var(--text-main); line-height:1.4; }
+    .notification-time { font-size:.68rem; color:var(--text-muted); white-space:nowrap; }
+    .notification-details { margin-top:10px; color:#475569; font-size:.82rem; line-height:1.75; white-space:pre-wrap; word-break:break-word; }
+    .notification-meta { margin-top:10px; display:flex; gap:6px; flex-wrap:wrap; }
+    .notification-chip { background:#f1f5f9; color:#475569; border-radius:999px; padding:4px 8px; font-size:.65rem; font-weight:700; }
+    .notification-empty { text-align:center; padding:35px 15px; color:var(--text-muted); background:#f8fafc; border:1px dashed var(--border-color); border-radius:18px; }
+    .notification-stat { display:flex; align-items:center; gap:10px; background:#fff; border:1px solid var(--border-color); border-radius:16px; padding:10px 12px; }
+    .notification-stat-icon { width:38px; height:38px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:var(--primary-light); font-size:1.1rem; }
+    .notification-filter-tabs { display:flex; gap:7px; overflow-x:auto; padding:2px 0 4px; scrollbar-width:none; }
+    .notification-filter-tabs button { border:1px solid var(--border-color); background:#fff; color:var(--text-muted); border-radius:999px; padding:7px 12px; font-size:.72rem; font-weight:800; cursor:pointer; white-space:nowrap; }
+    .notification-filter-tabs button.active { background:var(--primary); color:#fff; border-color:var(--primary); }
+
     .hidden { display: none !important; }
+  
+    /* نافذة عرض تفاصيل الإشعار */
+    .notification-view-modal .modal-content { max-width: 560px; width: calc(100% - 28px); border-radius: 24px; overflow: hidden; }
+    .notification-view-hero { padding: 22px 20px 18px; background: linear-gradient(135deg,var(--primary),var(--primary-dark)); color:#fff; position:relative; }
+    .notification-view-icon { width:58px;height:58px;border-radius:18px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:12px; }
+    .notification-view-title { font-size:1.15rem;font-weight:900;line-height:1.5;word-break:break-word;padding-left:34px; }
+    .notification-view-time { margin-top:7px;font-size:.75rem;opacity:.9; }
+    .notification-view-body { padding:20px; }
+    .notification-view-details { background:#f8fafc;border:1px solid #e5e7eb;border-radius:16px;padding:16px;line-height:1.9;font-size:.92rem;white-space:pre-wrap;word-break:break-word;min-height:80px; }
+    .notification-view-meta { margin-top:14px;display:flex;gap:8px;flex-wrap:wrap; }
+    .notification-openable { cursor:pointer; transition:transform .18s ease, box-shadow .18s ease; }
+    .notification-openable:hover { transform:translateY(-1px); box-shadow:0 8px 22px rgba(15,23,42,.08); }
+    .notification-openable:active { transform:scale(.99); }
+    .notification-openable:focus { outline:3px solid rgba(59,130,246,.25); outline-offset:2px; }
+
   </style>
 </head>
 <body>
@@ -695,6 +742,10 @@
           <div class="admin-card-btn" onclick="openProductStatsModal()">
             <span>📊</span>
             <span>إحصائيات المنتجات</span>
+          </div>
+          <div class="admin-card-btn" onclick="openAdminNotificationsModal()">
+            <span>🔔</span>
+            <span>إرسال الإشعارات</span>
           </div>
         </div>
 
@@ -759,6 +810,11 @@
       <button class="nav-item hidden" id="nav-delegates-clients-btn" onclick="openDelegateClientsModal()">
         <span class="nav-icon">👥</span>
         <span>زبائني</span>
+      </button>
+
+      <button class="nav-item hidden" id="nav-notifications-btn" onclick="openNotificationsModal()">
+        <span class="nav-icon notification-bell-wrap">🔔<span class="notification-badge hidden" id="notifications-badge">0</span></span>
+        <span>الإشعارات</span>
       </button>
     </nav>
 
@@ -969,6 +1025,89 @@
       </div>
     </div>
 
+    <!-- نافذة إرسال الإشعارات للمدير -->
+    <div id="admin-notifications-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>📣 مركز إرسال الإشعارات</h3>
+          <button class="close-modal" onclick="closeAdminNotificationsModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="notification-composer">
+            <div style="font-size:.78rem;font-weight:850;color:var(--primary-dark);margin-bottom:10px;">إرسال إشعار جديد</div>
+            <form id="notification-form" onsubmit="handleNotificationSubmit(event)" class="form-row">
+              <div>
+                <label class="field-label">إرسال إلى</label>
+                <select id="notification-audience" class="compact-input" onchange="updateNotificationRecipientOptions()" required>
+                  <option value="all-customers">جميع الزبائن</option>
+                  <option value="customer">زبون محدد</option>
+                  <option value="all-delegates">جميع المندوبين</option>
+                  <option value="delegate">مندوب محدد</option>
+                </select>
+              </div>
+              <div id="notification-recipient-wrap" class="hidden">
+                <label class="field-label">اختر المستلم</label>
+                <select id="notification-recipient" class="compact-input"></select>
+              </div>
+              <div>
+                <label class="field-label">موضوع الإشعار</label>
+                <input type="text" id="notification-subject" class="compact-input" maxlength="120" placeholder="مثال: عرض جديد لفترة محدودة" required>
+              </div>
+              <div>
+                <label class="field-label">تفاصيل الإشعار</label>
+                <textarea id="notification-details" class="compact-input" maxlength="2000" placeholder="اكتب تفاصيل الإشعار هنا..." style="resize:vertical;min-height:120px;line-height:1.7;" required></textarea>
+              </div>
+              <button type="submit" class="btn" style="width:100%;padding:12px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));">🚀 إرسال الإشعار</button>
+            </form>
+          </div>
+          <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+            <div class="notification-stat" style="flex:1;min-width:130px;"><div class="notification-stat-icon">👥</div><div><div style="font-size:.68rem;color:var(--text-muted);">الزبائن</div><strong id="notification-customers-count">0</strong></div></div>
+            <div class="notification-stat" style="flex:1;min-width:130px;"><div class="notification-stat-icon">🛵</div><div><div style="font-size:.68rem;color:var(--text-muted);">المندوبون</div><strong id="notification-delegates-count">0</strong></div></div>
+          </div>
+          <div style="margin-top:14px;background:#f8fafc;border-radius:16px;padding:12px;">
+            <div style="font-size:.78rem;font-weight:800;margin-bottom:8px;">آخر الإشعارات المرسلة</div>
+            <div id="admin-sent-notifications-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- نافذة تفاصيل الإشعار عند الضغط عليه -->
+    <div id="notification-view-modal" class="modal hidden notification-view-modal" role="dialog" aria-modal="true" aria-labelledby="notification-view-title">
+      <div class="modal-content">
+        <div class="notification-view-hero">
+          <button class="close-modal" onclick="closeNotificationViewModal()" aria-label="إغلاق" style="position:absolute;top:12px;left:12px;background:rgba(255,255,255,.16);color:#fff;border:0;">✕</button>
+          <div class="notification-view-icon">📢</div>
+          <div id="notification-view-title" class="notification-view-title">الإشعار</div>
+          <div id="notification-view-time" class="notification-view-time"></div>
+        </div>
+        <div class="notification-view-body">
+          <div id="notification-view-details" class="notification-view-details"></div>
+          <div class="notification-view-meta">
+            <span class="notification-chip">من: إدارة المتجر</span>
+            <span id="notification-view-status" class="notification-chip" style="background:#dcfce7;color:#166534;">تمت القراءة</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- نافذة إشعارات الزبون/المندوب -->
+    <div id="notifications-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="notifications-modal-title">🔔 الإشعارات</h3>
+          <button class="close-modal" onclick="closeNotificationsModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="notification-filter-tabs">
+            <button id="notification-filter-all" class="active" onclick="setNotificationFilter('all')">الكل</button>
+            <button id="notification-filter-unread" onclick="setNotificationFilter('unread')">غير المقروءة</button>
+          </div>
+          <div id="notifications-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- سكربتات التطبيق والمنطق (JavaScript) المدمجة -->
@@ -1062,6 +1201,31 @@
         }
       });
 
+      db.collection('notifications').onSnapshot(snapshot => {
+        notifications = [];
+        snapshot.forEach(doc => {
+          const data = doc.data() || {};
+          if (data.id || doc.id) notifications.push({ id: doc.id, ...data });
+        });
+        notifications.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+        localStorage.setItem('mustaqbal_notifications_cache', JSON.stringify(notifications));
+        updateNotificationsBadge();
+        renderNotificationsList();
+        renderAdminSentNotifications();
+      }, err => {
+        console.error('خطأ في مزامنة الإشعارات:', err);
+        // لا نوقف بقية التطبيق إذا كانت قواعد notifications غير مفعلة.
+        try {
+          const cached = JSON.parse(localStorage.getItem('mustaqbal_notifications_cache') || '[]');
+          if (Array.isArray(cached)) {
+            notifications = cached;
+            updateNotificationsBadge();
+            renderNotificationsList();
+            renderAdminSentNotifications();
+          }
+        } catch (_) {}
+      });
+
       db.collection('invoices').onSnapshot(snapshot => {
         invoices = [];
         snapshot.forEach(doc => {
@@ -1146,6 +1310,8 @@
         const btn = document.querySelector('header button[onclick="refreshAppData()"]');
         if(btn) btn.innerText = "⏳ جاري التحديث...";
 
+        // تحميل بيانات المشروع الأساسية بشكل مستقل عن الإشعارات،
+        // حتى لا يؤدي عدم وجود صلاحية لمجموعة notifications إلى فشل تحميل المشروع كله.
         const [catSnap, prodSnap, custSnap, delSnap, invSnap] = await Promise.all([
           db.collection('categories').get(),
           db.collection('products').get(),
@@ -1153,6 +1319,19 @@
           db.collection('delegates').get(),
           db.collection('invoices').get()
         ]);
+
+        let notifSnap = null;
+        try {
+          notifSnap = await db.collection('notifications').get();
+        } catch (notifErr) {
+          console.warn('تعذر تحميل الإشعارات من Firestore:', notifErr);
+          // نستمر باستخدام النسخة المحلية إن وجدت.
+          try {
+            notifications = JSON.parse(localStorage.getItem('mustaqbal_notifications_cache') || '[]');
+          } catch (_) {
+            notifications = [];
+          }
+        }
 
         categories = [];
         catSnap.forEach(doc => { if (doc.data().id) categories.push(doc.data()); });
@@ -1180,7 +1359,17 @@
         invSnap.forEach(doc => { if (doc.data().id) invoices.push(doc.data()); });
         invoices.sort((a, b) => b.id.localeCompare(a.id));
 
+        if (notifSnap) {
+          notifications = [];
+          notifSnap.forEach(doc => { notifications.push({ id: doc.id, ...(doc.data() || {}) }); });
+          notifications.sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+        } else {
+          notifications = notifications || [];
+        }
+
         saveData();
+        localStorage.setItem('mustaqbal_notifications_cache', JSON.stringify(notifications));
+        updateNotificationsBadge();
         renderTabs();
         renderProducts();
         populateCategorySelect();
@@ -1203,6 +1392,7 @@
       localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
       localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
       localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
+      localStorage.setItem('mustaqbal_notifications_cache', JSON.stringify(notifications || []));
     }
 
     function ensureDefaultCategories() {
@@ -1241,6 +1431,8 @@
     let delegateCart = JSON.parse(localStorage.getItem('mustaqbal_delegate_cart')) || [];
 
     let invoices = JSON.parse(localStorage.getItem('mustaqbal_invoices')) || [];
+    let notifications = [];
+    let notificationFilter = 'all';
     let activeCategory = 'all';
 
     let isAdmin = localStorage.getItem('isAdmin') === 'true';
@@ -1260,6 +1452,7 @@
       renderAdminDelegatesList();
       renderDelegateClientsList();
       monitorActiveSession();
+      updateNotificationsBadge();
     });
 
     function checkInitialSessionState() {
@@ -1275,6 +1468,7 @@
       const navActiveCustomersBtn = document.getElementById('nav-active-customers-btn');
       const navInvoicesBtn = document.getElementById('nav-invoices-btn');
       const navDelegatesClientsBtn = document.getElementById('nav-delegates-clients-btn');
+      const navNotificationsBtn = document.getElementById('nav-notifications-btn');
       const openCartBtn = document.getElementById('open-cart-btn');
 
       const isLogged = isAdmin || loggedCustomer || loggedDelegate;
@@ -1295,6 +1489,7 @@
           if (navActiveCustomersBtn) navActiveCustomersBtn.classList.remove('hidden');
           if (navInvoicesBtn) navInvoicesBtn.classList.add('hidden');
           if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
+          if (navNotificationsBtn) navNotificationsBtn.classList.add('hidden');
         } else if (loggedDelegate) {
           if (displaySpan) displaySpan.innerText = `مندوب: ${loggedDelegate.fullname || loggedDelegate.username}`;
           if (adminPanel) adminPanel.classList.add('hidden');
@@ -1303,6 +1498,8 @@
           if (navActiveCustomersBtn) navActiveCustomersBtn.classList.add('hidden');
           if (navInvoicesBtn) navInvoicesBtn.classList.remove('hidden');
           if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.remove('hidden');
+          if (navNotificationsBtn) navNotificationsBtn.classList.remove('hidden');
+          updateNotificationsBadge();
         } else {
           if (displaySpan && loggedCustomer) displaySpan.innerText = `${loggedCustomer.fullname || loggedCustomer.username}`;
           if (adminPanel) adminPanel.classList.add('hidden');
@@ -1311,6 +1508,8 @@
           if (navActiveCustomersBtn) navActiveCustomersBtn.classList.add('hidden');
           if (navInvoicesBtn) navInvoicesBtn.classList.remove('hidden');
           if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
+          if (navNotificationsBtn) navNotificationsBtn.classList.remove('hidden');
+          updateNotificationsBadge();
         }
       } else {
         if (displaySpan) displaySpan.innerText = '';
@@ -1325,6 +1524,7 @@
         if (navActiveCustomersBtn) navActiveCustomersBtn.classList.add('hidden');
         if (navInvoicesBtn) navInvoicesBtn.classList.add('hidden');
         if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
+        if (navNotificationsBtn) navNotificationsBtn.classList.add('hidden');
         if (openCartBtn) openCartBtn.classList.add('hidden');
       }
     }
@@ -1497,6 +1697,260 @@
       localStorage.removeItem('loggedDelegate');
       localStorage.setItem('isAdmin', 'false');
       checkInitialSessionState();
+    }
+
+    function getCurrentNotificationRecipientType() {
+      if (loggedCustomer) return 'customer';
+      if (loggedDelegate) return 'delegate';
+      return null;
+    }
+
+    function getReadNotificationIds() {
+      try { return JSON.parse(localStorage.getItem('mustaqbal_read_notifications') || '[]'); } catch(e) { return []; }
+    }
+
+    function setReadNotificationIds(ids) {
+      localStorage.setItem('mustaqbal_read_notifications', JSON.stringify(ids.slice(-500)));
+    }
+
+    function getVisibleNotifications() {
+      const type = getCurrentNotificationRecipientType();
+      const username = type === 'customer' ? loggedCustomer.username : (type === 'delegate' ? loggedDelegate.username : null);
+      if (!type || !username) return [];
+      return (notifications || []).filter(n => n.recipientType === type && (n.recipientUsername === username || n.recipientUsername === '*' || n.audience === `all-${type}s`));
+    }
+
+    function updateNotificationsBadge() {
+      const badge = document.getElementById('notifications-badge');
+      if (!badge) return;
+      const readIds = getReadNotificationIds();
+      const unread = getVisibleNotifications().filter(n => !readIds.includes(String(n.id))).length;
+      badge.innerText = unread > 99 ? '99+' : String(unread);
+      badge.classList.toggle('hidden', unread === 0);
+    }
+
+    function formatNotificationDate(ts) {
+      if (!ts) return '';
+      const d = new Date(Number(ts));
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleString('ar-IQ', { dateStyle:'medium', timeStyle:'short' });
+    }
+
+    function escapeNotificationHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    }
+
+    function openAdminNotificationsModal() {
+      document.getElementById('admin-notifications-modal').classList.remove('hidden');
+      updateNotificationRecipientOptions();
+      renderAdminSentNotifications();
+      const c = document.getElementById('notification-customers-count');
+      const d = document.getElementById('notification-delegates-count');
+      if (c) c.innerText = customers.length;
+      if (d) d.innerText = delegates.length;
+    }
+
+    function closeAdminNotificationsModal() { document.getElementById('admin-notifications-modal').classList.add('hidden'); }
+
+    function updateNotificationRecipientOptions() {
+      const audience = document.getElementById('notification-audience');
+      const wrap = document.getElementById('notification-recipient-wrap');
+      const select = document.getElementById('notification-recipient');
+      if (!audience || !wrap || !select) return;
+      const needsRecipient = audience.value === 'customer' || audience.value === 'delegate';
+      wrap.classList.toggle('hidden', !needsRecipient);
+      select.required = needsRecipient;
+      if (!needsRecipient) { select.innerHTML = ''; return; }
+      const list = audience.value === 'customer' ? customers : delegates;
+      select.innerHTML = list.length ? list.map(x => `<option value="${escapeNotificationHtml(x.username)}">${escapeNotificationHtml(x.fullname || x.username)} — ${escapeNotificationHtml(x.username)}</option>`).join('') : '<option value="">لا يوجد مستلمون</option>';
+    }
+
+    async function handleNotificationSubmit(e) {
+      e.preventDefault();
+      if (!isAdmin) return alert('هذه العملية متاحة للمدير فقط.');
+      const audience = document.getElementById('notification-audience').value;
+      const subject = document.getElementById('notification-subject').value.trim();
+      const details = document.getElementById('notification-details').value.trim();
+      const recipient = document.getElementById('notification-recipient').value;
+      if (!subject || !details) return;
+      if ((audience === 'customer' || audience === 'delegate') && !recipient) return alert('يرجى اختيار المستلم.');
+
+      const recipientType = audience.includes('customer') ? 'customer' : 'delegate';
+      const now = Date.now();
+      const data = {
+        id: 'notification_' + now + '_' + Math.random().toString(36).slice(2,8),
+        sender: 'admin',
+        senderName: 'إدارة المتجر',
+        recipientType,
+        recipientUsername: audience === 'all-customers' || audience === 'all-delegates' ? '*' : recipient,
+        audience,
+        subject,
+        details,
+        createdAt: now
+      };
+
+      const sendBtn = document.querySelector('#notification-form button[type=submit]');
+      if (sendBtn) { sendBtn.disabled = true; sendBtn.dataset.oldText = sendBtn.innerText; sendBtn.innerText = 'جاري الإرسال...'; }
+      try {
+        await db.collection('notifications').doc(data.id).set(data);
+        notifications = [data, ...(notifications || []).filter(n => String(n.id) !== String(data.id))];
+        localStorage.setItem('mustaqbal_notifications_cache', JSON.stringify(notifications));
+        document.getElementById('notification-subject').value = '';
+        document.getElementById('notification-details').value = '';
+        renderAdminSentNotifications();
+        alert('تم إرسال الإشعار بنجاح ✅');
+      } catch (err) {
+        console.error('خطأ إرسال الإشعار:', err);
+        const code = err && err.code ? err.code : '';
+        let msg = 'تعذر إرسال الإشعار.';
+        if (code === 'permission-denied') {
+          msg += '\n\nالسبب: صلاحيات Firestore تمنع الكتابة في مجموعة notifications.\nاذهب إلى Firebase Console > Firestore Database > Rules ثم أضف قاعدة notifications الموجودة في ملف firestore_notifications.rules.';
+        } else if (code === 'unavailable') {
+          msg += '\n\nالسبب: تعذر الاتصال بخدمة Firestore. تحقق من الإنترنت.';
+        } else if (code === 'failed-precondition') {
+          msg += '\n\nالسبب: Firestore غير مهيأ أو توجد مشكلة في إعداد المشروع.';
+        } else {
+          msg += '\n\nرمز الخطأ: ' + code;
+        }
+        alert(msg);
+      } finally {
+        if (sendBtn) { sendBtn.disabled = false; sendBtn.innerText = sendBtn.dataset.oldText || 'إرسال الإشعار 🚀'; }
+      }
+    }
+
+    function renderAdminSentNotifications() {
+      const box = document.getElementById('admin-sent-notifications-list');
+      if (!box) return;
+      const list = (notifications || []).slice(0, 8);
+      if (!list.length) {
+        box.innerHTML = '<div class="notification-empty" style="padding:20px;">لا توجد إشعارات مرسلة بعد.</div>';
+        return;
+      }
+      box.innerHTML = list.map(n => {
+        const target = n.recipientUsername === '*' ? (n.recipientType === 'customer' ? 'جميع الزبائن' : 'جميع المندوبين') : (n.recipientUsername || 'مستلم محدد');
+        const nid = escapeNotificationHtml(n.id);
+        return `<div class="notification-card"><div class="notification-top"><div style="display:flex;gap:10px;align-items:center;"><div class="notification-icon">🔔</div><div><div class="notification-title">${escapeNotificationHtml(n.subject)}</div><div class="notification-time">${escapeNotificationHtml(formatNotificationDate(n.createdAt))}</div></div></div><button type="button" onclick="deleteNotification('${nid}')" title="حذف الإشعار" style="border:0;background:#fee2e2;color:#b91c1c;border-radius:10px;padding:7px 10px;cursor:pointer;font-weight:800;">🗑️</button></div><div class="notification-details">${escapeNotificationHtml(n.details)}</div><div class="notification-meta"><span class="notification-chip">إلى: ${escapeNotificationHtml(target)}</span></div></div>`;
+      }).join('');
+    }
+
+    async function deleteNotification(notificationId) {
+      if (!isAdmin) return alert('هذه العملية متاحة للمدير فقط.');
+      const id = String(notificationId || '');
+      if (!id) return;
+      const item = (notifications || []).find(n => String(n.id) === id);
+      if (!item) return alert('لم يتم العثور على الإشعار.');
+      const ok = confirm(`هل أنت متأكد من حذف الإشعار «${String(item.subject || '').replace(/\n/g, ' ')}»؟\n\nسيختفي الإشعار أيضاً من حساب المستلم.`);
+      if (!ok) return;
+      try {
+        await db.collection('notifications').doc(id).delete();
+        notifications = (notifications || []).filter(n => String(n.id) !== id);
+        localStorage.setItem('mustaqbal_notifications_cache', JSON.stringify(notifications));
+        updateNotificationsBadge();
+        renderAdminSentNotifications();
+        renderNotificationsList();
+        alert('تم حذف الإشعار بنجاح.');
+      } catch (err) {
+        console.error('خطأ في حذف الإشعار:', err);
+        const code = err && err.code ? err.code : '';
+        let msg = 'تعذر حذف الإشعار.';
+        if (code === 'permission-denied') {
+          msg += '\n\nالسبب: قواعد Firestore لا تسمح بالحذف من notifications. أضف قاعدة الحذف الموجودة في ملف firestore_notifications.rules.';
+        } else if (code === 'unavailable') {
+          msg += '\n\nالسبب: تعذر الاتصال بخدمة Firestore.';
+        } else {
+          msg += '\n\nرمز الخطأ: ' + code;
+        }
+        alert(msg);
+      }
+    }
+
+    function openNotificationsModal() {
+      document.getElementById('notifications-modal').classList.remove('hidden');
+      const title = document.getElementById('notifications-modal-title');
+      if (title) title.innerText = loggedDelegate ? '🔔 إشعارات المندوب' : '🔔 إشعارات الزبون';
+      setNotificationFilter('all');
+      // لا نعتبر الإشعارات مقروءة عند فتح القائمة؛ تصبح مقروءة فقط عند الضغط عليها.
+      updateNotificationsBadge();
+      renderNotificationsList();
+    }
+
+    function closeNotificationsModal() { document.getElementById('notifications-modal').classList.add('hidden'); }
+
+    function setNotificationFilter(filter) {
+      notificationFilter = filter;
+      document.getElementById('notification-filter-all')?.classList.toggle('active', filter === 'all');
+      document.getElementById('notification-filter-unread')?.classList.toggle('active', filter === 'unread');
+      renderNotificationsList();
+    }
+
+    function markNotificationAsRead(notificationId) {
+      const id = String(notificationId || '');
+      if (!id) return;
+      const ids = getReadNotificationIds();
+      if (!ids.includes(id)) {
+        ids.push(id);
+        setReadNotificationIds(ids);
+      }
+      updateNotificationsBadge();
+    }
+
+    function openNotificationDetails(notificationId) {
+      const id = String(notificationId || '');
+      const item = (notifications || []).find(n => String(n.id) === id);
+      if (!item) return;
+      // الأمان: لا نسمح بفتح إشعار غير ظاهر لهذا المستخدم.
+      const visible = getVisibleNotifications().some(n => String(n.id) === id);
+      if (!visible) return;
+
+      markNotificationAsRead(id);
+      const title = document.getElementById('notification-view-title');
+      const time = document.getElementById('notification-view-time');
+      const details = document.getElementById('notification-view-details');
+      if (title) title.textContent = item.subject || 'إشعار';
+      if (time) time.textContent = formatNotificationDate(item.createdAt);
+      if (details) details.textContent = item.details || '';
+
+      const modal = document.getElementById('notification-view-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        setTimeout(() => modal.querySelector('.close-modal')?.focus(), 0);
+      }
+      renderNotificationsList();
+    }
+
+    function closeNotificationViewModal() {
+      document.getElementById('notification-view-modal')?.classList.add('hidden');
+    }
+
+    document.getElementById('notification-view-modal')?.addEventListener('click', function(e) {
+      if (e.target === this) closeNotificationViewModal();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeNotificationViewModal();
+    });
+
+    function handleNotificationCardKeydown(event, notificationId) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openNotificationDetails(notificationId);
+      }
+    }
+
+    function renderNotificationsList() {
+      const box = document.getElementById('notifications-list');
+      if (!box) return;
+      const visible = getVisibleNotifications();
+      const readIds = getReadNotificationIds();
+      let list = notificationFilter === 'unread' ? visible.filter(n => !readIds.includes(String(n.id))) : visible;
+      if (!list.length) {
+        box.innerHTML = `<div class="notification-empty"><div style="font-size:2rem;margin-bottom:8px;">${notificationFilter === 'unread' ? '🎉' : '🔔'}</div><strong>${notificationFilter === 'unread' ? 'لا توجد إشعارات غير مقروءة' : 'لا توجد إشعارات حالياً'}</strong><div style="font-size:.75rem;margin-top:6px;">ستظهر هنا رسائل إدارة المتجر.</div></div>`;
+        return;
+      }
+      box.innerHTML = list.map(n => {
+        const unread = !readIds.includes(String(n.id));
+        const safeId = escapeNotificationHtml(n.id);
+        return `<article class="notification-card notification-openable ${unread ? 'unread' : ''}" role="button" tabindex="0" aria-label="فتح إشعار: ${escapeNotificationHtml(n.subject)}" onclick="openNotificationDetails('${safeId}')" onkeydown="handleNotificationCardKeydown(event,'${safeId}')"><div class="notification-top"><div style="display:flex;gap:10px;align-items:center;min-width:0;"><div class="notification-icon">📢</div><div style="min-width:0;"><div class="notification-title">${escapeNotificationHtml(n.subject)}</div><div class="notification-time">${escapeNotificationHtml(formatNotificationDate(n.createdAt))}</div></div></div>${unread ? '<span class="notification-chip" style="background:#dbeafe;color:#0369a1;">جديد</span>' : ''}</div><div class="notification-details">${escapeNotificationHtml(n.details)}</div><div class="notification-meta"><span class="notification-chip">من: إدارة المتجر</span><span class="notification-chip" style="background:#f1f5f9;color:#475569;">اضغط لعرض الإشعار</span></div></article>`;
+      }).join('');
     }
 
     function handleAdminPasswordChange(e) {
