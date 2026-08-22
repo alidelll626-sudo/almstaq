@@ -612,46 +612,6 @@
       background: var(--primary-light);
     }
 
-    .filter-box {
-      background: var(--bg-surface);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      padding: 10px;
-      margin-bottom: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .filter-inputs {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .filter-inputs div {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .filter-inputs label {
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
-
-    .note-tag {
-      font-size: 0.7rem;
-      color: #b45309;
-      background: #fef3c7;
-      padding: 2px 6px;
-      border-radius: 4px;
-      margin-top: 2px;
-      display: block;
-    }
-
     .hidden { display: none !important; }
   </style>
 </head>
@@ -948,34 +908,31 @@
       </div>
     </div>
 
-    <!-- نافذة إحصائيات المنتجات للمدير (فاتورة إجمالي الطلبات + الملاحظات + فلترة التاريخ) -->
+    <!-- نافذة إحصائيات المنتجات للمدير (فاتورة إجمالي الطلبات والملاحظات) -->
     <div id="product-stats-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>إحصائيات المنتجات المطلوبة</h3>
+          <h3>فاتورة إحصائيات المنتجات والملاحظات</h3>
           <button class="close-modal" onclick="closeProductStatsModal()">✕</button>
         </div>
         <div class="modal-body">
-          <!-- فلتر التاريخ دقيق بدون وقت -->
-          <div class="filter-box">
-            <div class="filter-inputs">
-              <div>
-                <label>من تاريخ:</label>
-                <input type="date" id="stats-start-date" class="compact-input" style="padding: 6px 8px;">
+          <!-- عناصر التصفية الفلترة حسب التاريخ بدون ساعات/دقائق -->
+          <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg-surface); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+            <span style="font-size: 0.8rem; font-weight: bold; color: var(--primary-dark);">فلترة الإحصائيات حسب التاريخ:</span>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <div style="flex: 1; min-width: 120px;">
+                <label style="font-size: 0.7rem; color: var(--text-muted); display: block;">من تاريخ:</label>
+                <input type="date" id="stats-date-from" class="compact-input" style="padding: 6px 8px; font-size: 0.8rem;" onchange="renderProductStatsReceipt()">
               </div>
-              <div>
-                <label>إلى تاريخ:</label>
-                <input type="date" id="stats-end-date" class="compact-input" style="padding: 6px 8px;">
+              <div style="flex: 1; min-width: 120px;">
+                <label style="font-size: 0.7rem; color: var(--text-muted); display: block;">إلى تاريخ:</label>
+                <input type="date" id="stats-date-to" class="compact-input" style="padding: 6px 8px; font-size: 0.8rem;" onchange="renderProductStatsReceipt()">
               </div>
-            </div>
-            <div style="display: flex; gap: 6px; margin-top: 4px;">
-              <button class="btn" style="flex: 1; padding: 6px; font-size: 0.8rem;" onclick="applyProductStatsFilter()">تطبيق الفلتر 🔍</button>
-              <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="resetProductStatsFilter()">إعادة ضبط 🔄</button>
+              <button class="btn btn-secondary" onclick="resetStatsDateFilter()" style="padding: 6px 10px; font-size: 0.75rem; margin-top: auto;">إلغاء الفلتر</button>
             </div>
           </div>
 
           <div id="product-stats-receipt-area" class="receipt-area"></div>
-          
           <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px;">
             <button class="btn btn-secondary" onclick="closeProductStatsModal()">إغلاق</button>
             <button class="btn" style="background: var(--success);" onclick="downloadInvoiceAsImage('product-stats-receipt-area')">📥 حفظ الفاتورة كصورة</button>
@@ -2282,12 +2239,17 @@
       const totalAmount = currentCart.reduce((acc, item) => acc + ((item.price || 0) * (item.qty || 0)), 0);
 
       const now = new Date();
-      const formattedTimestamp = now.toISOString();
+      // حفظ تاريخ ISO دقيق للفلترة
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const isoDateString = `${yyyy}-${mm}-${dd}`;
 
       const newInvoice = {
         id: 'INV-' + Date.now(),
         date: now.toLocaleString('ar-IQ'),
-        createdAt: formattedTimestamp,
+        rawDate: isoDateString,
+        createdAt: now.getTime(),
         customer: { name: custName, phone: custPhone, address: custAddress, username: accountSource },
         delegateUsername: loggedDelegate ? loggedDelegate.username : null,
         items: currentCart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, note: i.note || '' })),
@@ -2490,7 +2452,7 @@
       });
     }
 
-    /* --- وظائف إحصائيات المنتجات للمدير المعدلة (تجميع الملاحظات + الفلترة بالتواريخ الدقيقة) --- */
+    /* --- وظائف إحصائيات المنتجات المعدلة بالكامل لحل مشكلة الفلترة --- */
     function openProductStatsModal() {
       renderProductStatsReceipt();
       document.getElementById('product-stats-modal').classList.remove('hidden');
@@ -2500,72 +2462,90 @@
       document.getElementById('product-stats-modal').classList.add('hidden');
     }
 
-    function parseInvoiceDate(inv) {
-      if (inv.createdAt) {
-        return new Date(inv.createdAt);
-      }
-      if (inv.id && inv.id.startsWith('INV-')) {
-        const timestamp = parseInt(inv.id.replace('INV-', ''), 10);
-        if (!isNaN(timestamp)) {
-          return new Date(timestamp);
+    function resetStatsDateFilter() {
+      const fromInput = document.getElementById('stats-date-from');
+      const toInput = document.getElementById('stats-date-to');
+      if (fromInput) fromInput.value = '';
+      if (toInput) toInput.value = '';
+      renderProductStatsReceipt();
+    }
+
+    function parseInvoiceDateString(dateStr, rawDate) {
+      if (rawDate) {
+        const parts = rawDate.split('-');
+        if (parts.length === 3) {
+          return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
         }
       }
-      return null;
-    }
-
-    function applyProductStatsFilter() {
-      renderProductStatsReceipt();
-    }
-
-    function resetProductStatsFilter() {
-      document.getElementById('stats-start-date').value = '';
-      document.getElementById('stats-end-date').value = '';
-      renderProductStatsReceipt();
+      if (!dateStr) return null;
+      try {
+        const cleanStr = dateStr.replace(/[\u0660-\u0669]/g, d => d.charCodeAt(0) - 1632);
+        const parts = cleanStr.split(',');
+        if (parts.length > 0) {
+          const dateParts = parts[0].trim().split('/');
+          if (dateParts.length === 3) {
+            return new Date(parseInt(dateParts[2]), parseInt(dateParts[1]) - 1, parseInt(dateParts[0]));
+          }
+        }
+      } catch (e) {}
+      const parsed = new Date(dateStr);
+      return isNaN(parsed.getTime()) ? null : parsed;
     }
 
     function renderProductStatsReceipt() {
       const area = document.getElementById('product-stats-receipt-area');
       if (!area) return;
 
-      const startDateVal = document.getElementById('stats-start-date').value;
-      const endDateVal = document.getElementById('stats-end-date').value;
+      const fromVal = document.getElementById('stats-date-from') ? document.getElementById('stats-date-from').value : '';
+      const toVal = document.getElementById('stats-date-to') ? document.getElementById('stats-date-to').value : '';
 
-      let startDate = startDateVal ? new Date(startDateVal + 'T00:00:00') : null;
-      let endDate = endDateVal ? new Date(endDateVal + 'T23:59:59') : null;
+      let fromDate = null;
+      let toDate = null;
+
+      if (fromVal) {
+        const fp = fromVal.split('-');
+        fromDate = new Date(parseInt(fp[0]), parseInt(fp[1]) - 1, parseInt(fp[2]), 0, 0, 0, 0);
+      }
+      if (toVal) {
+        const tp = toVal.split('-');
+        toDate = new Date(parseInt(tp[0]), parseInt(tp[1]) - 1, parseInt(tp[2]), 23, 59, 59, 999);
+      }
+
+      // تصفية دقيقة للغاية للفواتير بحسب التواريخ
+      let filteredInvoices = invoices.filter(inv => {
+        let invDate = null;
+        if (inv.createdAt) {
+          invDate = new Date(inv.createdAt);
+        } else {
+          invDate = parseInvoiceDateString(inv.date, inv.rawDate);
+        }
+
+        if (!invDate || isNaN(invDate.getTime())) return true;
+
+        if (fromDate && invDate.getTime() < fromDate.getTime()) return false;
+        if (toDate && invDate.getTime() > toDate.getTime()) return false;
+        return true;
+      });
 
       const productTotalsMap = {};
+      const productNotesMap = {};
       let overallQuantity = 0;
-      let filteredInvoicesCount = 0;
 
-      invoices.forEach(inv => {
-        const invDate = parseInvoiceDate(inv);
-
-        if (startDate && invDate && invDate < startDate) return;
-        if (endDate && invDate && invDate > endDate) return;
-
-        filteredInvoicesCount++;
-
+      filteredInvoices.forEach(inv => {
         if (inv.items && Array.isArray(inv.items)) {
           inv.items.forEach(item => {
             const pName = item.name ? item.name.trim() : 'منتج غير معروف';
             const qty = Number(item.qty) || 0;
-            const note = item.note ? item.note.trim() : '';
-
+            
             if (!productTotalsMap[pName]) {
-              productTotalsMap[pName] = {
-                qty: 0,
-                notes: []
-              };
+              productTotalsMap[pName] = 0;
+              productNotesMap[pName] = [];
             }
-
-            productTotalsMap[pName].qty += qty;
+            productTotalsMap[pName] += qty;
             overallQuantity += qty;
 
-            if (note) {
-              productTotalsMap[pName].notes.push({
-                note: note,
-                customer: inv.customer ? inv.customer.name : 'غير محدد'
-              });
+            if (item.note && item.note.trim() !== '') {
+              productNotesMap[pName].push(item.note.trim());
             }
           });
         }
@@ -2573,27 +2553,31 @@
 
       const itemsList = Object.keys(productTotalsMap).map(pName => ({
         name: pName,
-        totalQty: productTotalsMap[pName].qty,
-        notes: productTotalsMap[pName].notes
+        totalQty: productTotalsMap[pName],
+        notes: productNotesMap[pName] || []
       }));
 
       itemsList.sort((a, b) => b.totalQty - a.totalQty);
 
       if (itemsList.length === 0) {
-        area.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد أي طلبات أو منتجات خلال الفترة المحددة.</p>';
+        area.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد أي طلبات مطابقة للفترة المحددة.</p>';
         return;
       }
 
       let rowsHTML = itemsList.map((item, index) => {
         let notesHTML = '';
         if (item.notes && item.notes.length > 0) {
-          const notesText = item.notes.map(n => `<b>${n.customer}:</b> ${n.note}`).join(' | ');
-          notesHTML = `<span class="note-tag">📝 الملاحظات: ${notesText}</span>`;
+          notesHTML = `<div style="margin-top:4px; font-size:0.75rem; color:#b45309;">
+            <strong>الملاحظات المطلوبة:</strong>
+            <ul style="margin-right:15px; margin-top:2px;">
+              ${item.notes.map(n => `<li style="background:#fef3c7; padding:2px 6px; border-radius:4px; margin-bottom:2px; list-style-type:disc;">${n}</li>`).join('')}
+            </ul>
+          </div>`;
         }
 
         return `
           <tr>
-            <td style="text-align:center; width: 35px;">${index + 1}</td>
+            <td style="text-align:center; width: 40px;">${index + 1}</td>
             <td>
               <strong>${item.name}</strong>
               ${notesHTML}
@@ -2603,31 +2587,27 @@
         `;
       }).join('');
 
-      let datePeriodText = 'جميع الفترات';
-      if (startDateVal && endDateVal) {
-        datePeriodText = `من ${startDateVal} إلى ${endDateVal}`;
-      } else if (startDateVal) {
-        datePeriodText = `من تاريخ ${startDateVal}`;
-      } else if (endDateVal) {
-        datePeriodText = `حتى تاريخ ${endDateVal}`;
-      }
+      let dateRangeText = 'جميع التواريخ المسجلة';
+      if (fromVal && toVal) dateRangeText = `من ${fromVal} إلى ${toVal}`;
+      else if (fromVal) dateRangeText = `من تاريخ ${fromVal}`;
+      else if (toVal) dateRangeText = `حتى تاريخ ${toVal}`;
 
       area.innerHTML = `
         <div class="receipt-header">
           <h2 style="font-size:1.1rem; color:var(--primary-dark);">متجر المستقبل للجملة</h2>
-          <h3 style="font-size:0.9rem; color:var(--text-main); margin-top:4px;">تقرير إحصائيات المنتجات والملاحظات</h3>
-          <p style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">الفترة المحددّة: ${datePeriodText}</p>
+          <h3 style="font-size:0.9rem; color:var(--text-main); margin-top:4px;">فاتورة الإحصائيات الشاملة للمنتجات والملاحظات</h3>
+          <p style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">الفترة المحددة: ${dateRangeText}</p>
         </div>
         <div style="font-size:0.8rem; margin-bottom:12px; line-height:1.6; background: var(--primary-light); padding: 8px; border-radius: var(--radius-sm);">
           <strong>جهة التقرير:</strong> إدارة المتجر<br>
-          <strong>إجمالي الفواتير المشمولة:</strong> ${filteredInvoicesCount} فاتورة
+          <strong>عدد الفواتير المحللة:</strong> ${filteredInvoices.length} فاتورة
         </div>
         <table class="receipt-table">
           <thead>
             <tr>
-              <th style="text-align:center; width: 35px;">#</th>
-              <th>اسم المنتج والملاحظات الواردة</th>
-              <th style="text-align:center;">الكمية المطلوب</th>
+              <th style="text-align:center; width: 40px;">#</th>
+              <th>اسم المنتج والملاحظات</th>
+              <th style="text-align:center;">العدد الكلي المطلوب</th>
             </tr>
           </thead>
           <tbody>${rowsHTML}</tbody>
