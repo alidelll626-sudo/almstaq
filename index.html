@@ -612,8 +612,8 @@
       background: var(--primary-light);
     }
 
-    .date-filter-box {
-      background: #f1f5f9;
+    .filter-box {
+      background: var(--bg-surface);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-sm);
       padding: 10px;
@@ -623,22 +623,33 @@
       gap: 8px;
     }
 
-    .date-inputs-row {
+    .filter-inputs {
       display: flex;
       gap: 8px;
+      align-items: center;
     }
 
-    .date-input-group {
+    .filter-inputs div {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 2px;
     }
 
-    .date-input-group label {
-      font-size: 0.75rem;
+    .filter-inputs label {
+      font-size: 0.72rem;
       color: var(--text-muted);
-      font-weight: bold;
+      font-weight: 600;
+    }
+
+    .note-tag {
+      font-size: 0.7rem;
+      color: #b45309;
+      background: #fef3c7;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-top: 2px;
+      display: block;
     }
 
     .hidden { display: none !important; }
@@ -937,7 +948,7 @@
       </div>
     </div>
 
-    <!-- نافذة إحصائيات المنتجات للمدير (مع خيار الفلترة بالتاريخ) -->
+    <!-- نافذة إحصائيات المنتجات للمدير (فاتورة إجمالي الطلبات + الملاحظات + فلترة التاريخ) -->
     <div id="product-stats-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
@@ -945,21 +956,21 @@
           <button class="close-modal" onclick="closeProductStatsModal()">✕</button>
         </div>
         <div class="modal-body">
-          <!-- خيارات فلترة التواريخ -->
-          <div class="date-filter-box">
-            <div class="date-inputs-row">
-              <div class="date-input-group">
-                <label for="stats-start-date">من تاريخ:</label>
-                <input type="date" id="stats-start-date" class="compact-input">
+          <!-- فلتر التاريخ دقيق بدون وقت -->
+          <div class="filter-box">
+            <div class="filter-inputs">
+              <div>
+                <label>من تاريخ:</label>
+                <input type="date" id="stats-start-date" class="compact-input" style="padding: 6px 8px;">
               </div>
-              <div class="date-input-group">
-                <label for="stats-end-date">إلى تاريخ:</label>
-                <input type="date" id="stats-end-date" class="compact-input">
+              <div>
+                <label>إلى تاريخ:</label>
+                <input type="date" id="stats-end-date" class="compact-input" style="padding: 6px 8px;">
               </div>
             </div>
             <div style="display: flex; gap: 6px; margin-top: 4px;">
-              <button class="btn" style="flex: 1; padding: 6px 12px; font-size: 0.8rem;" onclick="renderProductStatsReceipt()">تصفية البيانات 🔍</button>
-              <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="resetProductStatsDates()">إعادة ضبط 🔄</button>
+              <button class="btn" style="flex: 1; padding: 6px; font-size: 0.8rem;" onclick="applyProductStatsFilter()">تطبيق الفلتر 🔍</button>
+              <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="resetProductStatsFilter()">إعادة ضبط 🔄</button>
             </div>
           </div>
 
@@ -2270,9 +2281,13 @@
       let accountSource = loggedCustomer ? 'زبون: ' + loggedCustomer.username : 'مندوب: ' + loggedDelegate.username;
       const totalAmount = currentCart.reduce((acc, item) => acc + ((item.price || 0) * (item.qty || 0)), 0);
 
+      const now = new Date();
+      const formattedTimestamp = now.toISOString();
+
       const newInvoice = {
         id: 'INV-' + Date.now(),
-        date: new Date().toLocaleString('ar-IQ'),
+        date: now.toLocaleString('ar-IQ'),
+        createdAt: formattedTimestamp,
         customer: { name: custName, phone: custPhone, address: custAddress, username: accountSource },
         delegateUsername: loggedDelegate ? loggedDelegate.username : null,
         items: currentCart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, note: i.note || '' })),
@@ -2475,17 +2490,8 @@
       });
     }
 
-    /* --- وظائف إحصائيات المنتجات للمدير مع الفلترة بالتواريخ --- */
+    /* --- وظائف إحصائيات المنتجات للمدير المعدلة (تجميع الملاحظات + الفلترة بالتواريخ الدقيقة) --- */
     function openProductStatsModal() {
-      const startDateInput = document.getElementById('stats-start-date');
-      const endDateInput = document.getElementById('stats-end-date');
-      
-      if (startDateInput && endDateInput) {
-        const todayStr = new Date().toISOString().split('T')[0];
-        startDateInput.value = todayStr;
-        endDateInput.value = todayStr;
-      }
-
       renderProductStatsReceipt();
       document.getElementById('product-stats-modal').classList.remove('hidden');
     }
@@ -2494,42 +2500,27 @@
       document.getElementById('product-stats-modal').classList.add('hidden');
     }
 
-    function resetProductStatsDates() {
-      const startDateInput = document.getElementById('stats-start-date');
-      const endDateInput = document.getElementById('stats-end-date');
-      if (startDateInput && endDateInput) {
-        startDateInput.value = '';
-        endDateInput.value = '';
+    function parseInvoiceDate(inv) {
+      if (inv.createdAt) {
+        return new Date(inv.createdAt);
       }
-      renderProductStatsReceipt();
-    }
-
-    function parseInvoiceDate(dateString) {
-      if (!dateString) return null;
-
-      if (dateString.includes('INV-')) {
-        const timestamp = parseInt(dateString.replace('INV-', ''), 10);
+      if (inv.id && inv.id.startsWith('INV-')) {
+        const timestamp = parseInt(inv.id.replace('INV-', ''), 10);
         if (!isNaN(timestamp)) {
           return new Date(timestamp);
         }
       }
-
-      const parsed = new Date(dateString);
-      if (!isNaN(parsed.getTime())) {
-        return parsed;
-      }
-
-      const match = dateString.match(/(\d{1,4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,4})/);
-      if (match) {
-        let p1 = parseInt(match[1], 10);
-        let p2 = parseInt(match[2], 10);
-        let p3 = parseInt(match[3], 10);
-
-        if (p1 > 1000) return new Date(p1, p2 - 1, p3);
-        if (p3 > 1000) return new Date(p3, p2 - 1, p1);
-      }
-
       return null;
+    }
+
+    function applyProductStatsFilter() {
+      renderProductStatsReceipt();
+    }
+
+    function resetProductStatsFilter() {
+      document.getElementById('stats-start-date').value = '';
+      document.getElementById('stats-end-date').value = '';
+      renderProductStatsReceipt();
     }
 
     function renderProductStatsReceipt() {
@@ -2539,108 +2530,104 @@
       const startDateVal = document.getElementById('stats-start-date').value;
       const endDateVal = document.getElementById('stats-end-date').value;
 
-      let startTimestamp = null;
-      let endTimestamp = null;
-
-      if (startDateVal) {
-        const startDate = new Date(startDateVal);
-        startDate.setHours(0, 0, 0, 0);
-        startTimestamp = startDate.getTime();
-      }
-
-      if (endDateVal) {
-        const endDate = new Date(endDateVal);
-        endDate.setHours(23, 59, 59, 999);
-        endTimestamp = endDate.getTime();
-      }
+      let startDate = startDateVal ? new Date(startDateVal + 'T00:00:00') : null;
+      let endDate = endDateVal ? new Date(endDateVal + 'T23:59:59') : null;
 
       const productTotalsMap = {};
       let overallQuantity = 0;
       let filteredInvoicesCount = 0;
 
       invoices.forEach(inv => {
-        let invDateObj = parseInvoiceDate(inv.date) || parseInvoiceDate(inv.id);
-        
-        let includeInvoice = true;
+        const invDate = parseInvoiceDate(inv);
 
-        if (invDateObj) {
-          const invTime = invDateObj.getTime();
-          if (startTimestamp && invTime < startTimestamp) includeInvoice = false;
-          if (endTimestamp && invTime > endTimestamp) includeInvoice = false;
-        }
+        if (startDate && invDate && invDate < startDate) return;
+        if (endDate && invDate && invDate > endDate) return;
 
-        if (includeInvoice) {
-          filteredInvoicesCount++;
-          if (inv.items && Array.isArray(inv.items)) {
-            inv.items.forEach(item => {
-              const pName = item.name ? item.name.trim() : 'منتج غير معروف';
-              const qty = Number(item.qty) || 0;
-              if (!productTotalsMap[pName]) {
-                productTotalsMap[pName] = 0;
-              }
-              productTotalsMap[pName] += qty;
-              overallQuantity += qty;
-            });
-          }
+        filteredInvoicesCount++;
+
+        if (inv.items && Array.isArray(inv.items)) {
+          inv.items.forEach(item => {
+            const pName = item.name ? item.name.trim() : 'منتج غير معروف';
+            const qty = Number(item.qty) || 0;
+            const note = item.note ? item.note.trim() : '';
+
+            if (!productTotalsMap[pName]) {
+              productTotalsMap[pName] = {
+                qty: 0,
+                notes: []
+              };
+            }
+
+            productTotalsMap[pName].qty += qty;
+            overallQuantity += qty;
+
+            if (note) {
+              productTotalsMap[pName].notes.push({
+                note: note,
+                customer: inv.customer ? inv.customer.name : 'غير محدد'
+              });
+            }
+          });
         }
       });
 
       const itemsList = Object.keys(productTotalsMap).map(pName => ({
         name: pName,
-        totalQty: productTotalsMap[pName]
+        totalQty: productTotalsMap[pName].qty,
+        notes: productTotalsMap[pName].notes
       }));
 
       itemsList.sort((a, b) => b.totalQty - a.totalQty);
 
-      let dateRangeText = "جميع التواريخ";
-      if (startDateVal && endDateVal) {
-        if (startDateVal === endDateVal) {
-          dateRangeText = `تاريخ: ${startDateVal}`;
-        } else {
-          dateRangeText = `من: ${startDateVal} إلى: ${endDateVal}`;
-        }
-      } else if (startDateVal) {
-        dateRangeText = `من: ${startDateVal}`;
-      } else if (endDateVal) {
-        dateRangeText = `حتى تاريخ: ${endDateVal}`;
-      }
-
       if (itemsList.length === 0) {
-        area.innerHTML = `
-          <div class="receipt-header">
-            <h2 style="font-size:1.1rem; color:var(--primary-dark);">متجر المستقبل للجملة</h2>
-            <h3 style="font-size:0.9rem; color:var(--text-main); margin-top:4px;">فاتورة الإحصائيات الشاملة للمنتجات المطلوبة</h3>
-            <p style="font-size:0.75rem; color:var(--primary-dark); font-weight:bold; margin-top:4px;">الفترة المحدد: ${dateRangeText}</p>
-          </div>
-          <p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد أي طلبات سابقة للمنتجات ضمن هذه الفترة الزمنية.</p>
-        `;
+        area.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد أي طلبات أو منتجات خلال الفترة المحددة.</p>';
         return;
       }
 
-      let rowsHTML = itemsList.map((item, index) => `
-        <tr>
-          <td style="text-align:center; width: 40px;">${index + 1}</td>
-          <td><strong>${item.name}</strong></td>
-          <td style="text-align:center; font-weight: bold; color: var(--primary-dark); font-size: 0.9rem;">${formatPrice(item.totalQty)}</td>
-        </tr>
-      `).join('');
+      let rowsHTML = itemsList.map((item, index) => {
+        let notesHTML = '';
+        if (item.notes && item.notes.length > 0) {
+          const notesText = item.notes.map(n => `<b>${n.customer}:</b> ${n.note}`).join(' | ');
+          notesHTML = `<span class="note-tag">📝 الملاحظات: ${notesText}</span>`;
+        }
+
+        return `
+          <tr>
+            <td style="text-align:center; width: 35px;">${index + 1}</td>
+            <td>
+              <strong>${item.name}</strong>
+              ${notesHTML}
+            </td>
+            <td style="text-align:center; font-weight: bold; color: var(--primary-dark); font-size: 0.9rem;">${formatPrice(item.totalQty)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      let datePeriodText = 'جميع الفترات';
+      if (startDateVal && endDateVal) {
+        datePeriodText = `من ${startDateVal} إلى ${endDateVal}`;
+      } else if (startDateVal) {
+        datePeriodText = `من تاريخ ${startDateVal}`;
+      } else if (endDateVal) {
+        datePeriodText = `حتى تاريخ ${endDateVal}`;
+      }
 
       area.innerHTML = `
         <div class="receipt-header">
           <h2 style="font-size:1.1rem; color:var(--primary-dark);">متجر المستقبل للجملة</h2>
-          <h3 style="font-size:0.9rem; color:var(--text-main); margin-top:4px;">فاتورة الإحصائيات الشاملة للمنتجات المطلوبة</h3>
-          <p style="font-size:0.75rem; color:var(--primary-dark); font-weight:bold; margin-top:4px;">الفترة المحدد: ${dateRangeText}</p>
+          <h3 style="font-size:0.9rem; color:var(--text-main); margin-top:4px;">تقرير إحصائيات المنتجات والملاحظات</h3>
+          <p style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">الفترة المحددّة: ${datePeriodText}</p>
         </div>
         <div style="font-size:0.8rem; margin-bottom:12px; line-height:1.6; background: var(--primary-light); padding: 8px; border-radius: var(--radius-sm);">
           <strong>جهة التقرير:</strong> إدارة المتجر<br>
-          <strong>عدد الفواتير المحللة:</strong> ${filteredInvoicesCount} فاتورة
+          <strong>إجمالي الفواتير المشمولة:</strong> ${filteredInvoicesCount} فاتورة
         </div>
         <table class="receipt-table">
           <thead>
             <tr>
-              <th style="text-align:center; width: 40px;">#</th>
-              <th>اسم المنتج</th>
-              <th style="text-align:center;">العدد الكلي المطلوب</th>
+              <th style="text-align:center; width: 35px;">#</th>
+              <th>اسم المنتج والملاحظات الواردة</th>
+              <th style="text-align:center;">الكمية المطلوب</th>
             </tr>
           </thead>
           <tbody>${rowsHTML}</tbody>
