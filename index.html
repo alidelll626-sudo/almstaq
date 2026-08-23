@@ -4227,11 +4227,84 @@
 
     async function deleteInvoice(invoiceId) {
       if (!requireAdminPermission('deleteInvoices')) return;
-      if (confirm('تأكيد حذف هذه الفاتورة؟')) {
-        invoices = invoices.filter(i => i.id !== invoiceId);
+      if (!confirm('تأكيد حذف هذه الفاتورة نهائياً؟')) return;
+
+      const invoiceKey = String(invoiceId);
+      const invoiceExists = invoices.some(i => String(i.id) === invoiceKey);
+      if (!invoiceExists) {
+        alert('لم يتم العثور على الفاتورة.');
+        return;
+      }
+
+      try {
+        // بعض الفواتير القديمة قد يكون رقم الفاتورة داخل الحقل id
+        // لكن معرّف مستند Firestore مختلفاً. لذلك نبحث عن المستند
+        // الفعلي ثم نحذفه، بدلاً من الاعتماد على doc(invoiceId) فقط.
+        const refsToDelete = [];
+        const directRef = db.collection('invoices').doc(invoiceKey);
+
+        // أولاً: إذا كان رقم الفاتورة هو نفسه Document ID.
+        try {
+          const directSnap = await directRef.get();
+          if (directSnap.exists) refsToDelete.push(directRef);
+        } catch (directGetErr) {
+          console.warn('تعذر فحص المستند المباشر:', directGetErr);
+        }
+
+        // ثانياً: البحث عن الفاتورة بالحقل id لمعالجة الفواتير القديمة
+        // التي تم حفظها بمعرّف مستند مختلف.
+        try {
+          const matches = await db.collection('invoices').where('id', '==', invoiceKey).get();
+          matches.forEach(doc => {
+            if (!refsToDelete.some(ref => ref.path === doc.ref.path)) refsToDelete.push(doc.ref);
+          });
+        } catch (queryErr) {
+          console.warn('تعذر البحث عن الفاتورة بالحقل id:', queryErr);
+        }
+
+        // دعم إضافي إذا كانت بعض النسخ القديمة تحفظ id كرقم بدلاً من نص.
+        if (/^\d+$/.test(invoiceKey)) {
+          try {
+            const numericId = Number(invoiceKey);
+            const numericMatches = await db.collection('invoices').where('id', '==', numericId).get();
+            numericMatches.forEach(doc => {
+              if (!refsToDelete.some(ref => ref.path === doc.ref.path)) refsToDelete.push(doc.ref);
+            });
+          } catch (_) {}
+        }
+
+        if (refsToDelete.length === 0) {
+          throw new Error('لم يتم العثور على مستند Firestore المطابق للفاتورة.');
+        }
+
+        // نحذف كل مستند مطابق حتى لا تعود الفاتورة من نسخة قديمة مكررة.
+        for (const ref of refsToDelete) {
+          await ref.delete();
+        }
+
+        // بعد نجاح الحذف من Firestore نحذفها من الذاكرة والتخزين المحلي.
+        invoices = invoices.filter(i => String(i.id) !== invoiceKey);
         saveData();
-        try { await db.collection('invoices').doc(String(invoiceId)).delete(); } catch(err){}
+
+        // تنظيف حالة القراءة والرقم من قائمة الفواتير غير المقروءة.
+        try {
+          const readIds = getReadInvoiceIds().filter(id => String(id) !== invoiceKey);
+          setReadInvoiceIds(readIds);
+        } catch (_) {}
+
         renderInvoicesList();
+        updateUnreadInvoicesBadge();
+
+        // رسالة نجاح قصيرة للتأكد من أن الحذف تم فعلياً.
+        alert('تم حذف الفاتورة نهائياً من قاعدة البيانات والفواتير السابقة.');
+      } catch (err) {
+        console.error('فشل حذف الفاتورة من Firestore:', err);
+        const code = err && err.code ? String(err.code) : '';
+        if (code === 'permission-denied') {
+          alert('تم رفض حذف الفاتورة من Firestore. يجب السماح بصلاحية delete لمجموعة invoices في قواعد Firestore للمدير الرئيسي/المدير المسموح له بحذف الفواتير.');
+        } else {
+          alert('تعذر حذف الفاتورة من قاعدة البيانات. لم يتم حذفها من القائمة. تحقق من اتصال الإنترنت ثم حاول مرة أخرى.');
+        }
       }
     }
 
