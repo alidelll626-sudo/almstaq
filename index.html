@@ -1391,31 +1391,86 @@
 
     let activeSessionUnsubscribe = null;
 
-    function initRealtimeListeners() {
-      db.collection('adminAccounts').onSnapshot(snapshot => {
-        const loaded = [];
-        snapshot.forEach(doc => {
-          const data = doc.data() || {};
-          // نستخدم رقم المستند كاسم مستخدم احتياطي حتى تظهر الحسابات
-          // حتى لو كانت الوثيقة القديمة لا تحتوي على username.
-          if (doc.id !== 'admin') {
-            const account = normalizeAdminAccount(Object.assign({}, data, {
-              username: data.username || doc.id
-            }));
-            if (account.username) loaded.push(account);
-          }
-        });
-        adminAccounts = loaded;
-        localStorage.setItem('mustaqbal_admin_accounts', JSON.stringify(adminAccounts));
-        // لا نعيد رسم القائمة هنا؛ نافذة حسابات المدراء تستخدم
-        // forceRenderAdminAccountsFromFirestore() مباشرةً من Firestore.
-      }, err => {
-        console.warn('تعذر تحميل حسابات المدراء:', err);
-        // لا نمسح القائمة المحلية عند فشل الاتصال.
-        renderAdminAccountsList();
-      });
+    // ============================================================
+    // Firestore performance optimization
+    // ------------------------------------------------------------
+    // نراقب فقط البيانات الأساسية التي تحتاج تحديثاً فورياً (الأقسام
+    // والمنتجات). أما الفواتير والإشعارات وقوائم الزبائن والمندوبين
+    // وحسابات المدراء فيتم تحميلها عند الحاجة فقط، حتى لا تتحول لوحة
+    // المدير إلى مستهلك دائم لقراءات Firestore.
+    // ============================================================
+    let coreRealtimeUnsubscribes = [];
+    let coreRealtimeStarted = false;
+    let adminInvoiceRealtimeUnsubscribe = null;
+    let adminInvoiceRealtimeStarted = false;
 
-      db.collection('categories').onSnapshot(snapshot => {
+    function stopRealtimeListeners() {
+      coreRealtimeUnsubscribes.forEach(unsub => {
+        try { if (typeof unsub === 'function') unsub(); } catch (_) {}
+      });
+      coreRealtimeUnsubscribes = [];
+      coreRealtimeStarted = false;
+
+      if (adminInvoiceRealtimeUnsubscribe) {
+        try { adminInvoiceRealtimeUnsubscribe(); } catch (_) {}
+        adminInvoiceRealtimeUnsubscribe = null;
+      }
+      adminInvoiceRealtimeStarted = false;
+    }
+
+    // للمدير فقط: نراقب آخر فاتورة بدلاً من مراقبة مجموعة invoices كاملة.
+    // عند إنشاء فاتورة جديدة تصل قراءة مستند واحد تقريباً، بدلاً من إعادة قراءة
+    // جميع الفواتير طوال اليوم. ويبقى العداد محدثاً أثناء استخدام المتجر فعلياً.
+    function startAdminInvoiceRealtime() {
+      if (adminInvoiceRealtimeStarted) return;
+      if (!(isAdmin || loggedAdmin)) return;
+
+      adminInvoiceRealtimeStarted = true;
+      try {
+        adminInvoiceRealtimeUnsubscribe = db.collection('invoices')
+          .orderBy('createdAt', 'desc')
+          .limit(1)
+          .onSnapshot(snapshot => {
+            if (snapshot.empty) return;
+
+            const doc = snapshot.docs[0];
+            const data = doc.data() || {};
+            if (!data.id) return;
+
+            const id = String(data.id);
+            const existingIndex = invoices.findIndex(inv => String(inv.id) === id);
+
+            if (existingIndex >= 0) {
+              invoices[existingIndex] = data;
+            } else {
+              invoices.unshift(data);
+            }
+
+            invoices.sort((a, b) => String(b.id).localeCompare(String(a.id)));
+            localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
+            updateUnreadInvoicesBadge();
+
+            const invoicesModal = document.getElementById('invoices-modal');
+            if (invoicesModal && !invoicesModal.classList.contains('hidden')) {
+              renderInvoicesList();
+            }
+          }, err => {
+            console.warn('تعذر تشغيل المزامنة الخفيفة للفواتير:', err);
+          });
+      } catch (err) {
+        adminInvoiceRealtimeStarted = false;
+        console.warn('تعذر بدء مستمع الفواتير:', err);
+      }
+    }
+
+    function startCoreRealtimeListeners() {
+      if (coreRealtimeStarted) return;
+      const isLogged = !!(isAdmin || loggedAdmin || loggedCustomer || loggedDelegate);
+      if (!isLogged) return;
+
+      coreRealtimeStarted = true;
+
+      const categoriesUnsub = db.collection('categories').onSnapshot(snapshot => {
         categories = [];
         snapshot.forEach(doc => {
           const data = doc.data();
@@ -1429,9 +1484,9 @@
         if (typeof renderTabs === 'function') renderTabs();
         if (typeof populateCategorySelect === 'function') populateCategorySelect();
         if (typeof updateProductsSortUI === 'function') updateProductsSortUI();
-      });
+      }, err => console.warn('تعذر مزامنة الأقسام:', err));
 
-      db.collection('products').onSnapshot(snapshot => {
+      const productsUnsub = db.collection('products').onSnapshot(snapshot => {
         products = [];
         snapshot.forEach(doc => {
           const data = doc.data();
@@ -1449,27 +1504,35 @@
           }
           if (typeof updateProductsSortUI === 'function') updateProductsSortUI();
         }
-      });
+      }, err => console.warn('تعذر مزامنة المنتجات:', err));
 
-      db.collection('customers').onSnapshot(snapshot => {
+      coreRealtimeUnsubscribes.push(categoriesUnsub, productsUnsub);
+    }
+
+    async function loadCustomersFromFirestore() {
+      try {
+        const snapshot = await db.collection('customers').get();
         customers = [];
         snapshot.forEach(doc => {
           const data = doc.data();
-          if (data && data.username && data.username !== 'undefined') {
-            customers.push(data);
-          }
+          if (data && data.username && data.username !== 'undefined') customers.push(data);
         });
         localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
         if (typeof renderAdminCustomersList === 'function') renderAdminCustomersList();
-      });
+        return true;
+      } catch (err) {
+        console.warn('تعذر تحميل الزبائن:', err);
+        return false;
+      }
+    }
 
-      db.collection('delegates').onSnapshot(snapshot => {
+    async function loadDelegatesFromFirestore() {
+      try {
+        const snapshot = await db.collection('delegates').get();
         delegates = [];
         snapshot.forEach(doc => {
           const data = doc.data();
-          if (data && data.username && data.username !== 'undefined') {
-            delegates.push(data);
-          }
+          if (data && data.username && data.username !== 'undefined') delegates.push(data);
         });
         localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
         if (typeof renderAdminDelegatesList === 'function') renderAdminDelegatesList();
@@ -1480,57 +1543,115 @@
             localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
           }
         }
-      });
+        return true;
+      } catch (err) {
+        console.warn('تعذر تحميل المندوبين:', err);
+        return false;
+      }
+    }
 
-      db.collection('notifications').onSnapshot(snapshot => {
-        notifications = [];
-        snapshot.forEach(doc => {
+    async function loadNotificationsFromFirestore(forceAll = false) {
+      try {
+        let snapshots = [];
+        if (!forceAll && (loggedCustomer || loggedDelegate)) {
+          const type = loggedCustomer ? 'customer' : 'delegate';
+          const username = loggedCustomer ? String(loggedCustomer.username) : String(loggedDelegate.username);
+          // نستخدم استعلاماً بحقل واحد في كل مرة لتجنب إنشاء فهارس مركبة غير ضرورية.
+          const [directSnap, broadcastSnap] = await Promise.all([
+            db.collection('notifications')
+              .where('recipientUsername', '==', username)
+              .get(),
+            db.collection('notifications')
+              .where('recipientUsername', '==', '*')
+              .get()
+          ]);
+          snapshots = [directSnap, broadcastSnap];
+        } else {
+          snapshots = [await db.collection('notifications').get()];
+        }
+
+        const byId = new Map();
+        snapshots.forEach(snapshot => snapshot.forEach(doc => {
           const data = doc.data() || {};
-          if (data.id || doc.id) notifications.push({ id: doc.id, ...data });
-        });
-        notifications.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+          if (data.id || doc.id) byId.set(String(doc.id), { id: doc.id, ...data });
+        }));
+        notifications = Array.from(byId.values());
+        notifications.sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
         localStorage.setItem('mustaqbal_notifications_cache', JSON.stringify(notifications));
         updateNotificationsBadge();
         renderNotificationsList();
         renderAdminSentNotifications();
-      }, err => {
-        console.error('خطأ في مزامنة الإشعارات:', err);
-        // لا نوقف بقية التطبيق إذا كانت قواعد notifications غير مفعلة.
+        return true;
+      } catch (err) {
+        console.warn('تعذر تحميل الإشعارات:', err);
         try {
           const cached = JSON.parse(localStorage.getItem('mustaqbal_notifications_cache') || '[]');
-          if (Array.isArray(cached)) {
-            notifications = cached;
-            updateNotificationsBadge();
-            renderNotificationsList();
-            renderAdminSentNotifications();
-          }
+          if (Array.isArray(cached)) notifications = cached;
         } catch (_) {}
-      });
+        updateNotificationsBadge();
+        return false;
+      }
+    }
 
-      db.collection('invoices').onSnapshot(snapshot => {
-        invoices = [];
-        snapshot.forEach(doc => {
+    async function loadInvoicesFromFirestore() {
+      try {
+        let snapshots = [];
+        if (loggedCustomer) {
+          snapshots = [await db.collection('invoices')
+            .where('customer.username', '==', 'زبون: ' + String(loggedCustomer.username)).get()];
+        } else if (loggedDelegate) {
+          const username = String(loggedDelegate.username);
+          const [delegateSnap, customerSnap] = await Promise.all([
+            db.collection('invoices').where('delegateUsername', '==', username).get(),
+            db.collection('invoices').where('customer.username', '==', 'مندوب: ' + username).get()
+          ]);
+          snapshots = [delegateSnap, customerSnap];
+        } else if (isAdmin || loggedAdmin) {
+          snapshots = [await db.collection('invoices').get()];
+        } else {
+          snapshots = [];
+        }
+
+        const byId = new Map();
+        snapshots.forEach(snapshot => snapshot.forEach(doc => {
           const data = doc.data();
-          if (data && data.id) {
-            invoices.push(data);
-          }
-        });
-        invoices.sort((a, b) => b.id.localeCompare(a.id));
+          if (data && data.id) byId.set(String(data.id), data);
+        }));
+        invoices = Array.from(byId.values());
+        invoices.sort((a, b) => String(b.id).localeCompare(String(a.id)));
         localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
-        const invoicesModal = document.getElementById('invoices-modal');
         updateUnreadInvoicesBadge();
-        if (invoicesModal && !invoicesModal.classList.contains('hidden')) {
-          renderInvoicesList();
-        }
-        const topCustomersModal = document.getElementById('top-customers-modal');
-        if (topCustomersModal && !topCustomersModal.classList.contains('hidden')) {
-          renderTopCustomersList();
-        }
-        const productStatsModal = document.getElementById('product-stats-modal');
-        if (productStatsModal && !productStatsModal.classList.contains('hidden')) {
-          renderProductStatsReceipt();
-        }
-      });
+        return true;
+      } catch (err) {
+        console.warn('تعذر تحميل الفواتير:', err);
+        try {
+          const cached = JSON.parse(localStorage.getItem('mustaqbal_invoices') || '[]');
+          if (Array.isArray(cached)) invoices = cached;
+        } catch (_) {}
+        updateUnreadInvoicesBadge();
+        return false;
+      }
+    }
+
+    async function refreshOnLoginData() {
+      startCoreRealtimeListeners();
+
+      // الإشعارات للمستخدم الحالي فقط، بدلاً من تحميل مجموعة notifications كاملة.
+      if (loggedCustomer || loggedDelegate) {
+        await loadNotificationsFromFirestore(false);
+      }
+
+      if (isAdmin || loggedAdmin) {
+        // تحميل الفواتير مرة عند تسجيل الدخول لضبط العداد والحالة الحالية.
+        // بعد ذلك تتم مراقبة آخر فاتورة فقط بشكل خفيف، وليس المجموعة كاملة.
+        await loadInvoicesFromFirestore();
+        startAdminInvoiceRealtime();
+      }
+    }
+
+    // التوافق مع الاستدعاءات القديمة في الملف.
+    function initRealtimeListeners() {
+      startCoreRealtimeListeners();
     }
 
     function monitorActiveSession() {
@@ -1590,80 +1711,30 @@
     async function refreshAppData() {
       try {
         const btn = document.querySelector('header button[onclick="refreshAppData()"]');
-        if(btn) btn.innerText = "⏳ جاري التحديث...";
+        if (btn) btn.innerText = "⏳ جاري التحديث...";
 
-        // تحميل بيانات المشروع الأساسية بشكل مستقل عن الإشعارات،
-        // حتى لا يؤدي عدم وجود صلاحية لمجموعة notifications إلى فشل تحميل المشروع كله.
-        const [catSnap, prodSnap, custSnap, delSnap, invSnap, adminSnap] = await Promise.all([
-          db.collection('categories').get(),
-          db.collection('products').get(),
-          db.collection('customers').get(),
-          db.collection('delegates').get(),
-          db.collection('invoices').get(),
-          db.collection('adminAccounts').get()
-        ]);
+        // التحديث اليدوي ما زال متاحاً، لكنه يُنفذ فقط عند طلب المدير له.
+        // لا توجد الآن قراءات كاملة مستمرة للفواتير/الإشعارات/الزبائن/المندوبين.
+        startCoreRealtimeListeners();
 
-        let notifSnap = null;
-        try {
-          notifSnap = await db.collection('notifications').get();
-        } catch (notifErr) {
-          console.warn('تعذر تحميل الإشعارات من Firestore:', notifErr);
-          // نستمر باستخدام النسخة المحلية إن وجدت.
-          try {
-            notifications = JSON.parse(localStorage.getItem('mustaqbal_notifications_cache') || '[]');
-          } catch (_) {
-            notifications = [];
-          }
+        const tasks = [];
+
+        if (isAdmin || loggedAdmin) {
+          tasks.push(loadCustomersFromFirestore());
+          tasks.push(loadDelegatesFromFirestore());
+          tasks.push(loadInvoicesFromFirestore());
+          tasks.push(loadNotificationsFromFirestore(true));
+          tasks.push(loadAdminAccountsFromFirestore());
+        } else if (loggedCustomer || loggedDelegate) {
+          tasks.push(loadInvoicesFromFirestore());
+          tasks.push(loadNotificationsFromFirestore(false));
         }
 
-        categories = [];
-        catSnap.forEach(doc => { if (doc.data().id) categories.push(doc.data()); });
-        categories.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
-        ensureDefaultCategories();
-
-        products = [];
-        prodSnap.forEach(doc => { if (doc.data().id) products.push(doc.data()); });
-
-        customers = [];
-        custSnap.forEach(doc => { if (doc.data().username) customers.push(doc.data()); });
-
-        delegates = [];
-        delSnap.forEach(doc => { 
-          const dData = doc.data();
-          if (dData.username) delegates.push(dData); 
-        });
-
-        adminAccounts = [];
-        adminSnap.forEach(doc => {
-          const data = doc.data() || {};
-          if (doc.id !== 'admin') {
-            const account = normalizeAdminAccount(Object.assign({}, data, { username: data.username || doc.id }));
-            if (account.username) adminAccounts.push(account);
-          }
-        });
-        localStorage.setItem('mustaqbal_admin_accounts', JSON.stringify(adminAccounts));
-        renderAdminAccountsList();
-
-        if (loggedDelegate) {
-          const foundD = delegates.find(d => d.username === loggedDelegate.username);
-          if (foundD) { loggedDelegate = foundD; localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate)); }
-        }
-
-        invoices = [];
-        invSnap.forEach(doc => { if (doc.data().id) invoices.push(doc.data()); });
-        invoices.sort((a, b) => b.id.localeCompare(a.id));
-
-        if (notifSnap) {
-          notifications = [];
-          notifSnap.forEach(doc => { notifications.push({ id: doc.id, ...(doc.data() || {}) }); });
-          notifications.sort((a,b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
-        } else {
-          notifications = notifications || [];
-        }
+        await Promise.all(tasks);
 
         saveData();
-        localStorage.setItem('mustaqbal_notifications_cache', JSON.stringify(notifications));
         updateNotificationsBadge();
+        updateUnreadInvoicesBadge();
         renderTabs();
         renderProducts();
         populateCategorySelect();
@@ -1671,12 +1742,15 @@
         renderAdminDelegatesList();
         renderDelegateClientsList();
 
-        if(btn) {
+        if (btn) {
           btn.innerText = "🔄 تم التحديث";
           setTimeout(() => { btn.innerText = "🔄 تحديث"; }, 2000);
         }
       } catch (err) {
+        console.error('خطأ أثناء التحديث:', err);
         alert("حدث خطأ أثناء تحديث البيانات.");
+        const btn = document.querySelector('header button[onclick="refreshAppData()"]');
+        if (btn) btn.innerText = "🔄 تحديث";
       }
     }
 
@@ -1819,9 +1893,10 @@
     let loggedDelegate = JSON.parse(localStorage.getItem('loggedDelegate')) || null;
     let currentImageData = "";
 
-    document.addEventListener('DOMContentLoaded', () => {
-      initRealtimeListeners();
+    document.addEventListener('DOMContentLoaded', async () => {
+      // نحدد الجلسة أولاً حتى لا نبدأ أي مستمع Firestore إذا لم يوجد مستخدم مسجل.
       checkInitialSessionState();
+      await refreshOnLoginData();
 
       // عند فتح التطبيق لأول مرة: جميع المنتجات من الأقدم إلى الأحدث.
       resetProductsToOldestOnReturn();
@@ -1938,9 +2013,9 @@
     function openLoginModal() { document.getElementById('login-modal').classList.remove('hidden'); }
     function closeLoginModal() { document.getElementById('login-modal').classList.add('hidden'); }
 
-    function openAdminCustomersModal() { if (!requireAdminPermission('createCustomers')) return; document.getElementById('admin-customers-modal').classList.remove('hidden'); }
+    async function openAdminCustomersModal() { if (!requireAdminPermission('createCustomers')) return; document.getElementById('admin-customers-modal').classList.remove('hidden'); await loadCustomersFromFirestore(); }
     function closeAdminCustomersModal() { document.getElementById('admin-customers-modal').classList.add('hidden'); }
-    function openAdminDelegatesModal() { if (!requireAdminPermission('createDelegates')) return; document.getElementById('admin-delegates-modal').classList.remove('hidden'); }
+    async function openAdminDelegatesModal() { if (!requireAdminPermission('createDelegates')) return; document.getElementById('admin-delegates-modal').classList.remove('hidden'); await loadDelegatesFromFirestore(); }
     function closeAdminDelegatesModal() { document.getElementById('admin-delegates-modal').classList.add('hidden'); }
 
     async function handleUnifiedLogin(e) {
@@ -2228,6 +2303,7 @@
       document.getElementById('login-username').value = '';
       document.getElementById('login-password').value = '';
       checkInitialSessionState();
+      refreshOnLoginData();
       renderTabs();
       renderProducts();
       updateCartUI();
@@ -2243,6 +2319,7 @@
         activeSessionUnsubscribe();
         activeSessionUnsubscribe = null;
       }
+      stopRealtimeListeners();
 
       try {
         if (loggedCustomer) {
@@ -2313,9 +2390,10 @@
       return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
     }
 
-    function openAdminNotificationsModal() {
+    async function openAdminNotificationsModal() {
       if (!requireAdminPermission('sendNotifications')) return;
       document.getElementById('admin-notifications-modal').classList.remove('hidden');
+      await Promise.all([loadCustomersFromFirestore(), loadDelegatesFromFirestore(), loadNotificationsFromFirestore(true)]);
       updateNotificationRecipientOptions();
       renderAdminSentNotifications();
       const c = document.getElementById('notification-customers-count');
@@ -2438,11 +2516,17 @@
       }
     }
 
-    function openNotificationsModal() {
+    async function openNotificationsModal() {
       document.getElementById('notifications-modal').classList.remove('hidden');
       const title = document.getElementById('notifications-modal-title');
       if (title) title.innerText = loggedDelegate ? '🔔 إشعارات المندوب' : '🔔 إشعارات الزبون';
       setNotificationFilter('all');
+
+      // تحديث الإشعارات عند فتح النافذة فقط، بدلاً من مراقبتها طوال اليوم.
+      if (loggedCustomer || loggedDelegate) {
+        await loadNotificationsFromFirestore(false);
+      }
+
       // لا نعتبر الإشعارات مقروءة عند فتح القائمة؛ تصبح مقروءة فقط عند الضغط عليها.
       updateNotificationsBadge();
       renderNotificationsList();
@@ -4117,11 +4201,12 @@
       }
     }
 
-    function openInvoicesModal() {
+    async function openInvoicesModal() {
       if ((isAdmin || loggedAdmin) && !requireAdminPermission('deleteInvoices')) return;
+      document.getElementById('invoices-modal').classList.remove('hidden');
+      await loadInvoicesFromFirestore();
       renderInvoicesList();
       updateUnreadInvoicesBadge();
-      document.getElementById('invoices-modal').classList.remove('hidden');
     }
 
     function renderInvoicesList() {
