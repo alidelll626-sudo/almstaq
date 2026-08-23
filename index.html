@@ -215,6 +215,129 @@
       box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
     }
 
+    /* ===== فلتر ترتيب المنتجات ===== */
+    .products-sortbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 20;
+    }
+
+    .products-filter-btn {
+      width: 42px;
+      height: 42px;
+      border: 1px solid var(--border-color);
+      background: var(--card-bg);
+      color: var(--text-main);
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(15,23,42,.06);
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease, background .18s ease;
+    }
+
+    .products-filter-btn:hover {
+      border-color: #bae6fd;
+      box-shadow: 0 7px 18px rgba(2,132,199,.12);
+    }
+
+    .products-filter-btn:active {
+      transform: scale(.94);
+    }
+
+    .products-filter-btn.active {
+      background: var(--primary-light);
+      border-color: #7dd3fc;
+      color: var(--primary-dark);
+    }
+
+    .products-filter-btn svg {
+      width: 20px;
+      height: 20px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .products-sort-menu {
+      position: absolute;
+      top: 48px;
+      right: 0;
+      width: min(235px, calc(100vw - 24px));
+      padding: 8px;
+      background: rgba(255,255,255,.98);
+      border: 1px solid var(--border-color);
+      border-radius: 18px;
+      box-shadow: 0 16px 35px rgba(15,23,42,.14);
+      backdrop-filter: blur(12px);
+      display: none;
+    }
+
+    .products-sort-menu.open {
+      display: block;
+      animation: sortMenuIn .18s ease;
+    }
+
+    @keyframes sortMenuIn {
+      from { opacity: 0; transform: translateY(-5px) scale(.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .products-sort-title {
+      padding: 7px 10px 5px;
+      color: var(--text-muted);
+      font-size: .7rem;
+      font-weight: 800;
+    }
+
+    .products-sort-option {
+      width: 100%;
+      border: 0;
+      background: transparent;
+      color: var(--text-main);
+      padding: 11px 12px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      cursor: pointer;
+      font-size: .82rem;
+      font-weight: 750;
+      text-align: right;
+    }
+
+    .products-sort-option:hover {
+      background: var(--bg-surface);
+    }
+
+    .products-sort-option.selected {
+      background: var(--primary-light);
+      color: var(--primary-dark);
+    }
+
+    .products-sort-option .sort-option-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #f1f5f9;
+      font-size: .95rem;
+    }
+
+    .products-sort-option.selected .sort-option-icon {
+      background: #bae6fd;
+    }
+
     .products-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
@@ -670,10 +793,43 @@
     .notification-filter-tabs button { border:1px solid var(--border-color); background:#fff; color:var(--text-muted); border-radius:999px; padding:7px 12px; font-size:.72rem; font-weight:800; cursor:pointer; white-space:nowrap; }
     .notification-filter-tabs button.active { background:var(--primary); color:#fff; border-color:var(--primary); }
 
+
+    .admin-permissions-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .admin-permission-item { display:flex; align-items:center; gap:9px; padding:10px 11px; background:#f8fafc; border:1px solid var(--border-color); border-radius:12px; cursor:pointer; font-size:.78rem; font-weight:700; }
+    .admin-permission-item input { width:18px; height:18px; accent-color:var(--primary); }
+    .admin-account-card {
+      background:#fff !important;
+      border:1px solid #dbe3ec !important;
+      border-radius:16px !important;
+      padding:14px !important;
+      display:flex !important;
+      flex-direction:column !important;
+      gap:9px !important;
+      color:#111827 !important;
+      box-shadow:0 3px 12px rgba(15,23,42,.08) !important;
+      width:100% !important;
+      box-sizing:border-box !important;
+      position:relative !important;
+      z-index:2 !important;
+    }
+    .admin-account-card strong { color:#111827 !important; font-size:.95rem !important; }
+    .admin-account-card .notification-chip { background:#e8f1f8 !important; color:#334155 !important; }
+    .admin-account-actions { display:flex; gap:8px; width:100%; }
+    .admin-account-actions button { flex:1; min-height:42px; font-weight:800; }
+    .admin-accounts-list-visible {
+      max-height:none !important;
+      overflow:visible !important;
+      width:100% !important;
+      box-sizing:border-box !important;
+    }
+    .admin-account-actions { display:flex; gap:6px; }
+    .admin-account-actions button { flex:1; }
+    @media (max-width:520px) { .admin-permissions-grid { grid-template-columns:1fr; } }
     .hidden { display: none !important; }
   
     /* نافذة عرض تفاصيل الإشعار */
-    .notification-view-modal .modal-content { max-width: 560px; width: calc(100% - 28px); border-radius: 24px; overflow: hidden; }
+    .notification-view-modal { z-index: 2000 !important; align-items: center; }
+    .notification-view-modal .modal-content { max-width: 560px; width: calc(100% - 28px); max-height: 88vh; border-radius: 24px; overflow: hidden; position: relative; z-index: 2001; }
     .notification-view-hero { padding: 22px 20px 18px; background: linear-gradient(135deg,var(--primary),var(--primary-dark)); color:#fff; position:relative; }
     .notification-view-icon { width:58px;height:58px;border-radius:18px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:30px;margin-bottom:12px; }
     .notification-view-title { font-size:1.15rem;font-weight:900;line-height:1.5;word-break:break-word;padding-left:34px; }
@@ -722,6 +878,34 @@
         <div id="vertical-tabs" style="display: flex; gap: 8px;"></div>
       </div>
 
+      <div class="products-sortbar hidden" id="products-sortbar">
+        <button
+          id="products-filter-btn"
+          class="products-filter-btn"
+          type="button"
+          onclick="toggleProductsSortMenu(event)"
+          aria-label="فلترة ترتيب المنتجات"
+          title="ترتيب المنتجات">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 6h16"></path>
+            <path d="M7 12h10"></path>
+            <path d="M10 18h4"></path>
+          </svg>
+        </button>
+
+        <div id="products-sort-menu" class="products-sort-menu">
+          <div class="products-sort-title">ترتيب المنتجات</div>
+          <button id="sort-newest-btn" class="products-sort-option" type="button" onclick="setProductsSort('newest')">
+            <span>الأحدث أولاً</span>
+            <span class="sort-option-icon">⬆️</span>
+          </button>
+          <button id="sort-oldest-btn" class="products-sort-option" type="button" onclick="setProductsSort('oldest')">
+            <span>الأقدم أولاً</span>
+            <span class="sort-option-icon">⬇️</span>
+          </button>
+        </div>
+      </div>
+
       <!-- واجهة المدير الرئيسية بالأيقونات الاربع -->
       <div id="admin-panel" class="admin-panel hidden">
         <h2>لوحة تحكم المدير</h2>
@@ -746,6 +930,10 @@
           <div class="admin-card-btn" onclick="openAdminNotificationsModal()">
             <span>🔔</span>
             <span>إرسال الإشعارات</span>
+          </div>
+          <div class="admin-card-btn" id="admin-accounts-card" onclick="openAdminAccountsModal()">
+            <span>👨‍💼</span>
+            <span>حسابات المدراء</span>
           </div>
         </div>
 
@@ -775,7 +963,7 @@
 
         <hr style="border: 0; border-top: 1px solid var(--border-color);">
 
-        <div>
+        <div id="owner-password-change-box">
           <h2 style="font-size: 0.85rem; margin-bottom: 6px;">تغيير كلمة سر المدير</h2>
           <form onsubmit="handleAdminPasswordChange(event)" style="display: flex; gap: 6px;">
             <input type="password" id="new-admin-pass" placeholder="كلمة المرور الجديدة" required class="compact-input" style="flex:1;">
@@ -1072,6 +1260,47 @@
       </div>
     </div>
 
+
+    <!-- نافذة إدارة حسابات المدراء -->
+    <div id="admin-accounts-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>👨‍💼 إدارة حسابات المدراء</h3>
+          <button class="close-modal" onclick="closeAdminAccountsModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <form id="admin-account-form" onsubmit="handleAdminAccountSubmit(event)" class="form-row">
+            <input type="hidden" id="edit-admin-username-flag">
+            <input type="text" id="new-admin-username" placeholder="اسم المستخدم" required class="compact-input">
+            <input type="password" id="new-admin-password" placeholder="كلمة السر" required class="compact-input">
+            <input type="text" id="new-admin-fullname" placeholder="اسم المدير" required class="compact-input">
+            <div>
+              <div style="font-size:.78rem;font-weight:800;color:var(--primary-dark);margin-bottom:7px;">الصلاحيات</div>
+              <div class="admin-permissions-grid">
+                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="addProducts"> إضافة منتجات</label>
+                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="editProducts"> التعديل على المنتجات</label>
+                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="deleteProducts"> حذف المنتجات</label>
+                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="createCustomers"> إنشاء حسابات الزبائن</label>
+                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="createDelegates"> إنشاء حسابات المندوبين</label>
+                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="deleteInvoices"> حذف الفواتير السابقة</label>
+                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="sendNotifications"> إرسال الإشعارات</label>
+              </div>
+            </div>
+            <div style="display:flex;gap:7px;">
+              <button type="button" class="btn btn-secondary" onclick="selectAllAdminPermissions()">تحديد الكل</button>
+              <button type="button" class="btn btn-secondary" onclick="clearAllAdminPermissions()">إلغاء الكل</button>
+            </div>
+            <button type="submit" class="btn" id="save-admin-account-btn">إنشاء حساب المدير</button>
+          </form>
+          <hr style="border:0;border-top:1px solid var(--border-color);">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px;padding:10px 12px;background:#f1f7fb;border:1px solid #dbeafe;border-radius:14px;font-weight:900;color:#0f3d56;"><span>👨‍💼 حسابات المدراء المحفوظة في Firestore</span><span id="admin-accounts-count" class="notification-chip">0</span></div><div id="admin-accounts-list" class="admin-accounts-list-visible" style="display:flex;flex-direction:column;gap:10px;min-height:20px;max-height:none;overflow:visible;visibility:visible;opacity:1;"></div>
+          <div style="margin-top:8px;padding:9px 11px;background:#f8fafc;border:1px solid var(--border-color);border-radius:12px;font-size:.7rem;color:var(--text-muted);line-height:1.7;">
+            يمكنك الضغط على «تعديل» لتغيير اسم المستخدم أو كلمة السر أو اسم المدير أو إضافة/إزالة أي صلاحية، ثم الضغط على «تحديث حساب المدير».
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- نافذة تفاصيل الإشعار عند الضغط عليه -->
     <div id="notification-view-modal" class="modal hidden notification-view-modal" role="dialog" aria-modal="true" aria-labelledby="notification-view-title">
       <div class="modal-content">
@@ -1136,6 +1365,29 @@
     let activeSessionUnsubscribe = null;
 
     function initRealtimeListeners() {
+      db.collection('adminAccounts').onSnapshot(snapshot => {
+        const loaded = [];
+        snapshot.forEach(doc => {
+          const data = doc.data() || {};
+          // نستخدم رقم المستند كاسم مستخدم احتياطي حتى تظهر الحسابات
+          // حتى لو كانت الوثيقة القديمة لا تحتوي على username.
+          if (doc.id !== 'admin') {
+            const account = normalizeAdminAccount(Object.assign({}, data, {
+              username: data.username || doc.id
+            }));
+            if (account.username) loaded.push(account);
+          }
+        });
+        adminAccounts = loaded;
+        localStorage.setItem('mustaqbal_admin_accounts', JSON.stringify(adminAccounts));
+        // لا نعيد رسم القائمة هنا؛ نافذة حسابات المدراء تستخدم
+        // forceRenderAdminAccountsFromFirestore() مباشرةً من Firestore.
+      }, err => {
+        console.warn('تعذر تحميل حسابات المدراء:', err);
+        // لا نمسح القائمة المحلية عند فشل الاتصال.
+        renderAdminAccountsList();
+      });
+
       db.collection('categories').onSnapshot(snapshot => {
         categories = [];
         snapshot.forEach(doc => {
@@ -1149,6 +1401,7 @@
         localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
         if (typeof renderTabs === 'function') renderTabs();
         if (typeof populateCategorySelect === 'function') populateCategorySelect();
+        if (typeof updateProductsSortUI === 'function') updateProductsSortUI();
       });
 
       db.collection('products').onSnapshot(snapshot => {
@@ -1167,6 +1420,7 @@
           } else {
             renderProducts();
           }
+          if (typeof updateProductsSortUI === 'function') updateProductsSortUI();
         }
       });
 
@@ -1312,12 +1566,13 @@
 
         // تحميل بيانات المشروع الأساسية بشكل مستقل عن الإشعارات،
         // حتى لا يؤدي عدم وجود صلاحية لمجموعة notifications إلى فشل تحميل المشروع كله.
-        const [catSnap, prodSnap, custSnap, delSnap, invSnap] = await Promise.all([
+        const [catSnap, prodSnap, custSnap, delSnap, invSnap, adminSnap] = await Promise.all([
           db.collection('categories').get(),
           db.collection('products').get(),
           db.collection('customers').get(),
           db.collection('delegates').get(),
-          db.collection('invoices').get()
+          db.collection('invoices').get(),
+          db.collection('adminAccounts').get()
         ]);
 
         let notifSnap = null;
@@ -1349,6 +1604,17 @@
           const dData = doc.data();
           if (dData.username) delegates.push(dData); 
         });
+
+        adminAccounts = [];
+        adminSnap.forEach(doc => {
+          const data = doc.data() || {};
+          if (doc.id !== 'admin') {
+            const account = normalizeAdminAccount(Object.assign({}, data, { username: data.username || doc.id }));
+            if (account.username) adminAccounts.push(account);
+          }
+        });
+        localStorage.setItem('mustaqbal_admin_accounts', JSON.stringify(adminAccounts));
+        renderAdminAccountsList();
 
         if (loggedDelegate) {
           const foundD = delegates.find(d => d.username === loggedDelegate.username);
@@ -1426,6 +1692,37 @@
     let customers = JSON.parse(localStorage.getItem('mustaqbal_customers')) || [];
     let delegates = JSON.parse(localStorage.getItem('mustaqbal_delegates')) || [];
     let adminPassword = localStorage.getItem('mustaqbal_admin_pass') || '799673';
+    const ADMIN_PERMISSION_KEYS = ['addProducts','editProducts','deleteProducts','createCustomers','createDelegates','deleteInvoices','sendNotifications'];
+    const ADMIN_PERMISSION_LABELS = {
+      addProducts:'إضافة منتجات', editProducts:'التعديل على المنتجات', deleteProducts:'حذف المنتجات',
+      createCustomers:'إنشاء حسابات الزبائن', createDelegates:'إنشاء حسابات المندوبين',
+      deleteInvoices:'حذف الفواتير السابقة', sendNotifications:'إرسال الإشعارات'
+    };
+    let adminAccounts = JSON.parse(localStorage.getItem('mustaqbal_admin_accounts') || '[]');
+    let loggedAdmin = JSON.parse(localStorage.getItem('loggedAdmin') || 'null');
+    let adminForceLogoutUnsubscribe = null;
+    let adminSessionToken = localStorage.getItem('mustaqbal_admin_session_token') || '';
+    function getDefaultAdminPermissions() {
+      return Object.fromEntries(ADMIN_PERMISSION_KEYS.map(k => [k, true]));
+    }
+    function normalizeAdminAccount(a) {
+      const sourcePermissions = (a && a.permissions && typeof a.permissions === 'object') ? a.permissions : {};
+      const permissions = {};
+      // لا نفترض أن الصلاحية مفعّلة. نحافظ على false المحفوظة في Firestore،
+      // ونضع false لأي صلاحية لم تُحفظ بعد. المدير الرئيسي فقط يحصل على الكل.
+      ADMIN_PERMISSION_KEYS.forEach(k => { permissions[k] = sourcePermissions[k] === true; });
+      return {
+        username:String(a && a.username || ''),
+        password:String(a && a.password || ''),
+        fullname:String((a && a.fullname) || (a && a.username) || ''),
+        permissions,
+        deviceId:String(a && a.deviceId || ''),
+        sessionToken:String(a && a.sessionToken || ''),
+        forceLogoutAt:Number(a && a.forceLogoutAt || 0),
+        accountUpdatedAt:Number(a && a.accountUpdatedAt || 0)
+      };
+    }
+    adminAccounts = adminAccounts.map(normalizeAdminAccount).filter(a => a.username);
     
     let customerCart = JSON.parse(localStorage.getItem('mustaqbal_customer_cart')) || [];
     let delegateCart = JSON.parse(localStorage.getItem('mustaqbal_delegate_cart')) || [];
@@ -1434,6 +1731,42 @@
     let notifications = [];
     let notificationFilter = 'all';
     let activeCategory = 'all';
+
+    // ترتيب كل تبويب محفوظ بشكل مستقل:
+    // جميع المنتجات = الأقدم أولاً كإعداد افتراضي ثابت.
+    // بقية التبويبات = الأحدث أولاً كإعداد افتراضي.
+    let productSortModes = JSON.parse(localStorage.getItem('mustaqbal_product_sort_modes') || '{}');
+    let productsSortMenuOpen = false;
+
+    function getDefaultProductSort(categoryId = activeCategory) {
+      return categoryId === 'all' ? 'oldest' : 'newest';
+    }
+
+    function getProductSortMode(categoryId = activeCategory) {
+      const saved = productSortModes && productSortModes[categoryId];
+      return saved === 'newest' || saved === 'oldest' ? saved : getDefaultProductSort(categoryId);
+    }
+
+    function saveProductSortModes() {
+      localStorage.setItem('mustaqbal_product_sort_modes', JSON.stringify(productSortModes || {}));
+    }
+
+    function getProductCreatedTime(product) {
+      const raw = product && (product.createdAt ?? product.addedAt ?? product.created_at);
+      const numericRaw = Number(raw);
+
+      if (Number.isFinite(numericRaw) && numericRaw > 0) {
+        return numericRaw;
+      }
+
+      // المنتجات القديمة في النسخ السابقة كان رقم id الخاص بها مبنياً على Date.now().
+      const numericId = Number(product && product.id);
+      if (Number.isFinite(numericId) && numericId > 0) {
+        return numericId;
+      }
+
+      return 0;
+    }
 
     let isAdmin = localStorage.getItem('isAdmin') === 'true';
     let loggedCustomer = JSON.parse(localStorage.getItem('loggedCustomer')) || null;
@@ -1445,17 +1778,25 @@
       checkInitialSessionState();
       renderTabs();
       renderProducts();
+      updateProductsSortUI();
       updateCartUI();
       populateCategorySelect();
       setupImageUploader();
       renderAdminCustomersList();
       renderAdminDelegatesList();
+      renderAdminAccountsList();
       renderDelegateClientsList();
       monitorActiveSession();
       updateNotificationsBadge();
     });
 
     function checkInitialSessionState() {
+      if (loggedAdmin) {
+        isAdmin = String(loggedAdmin.username || '') === 'admin';
+        startAdminSessionMonitor();
+      } else {
+        isAdmin = localStorage.getItem('isAdmin') === 'true';
+      }
       const displaySpan = document.getElementById('logged-user-display');
       const logoutBtn = document.getElementById('logout-btn');
       const loginBtn = document.getElementById('open-login-btn');
@@ -1471,7 +1812,7 @@
       const navNotificationsBtn = document.getElementById('nav-notifications-btn');
       const openCartBtn = document.getElementById('open-cart-btn');
 
-      const isLogged = isAdmin || loggedCustomer || loggedDelegate;
+      const isLogged = isAdmin || loggedAdmin || loggedCustomer || loggedDelegate;
 
       if (isLogged) {
         if (logoutBtn) logoutBtn.classList.remove('hidden');
@@ -1481,8 +1822,8 @@
         if (productsGrid) productsGrid.classList.remove('hidden');
         if (loggedOutWelcome) loggedOutWelcome.classList.add('hidden');
 
-        if (isAdmin) {
-          if (displaySpan) displaySpan.innerText = 'المدير';
+        if (isAdmin || loggedAdmin) {
+          if (displaySpan) displaySpan.innerText = isAdmin ? 'المدير الرئيسي (admin)' : `المدير: ${loggedAdmin.fullname || loggedAdmin.username}`;
           if (adminPanel) adminPanel.classList.remove('hidden');
           if (adminTabCreator) adminTabCreator.classList.remove('hidden');
           if (openCartBtn) openCartBtn.classList.add('hidden');
@@ -1499,6 +1840,7 @@
           if (navInvoicesBtn) navInvoicesBtn.classList.remove('hidden');
           if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.remove('hidden');
           if (navNotificationsBtn) navNotificationsBtn.classList.remove('hidden');
+          applyAdminPermissionsUI();
           updateNotificationsBadge();
         } else {
           if (displaySpan && loggedCustomer) displaySpan.innerText = `${loggedCustomer.fullname || loggedCustomer.username}`;
@@ -1527,14 +1869,17 @@
         if (navNotificationsBtn) navNotificationsBtn.classList.add('hidden');
         if (openCartBtn) openCartBtn.classList.add('hidden');
       }
+
+      // إعادة تطبيق صلاحيات المدير بعد استعادة الجلسة أو تغييرها.
+      applyAdminPermissionsUI();
     }
 
     function openLoginModal() { document.getElementById('login-modal').classList.remove('hidden'); }
     function closeLoginModal() { document.getElementById('login-modal').classList.add('hidden'); }
 
-    function openAdminCustomersModal() { document.getElementById('admin-customers-modal').classList.remove('hidden'); }
+    function openAdminCustomersModal() { if (!requireAdminPermission('createCustomers')) return; document.getElementById('admin-customers-modal').classList.remove('hidden'); }
     function closeAdminCustomersModal() { document.getElementById('admin-customers-modal').classList.add('hidden'); }
-    function openAdminDelegatesModal() { document.getElementById('admin-delegates-modal').classList.remove('hidden'); }
+    function openAdminDelegatesModal() { if (!requireAdminPermission('createDelegates')) return; document.getElementById('admin-delegates-modal').classList.remove('hidden'); }
     function closeAdminDelegatesModal() { document.getElementById('admin-delegates-modal').classList.add('hidden'); }
 
     async function handleUnifiedLogin(e) {
@@ -1543,14 +1888,74 @@
       const p = document.getElementById('login-password').value.trim();
 
       if (u === 'admin' && p === adminPassword) {
-        isAdmin = true;
-        loggedCustomer = null;
-        loggedDelegate = null;
-        localStorage.removeItem('loggedCustomer');
-        localStorage.removeItem('loggedDelegate');
-        localStorage.setItem('isAdmin', 'true');
-        finishLoginProcess();
-        return;
+        try {
+          const ownerRef = db.collection('adminAccounts').doc('admin');
+          const ownerSnap = await ownerRef.get();
+          const owner = normalizeAdminAccount(ownerSnap.exists ? ownerSnap.data() : {
+            username:'admin', password:adminPassword, fullname:'المدير الرئيسي',
+            permissions:getDefaultAdminPermissions()
+          });
+          if (owner.deviceId && owner.deviceId !== deviceId) {
+            alert('حساب المدير الرئيسي مفتوح حالياً في متصفح أو تطبيق آخر! يرجى تسجيل الخروج منه أولاً.');
+            return;
+          }
+          adminSessionToken = 'adm_' + Math.random().toString(36).slice(2) + Date.now();
+          owner.password = adminPassword;
+          owner.deviceId = deviceId;
+          owner.sessionToken = adminSessionToken;
+          owner.permissions = getDefaultAdminPermissions();
+          await ownerRef.set(owner, {merge:true});
+          loggedAdmin = owner;
+          isAdmin = true;
+          loggedCustomer = null;
+          loggedDelegate = null;
+          localStorage.setItem('loggedAdmin', JSON.stringify(loggedAdmin));
+          localStorage.setItem('mustaqbal_admin_session_token', adminSessionToken);
+          localStorage.removeItem('loggedCustomer');
+          localStorage.removeItem('loggedDelegate');
+          localStorage.setItem('isAdmin', 'true');
+          finishLoginProcess();
+          startAdminSessionMonitor();
+          return;
+        } catch (ownerErr) {
+          console.error('خطأ في جلسة المدير الرئيسي:', ownerErr);
+          alert('تعذر إنشاء جلسة المدير الرئيسي. تحقق من اتصال Firestore وقواعد الصلاحيات.');
+          return;
+        }
+      }
+
+      try {
+        const adminDoc = await db.collection('adminAccounts').doc(u).get();
+        if (adminDoc.exists) {
+          const foundAdmin = normalizeAdminAccount(adminDoc.data());
+          if (foundAdmin.password === p) {
+            if (foundAdmin.deviceId && foundAdmin.deviceId !== deviceId) {
+              alert('هذا الحساب مفتوح حالياً في متصفح أو تطبيق آخر! يرجى تسجيل الخروج منه أولاً.');
+              return;
+            }
+            adminSessionToken = 'adm_' + Math.random().toString(36).slice(2) + Date.now();
+            foundAdmin.deviceId = deviceId;
+            foundAdmin.sessionToken = adminSessionToken;
+            await db.collection('adminAccounts').doc(u).set(foundAdmin, {merge:true});
+            adminAccounts = adminAccounts.filter(a => a.username !== u);
+            adminAccounts.push(foundAdmin);
+            localStorage.setItem('mustaqbal_admin_accounts', JSON.stringify(adminAccounts));
+            loggedAdmin = foundAdmin;
+            isAdmin = false;
+            loggedCustomer = null;
+            loggedDelegate = null;
+            localStorage.setItem('loggedAdmin', JSON.stringify(loggedAdmin));
+            localStorage.setItem('mustaqbal_admin_session_token', adminSessionToken);
+            localStorage.removeItem('loggedCustomer');
+            localStorage.removeItem('loggedDelegate');
+            localStorage.setItem('isAdmin', 'false');
+            finishLoginProcess();
+            startAdminSessionMonitor();
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('خطأ أثناء تسجيل الدخول كمدير فرعي:', err);
       }
 
       try {
@@ -1663,6 +2068,95 @@
       });
     }
 
+    function stopAdminSessionMonitor() {
+      if (adminForceLogoutUnsubscribe) {
+        try { adminForceLogoutUnsubscribe(); } catch(e) {}
+        adminForceLogoutUnsubscribe = null;
+      }
+    }
+
+    function startAdminSessionMonitor() {
+      stopAdminSessionMonitor();
+      if (!loggedAdmin || !loggedAdmin.username) return;
+      const username = String(loggedAdmin.username);
+      const ref = db.collection('adminAccounts').doc(username);
+      const initialToken = String(loggedAdmin.sessionToken || adminSessionToken || '');
+      adminForceLogoutUnsubscribe = ref.onSnapshot((doc) => {
+        if (!doc.exists || !loggedAdmin) return;
+        const data = normalizeAdminAccount(doc.data());
+        if (data.deviceId && data.deviceId !== deviceId) {
+          alert('تم فتح حساب المدير من متصفح أو تطبيق آخر، لذلك تم تسجيل خروج هذه الجلسة.');
+          forceLogoutAdminLocal();
+          return;
+        }
+        if (data.sessionToken && initialToken && data.sessionToken !== initialToken) {
+          alert('تم تسجيل الدخول إلى حساب المدير من جلسة أخرى.');
+          forceLogoutAdminLocal();
+          return;
+        }
+        if (Number(data.forceLogoutAt||0) > Number(loggedAdmin.forceLogoutAt||0)) {
+          alert('تم تعديل حساب المدير، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول مرة أخرى.');
+          forceLogoutAdminLocal();
+          return;
+        }
+        if (data.password !== loggedAdmin.password || data.username !== loggedAdmin.username) {
+          alert('تم تغيير اسم المستخدم أو كلمة السر، لذلك تم تسجيل خروجك تلقائياً.');
+          forceLogoutAdminLocal();
+          return;
+        }
+        loggedAdmin = data;
+        localStorage.setItem('loggedAdmin', JSON.stringify(loggedAdmin));
+        applyAdminPermissionsUI();
+      });
+    }
+
+    function forceLogoutAdminLocal() {
+      stopAdminSessionMonitor();
+      loggedAdmin = null;
+      adminSessionToken = '';
+      localStorage.removeItem('loggedAdmin');
+      localStorage.removeItem('mustaqbal_admin_session_token');
+      isAdmin = false;
+      localStorage.setItem('isAdmin','false');
+      checkInitialSessionState();
+      renderProducts();
+    }
+
+    function hasAdminPermission(permission) {
+      if (isAdmin) return true;
+      if (!loggedAdmin) return false;
+      return !!(loggedAdmin.permissions && loggedAdmin.permissions[permission]);
+    }
+
+    function requireAdminPermission(permission) {
+      if (hasAdminPermission(permission)) return true;
+      alert('ليس لديك صلاحية لتنفيذ هذه العملية.');
+      return false;
+    }
+
+    function applyAdminPermissionsUI() {
+      if (!(isAdmin || loggedAdmin)) return;
+      const rules = [
+        ['admin-accounts-card', isAdmin],
+        ['save-product-btn', hasAdminPermission('addProducts') || hasAdminPermission('editProducts')],
+      ];
+      rules.forEach(([id,show]) => { const el=document.getElementById(id); if(el) el.classList.toggle('hidden', !show); });
+      const custCard = document.querySelector('[onclick="openAdminCustomersModal()"]');
+      const delCard = document.querySelector('[onclick="openAdminDelegatesModal()"]');
+      const invCard = document.querySelector('[onclick="openInvoicesModal()"]');
+      const notifCard = document.querySelector('[onclick="openAdminNotificationsModal()"]');
+      if (custCard) custCard.classList.toggle('hidden', !hasAdminPermission('createCustomers'));
+      if (delCard) delCard.classList.toggle('hidden', !hasAdminPermission('createDelegates'));
+      if (invCard) invCard.classList.toggle('hidden', !hasAdminPermission('deleteInvoices'));
+      if (notifCard) notifCard.classList.toggle('hidden', !hasAdminPermission('sendNotifications'));
+      const productForm = document.getElementById('product-form');
+      if (productForm) productForm.classList.toggle('hidden', !(hasAdminPermission('addProducts') || hasAdminPermission('editProducts')));
+      const tabCreator = document.getElementById('admin-tab-creator');
+      if (tabCreator) tabCreator.classList.toggle('hidden', !(isAdmin || hasAdminPermission('addProducts')));
+      const ownerPassBox = document.getElementById('owner-password-change-box');
+      if (ownerPassBox) ownerPassBox.classList.toggle('hidden', !isAdmin);
+    }
+
     function finishLoginProcess() {
       closeLoginModal();
       document.getElementById('login-username').value = '';
@@ -1672,6 +2166,8 @@
       renderProducts();
       updateCartUI();
       monitorActiveSession();
+      if (loggedAdmin) startAdminSessionMonitor();
+      applyAdminPermissionsUI();
     }
 
     async function handleLogout() {
@@ -1687,12 +2183,23 @@
           await db.collection('customers').doc(String(loggedCustomer.username)).update({ deviceId: "" });
         } else if (loggedDelegate) {
           await db.collection('delegates').doc(String(loggedDelegate.username)).update({ deviceId: "" });
+        } else if (loggedAdmin) {
+          const ref = db.collection('adminAccounts').doc(String(loggedAdmin.username));
+          const snap = await ref.get();
+          if (snap.exists && String(snap.data().sessionToken || '') === String(loggedAdmin.sessionToken || '')) {
+            await ref.update({ deviceId:"", sessionToken:"" });
+          }
         }
       } catch(err) {}
 
+      stopAdminSessionMonitor();
       isAdmin = false;
+      loggedAdmin = null;
+      adminSessionToken = '';
       loggedCustomer = null;
       loggedDelegate = null;
+      localStorage.removeItem('loggedAdmin');
+      localStorage.removeItem('mustaqbal_admin_session_token');
       localStorage.removeItem('loggedCustomer');
       localStorage.removeItem('loggedDelegate');
       localStorage.setItem('isAdmin', 'false');
@@ -1741,6 +2248,7 @@
     }
 
     function openAdminNotificationsModal() {
+      if (!requireAdminPermission('sendNotifications')) return;
       document.getElementById('admin-notifications-modal').classList.remove('hidden');
       updateNotificationRecipientOptions();
       renderAdminSentNotifications();
@@ -1912,6 +2420,8 @@
 
       const modal = document.getElementById('notification-view-modal');
       if (modal) {
+        // إبقاء تفاصيل الإشعار فوق نافذة قائمة الإشعارات.
+        modal.style.zIndex = '2000';
         modal.classList.remove('hidden');
         setTimeout(() => modal.querySelector('.close-modal')?.focus(), 0);
       }
@@ -1953,18 +2463,328 @@
       }).join('');
     }
 
-    function handleAdminPasswordChange(e) {
+    async function loadAdminAccountsFromFirestore() {
+      const box = document.getElementById('admin-accounts-list');
+      try {
+        const snapshot = await db.collection('adminAccounts').get({ source: 'server' });
+        const loaded = [];
+        snapshot.forEach(doc => {
+          const data = doc.data() || {};
+          const docId = String(doc.id || '').trim();
+          if (!docId || docId.toLowerCase() === 'admin') return;
+          const account = normalizeAdminAccount(Object.assign({}, data, {
+            username: data.username || docId,
+            fullname: data.fullname || data.name || docId
+          }));
+          account.__docId = docId;
+          loaded.push(account);
+        });
+
+        loaded.sort((a,b) => String(a.fullname || a.username).localeCompare(String(b.fullname || b.username), 'ar'));
+        adminAccounts = loaded;
+        localStorage.setItem('mustaqbal_admin_accounts', JSON.stringify(adminAccounts));
+
+        const badge = document.getElementById('admin-accounts-count');
+        if (badge) badge.textContent = String(loaded.length);
+
+        renderAdminAccountsList();
+
+        if (box) {
+          console.log('تم تحميل حسابات المدراء من Firestore:', loaded.length, loaded.map(a => a.username));
+        }
+        return true;
+      } catch (err) {
+        console.error('تعذر قراءة حسابات المدراء من Firestore:', err);
+        if (box) {
+          box.innerHTML = `<div class="notification-empty" style="color:#b91c1c;">تعذر قراءة حسابات المدراء من Firestore.<br><small>${escapeNotificationHtml(err && err.message ? err.message : err)}</small></div>`;
+        }
+        return false;
+      }
+    }
+
+    async function forceRenderAdminAccountsFromFirestore() {
+      const box = document.getElementById('admin-accounts-list');
+      const badge = document.getElementById('admin-accounts-count');
+      if (!box) return;
+
+      try {
+        const snapshot = await db.collection('adminAccounts').get({ source: 'server' });
+        const docs = [];
+
+        snapshot.forEach(doc => {
+          const data = doc.data() || {};
+          const docId = String(doc.id || '').trim();
+          if (!docId || docId.toLowerCase() === 'admin') return;
+          docs.push({
+            id: docId,
+            username: String(data.username || docId),
+            fullname: String(data.fullname || data.name || data.username || docId),
+            permissions: data.permissions && typeof data.permissions === 'object' ? data.permissions : {}
+          });
+        });
+
+        if (badge) badge.textContent = String(docs.length);
+
+        // Clear only this list, then create real DOM elements.
+        box.replaceChildren();
+        box.style.display = 'flex';
+        box.style.flexDirection = 'column';
+        box.style.gap = '10px';
+        box.style.maxHeight = 'none';
+        box.style.overflow = 'visible';
+        box.scrollTop = 0;
+        box.style.visibility = 'visible';
+        box.style.opacity = '1';
+
+        if (!docs.length) {
+          const empty = document.createElement('div');
+          empty.className = 'notification-empty';
+          empty.textContent = 'لا توجد حسابات مدراء فرعية.';
+          box.appendChild(empty);
+          return;
+        }
+
+        const labels = {
+          addProducts:'إضافة منتجات',
+          editProducts:'التعديل على المنتجات',
+          deleteProducts:'حذف المنتجات',
+          createCustomers:'إنشاء حسابات الزبائن',
+          createDelegates:'إنشاء حسابات المندوبين',
+          deleteInvoices:'حذف الفواتير السابقة',
+          sendNotifications:'إرسال الإشعارات'
+        };
+
+        docs.forEach(a => {
+          const card = document.createElement('div');
+          card.className = 'admin-account-card';
+          card.style.cssText = 'display:flex !important;visibility:visible !important;opacity:1 !important;background:#fff !important;color:#111 !important;';
+
+          const top = document.createElement('div');
+          top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;';
+
+          const name = document.createElement('strong');
+          name.textContent = '👨‍💼 ' + a.fullname;
+
+          const user = document.createElement('span');
+          user.className = 'notification-chip';
+          user.textContent = '@' + a.username;
+
+          top.appendChild(name);
+          top.appendChild(user);
+
+          const perms = document.createElement('div');
+          perms.style.cssText = 'font-size:.72rem;color:var(--text-muted);line-height:1.7;';
+          const active = Object.keys(labels)
+            .filter(k => a.permissions[k] === true)
+            .map(k => labels[k]);
+          perms.textContent = 'الصلاحيات: ' + (active.length ? active.join('، ') : 'لا توجد صلاحيات محددة');
+
+          const actions = document.createElement('div');
+          actions.className = 'admin-account-actions';
+
+          const edit = document.createElement('button');
+          edit.type = 'button';
+          edit.className = 'btn btn-secondary';
+          edit.textContent = '✏️ تعديل';
+          edit.addEventListener('click', () => editAdminAccount(a.username));
+
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'btn btn-danger';
+          del.textContent = '🗑️ حذف';
+          del.addEventListener('click', () => deleteAdminAccount(a.username));
+
+          actions.appendChild(edit);
+          actions.appendChild(del);
+
+          card.appendChild(top);
+          card.appendChild(perms);
+          card.appendChild(actions);
+          box.appendChild(card);
+        });
+
+        console.log('تم رسم حسابات المدراء مباشرة من Firestore:', docs.map(x => x.username));
+      } catch (err) {
+        console.error('فشل عرض حسابات المدراء مباشرة:', err);
+        box.replaceChildren();
+        const error = document.createElement('div');
+        error.className = 'notification-empty';
+        error.style.color = '#b91c1c';
+        error.textContent = 'تعذر عرض حسابات المدراء: ' + (err && err.message ? err.message : String(err));
+        box.appendChild(error);
+      }
+    }
+
+    async function openAdminAccountsModal() {
+      if (!isAdmin) { alert('إدارة حسابات المدراء متاحة للمدير الرئيسي فقط.'); return; }
+      document.getElementById('admin-accounts-modal').classList.remove('hidden');
+      await forceRenderAdminAccountsFromFirestore();
+    }
+    function closeAdminAccountsModal() { document.getElementById('admin-accounts-modal').classList.add('hidden'); }
+    function setAdminPermissionCheckboxes(perms) {
+      document.querySelectorAll('[data-admin-permission]').forEach(cb => { cb.checked = !!(perms && perms[cb.dataset.adminPermission]); });
+    }
+    function selectAllAdminPermissions() { setAdminPermissionCheckboxes(Object.fromEntries(ADMIN_PERMISSION_KEYS.map(k=>[k,true]))); }
+    function clearAllAdminPermissions() { setAdminPermissionCheckboxes({}); }
+    function getSelectedAdminPermissions() {
+      const perms = {};
+      document.querySelectorAll('[data-admin-permission]').forEach(cb => perms[cb.dataset.adminPermission] = cb.checked);
+      return perms;
+    }
+    function resetAdminAccountForm() {
+      document.getElementById('admin-account-form').reset();
+      document.getElementById('edit-admin-username-flag').value = '';
+      document.getElementById('save-admin-account-btn').innerText = 'إنشاء حساب المدير';
+      setAdminPermissionCheckboxes({});
+    }
+    function editAdminAccount(username) {
+      if (!isAdmin) return alert('متاح للمدير الرئيسي فقط.');
+      const a = adminAccounts.find(x => x.username === username);
+      if (!a) return;
+      document.getElementById('edit-admin-username-flag').value = a.username;
+      document.getElementById('new-admin-username').value = a.username;
+      document.getElementById('new-admin-password').value = a.password;
+      document.getElementById('new-admin-fullname').value = a.fullname;
+      setAdminPermissionCheckboxes(a.permissions);
+      document.getElementById('save-admin-account-btn').innerText = 'تحديث حساب المدير';
+    }
+    function renderAdminAccountsList() {
+      const box = document.getElementById('admin-accounts-list');
+      const badge = document.getElementById('admin-accounts-count');
+      if (!box) return;
+
+      const accounts = Array.isArray(adminAccounts) ? adminAccounts.filter(Boolean) : [];
+      if (badge) badge.textContent = String(accounts.length);
+
+      if (!accounts.length) {
+        box.innerHTML = '<div class="notification-empty">لا توجد حسابات مدراء فرعية.</div>';
+        return;
+      }
+
+      const escape = (value) => {
+        const s = String(value == null ? '' : value);
+        return s.replace(/[&<>'"]/g, c => ({
+          '&':'&amp;','<':'&lt;','>':'&gt;',
+          "'":'&#39;','"':'&quot;'
+        }[c]));
+      };
+
+      box.innerHTML = accounts.map((a, index) => {
+        const username = String(a.username || a.__docId || ('manager_' + (index + 1)));
+        const fullname = String(a.fullname || a.name || username);
+        const permissions = (a.permissions && typeof a.permissions === 'object') ? a.permissions : {};
+
+        const labels = {
+          addProducts:'إضافة منتجات',
+          editProducts:'التعديل على المنتجات',
+          deleteProducts:'حذف المنتجات',
+          createCustomers:'إنشاء حسابات الزبائن',
+          createDelegates:'إنشاء حسابات المندوبين',
+          deleteInvoices:'حذف الفواتير السابقة',
+          sendNotifications:'إرسال الإشعارات'
+        };
+
+        const activePermissions = Object.keys(labels)
+          .filter(k => permissions[k] === true)
+          .map(k => labels[k]);
+
+        const permissionText = activePermissions.length
+          ? activePermissions.join('، ')
+          : 'لا توجد صلاحيات محددة';
+
+        const safeUsername = username.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+        return `
+          <div class="admin-account-card" style="display:flex !important;visibility:visible !important;opacity:1 !important;">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+              <strong>👨‍💼 ${escape(fullname)}</strong>
+              <span class="notification-chip">@${escape(username)}</span>
+            </div>
+            <div style="font-size:.72rem;color:var(--text-muted);line-height:1.7;">
+              الصلاحيات: ${escape(permissionText)}
+            </div>
+            <div class="admin-account-actions">
+              <button class="btn btn-secondary" type="button" onclick="editAdminAccount('${safeUsername}')">✏️ تعديل</button>
+              <button class="btn btn-danger" type="button" onclick="deleteAdminAccount('${safeUsername}')">🗑️ حذف</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    async function handleAdminAccountSubmit(e) {
+      e.preventDefault();
+      if (!isAdmin) return alert('إدارة حسابات المدراء متاحة للمدير الرئيسي فقط.');
+      const username = document.getElementById('new-admin-username').value.trim();
+      const password = document.getElementById('new-admin-password').value.trim();
+      const fullname = document.getElementById('new-admin-fullname').value.trim();
+      const editFlag = document.getElementById('edit-admin-username-flag').value.trim();
+      if (!username || !password || !fullname) return;
+      if (username === 'admin') return alert('لا يمكن استخدام اسم المستخدم admin لهذا الحساب.');
+      if (!editFlag && adminAccounts.some(a => a.username === username)) return alert('اسم المستخدم مستخدم مسبقاً.');
+      let old = editFlag ? adminAccounts.find(a => a.username === editFlag) : null;
+      const usernameChanged = !!editFlag && editFlag !== username;
+      const passwordChanged = !!old && old.password !== password;
+      const forceLogoutAt = (usernameChanged || passwordChanged) ? Date.now() : Number(old && old.forceLogoutAt || 0);
+      const account = normalizeAdminAccount({
+        username, password, fullname,
+        permissions:getSelectedAdminPermissions(),
+        deviceId: old ? old.deviceId : '',
+        sessionToken: old ? old.sessionToken : '',
+        forceLogoutAt,
+        accountUpdatedAt: Date.now()
+      });
+      try {
+        if (editFlag && editFlag !== username) await db.collection('adminAccounts').doc(editFlag).delete();
+        await db.collection('adminAccounts').doc(username).set(account, { merge: true });
+
+        // نحدّث القائمة محلياً فور نجاح الحفظ، حتى يظهر الحساب مباشرةً
+        // ولا تعتمد الواجهة على تأخر onSnapshot أو إعادة القراءة.
+        adminAccounts = adminAccounts.filter(a => a.username !== editFlag && a.username !== username);
+        adminAccounts.push(account);
+        adminAccounts.sort((a,b) => String(a.fullname).localeCompare(String(b.fullname), 'ar'));
+        localStorage.setItem('mustaqbal_admin_accounts', JSON.stringify(adminAccounts));
+        renderAdminAccountsList();
+
+        // محاولة مزامنة نهائية من Firestore. إذا فشلت القراءة تبقى القائمة المحلية
+        // ظاهرة ولا تختفي الحسابات التي تم حفظها بنجاح.
+        await loadAdminAccountsFromFirestore();
+        resetAdminAccountForm();
+        alert(usernameChanged || passwordChanged ? 'تم تعديل الحساب والصلاحيات بنجاح، وسيتم تسجيل خروج المدير إذا كان متصلاً.' : 'تم إنشاء حساب المدير وحفظ صلاحياته بنجاح.');
+      } catch(err) {
+        console.error(err);
+        alert('تعذر حفظ حساب المدير. تحقق من اتصال Firestore وقواعد الصلاحيات.');
+      }
+    }
+    async function deleteAdminAccount(username) {
+      if (!isAdmin) return alert('متاح للمدير الرئيسي فقط.');
+      if (!confirm('تأكيد حذف حساب المدير؟')) return;
+      try {
+        await db.collection('adminAccounts').doc(String(username)).delete();
+        await loadAdminAccountsFromFirestore();
+      } catch(err) { alert('تعذر حذف حساب المدير.'); }
+    }
+
+    async function handleAdminPasswordChange(e) {
+      if (!isAdmin) { alert('تغيير كلمة سر المدير الرئيسي متاح للمدير الرئيسي فقط.'); return; }
       e.preventDefault();
       const newPass = document.getElementById('new-admin-pass').value.trim();
       if (newPass) {
         adminPassword = newPass;
         localStorage.setItem('mustaqbal_admin_pass', adminPassword);
+        try {
+          const ownerRef = db.collection('adminAccounts').doc('admin');
+          const ownerSnap = await ownerRef.get();
+          if (ownerSnap.exists) {
+            await ownerRef.update({ password:newPass, forceLogoutAt:Date.now(), accountUpdatedAt:Date.now() });
+          }
+        } catch(err) {}
         alert('تم تغيير كلمة سر المدير بنجاح!');
         document.getElementById('new-admin-pass').value = '';
       }
     }
 
     async function handleDelegateMgmtSubmit(e) {
+      if (!requireAdminPermission('createDelegates')) return;
       e.preventDefault();
       const username = document.getElementById('new-del-username').value.trim();
       const password = document.getElementById('new-del-password').value.trim();
@@ -2248,6 +3068,7 @@
     });
 
     async function handleCustomerMgmtSubmit(e) {
+      if (!requireAdminPermission('createCustomers')) return;
       e.preventDefault();
       const username = document.getElementById('new-cust-username').value.trim();
       const password = document.getElementById('new-cust-password').value.trim();
@@ -2395,7 +3216,7 @@
       const tabsContainer = document.getElementById('vertical-tabs');
       if (!tabsContainer) return;
       tabsContainer.innerHTML = '';
-      if (!isAdmin && !loggedCustomer && !loggedDelegate) return;
+      if (!isAdmin && !loggedAdmin && !loggedCustomer && !loggedDelegate) return;
 
       categories.forEach((cat, index) => {
         const chip = document.createElement('div');
@@ -2446,7 +3267,9 @@
 
     function selectCategory(catId) {
       activeCategory = catId;
+      productsSortMenuOpen = false;
       renderTabs();
+      updateProductsSortUI();
       renderProducts();
     }
 
@@ -2463,6 +3286,7 @@
     }
 
     async function handleAddTab(e) {
+      if (!requireAdminPermission('addProducts')) return;
       e.preventDefault();
       const input = document.getElementById('tab-name-input');
       const name = input.value.trim();
@@ -2505,6 +3329,8 @@
 
     async function handleProductSubmit(e) {
       e.preventDefault();
+      const editingExistingProduct = !!document.getElementById('product-id').value;
+      if (editingExistingProduct ? !requireAdminPermission('editProducts') : !requireAdminPermission('addProducts')) return;
       const id = document.getElementById('product-id').value;
       const name = document.getElementById('product-name').value.trim();
       const category = document.getElementById('product-tab').value;
@@ -2518,11 +3344,17 @@
         if (existing && existing.isNew !== undefined) isNew = existing.isNew;
       }
 
+      const existingProduct = id ? products.find(p => p.id == id) : null;
+      const productCreatedAt = existingProduct
+        ? getProductCreatedTime(existingProduct)
+        : Date.now();
+
       const productData = {
         id: id ? Number(id) : Date.now(),
         name, category, price, desc,
         image: currentImageData || '',
-        isNew: isNew
+        isNew: isNew,
+        createdAt: productCreatedAt
       };
 
       if (id) {
@@ -2546,6 +3378,7 @@
     }
 
     function editProduct(id) {
+      if (!requireAdminPermission('editProducts')) return;
       const product = products.find(p => p.id === id);
       if (!product) return;
       document.getElementById('product-id').value = product.id;
@@ -2558,6 +3391,7 @@
     }
 
     async function removeProductFromNewArrivals(id) {
+      if (!requireAdminPermission('editProducts')) return;
       const product = products.find(p => p.id === id);
       if (!product) return;
       if (confirm('هل تريد إزالة هذا المنتج من تبويب "أُضيفت حديثاً"؟')) {
@@ -2569,6 +3403,7 @@
     }
 
     async function deleteProduct(id) {
+      if (!requireAdminPermission('deleteProducts')) return;
       if (confirm('تأكيد حذف المنتج بالكامل من البرنامج؟')) {
         products = products.filter(p => p.id !== id);
         try { await db.collection('products').doc(String(id)).delete(); } catch(err){}
@@ -2585,10 +3420,14 @@
     }
 
     function renderProducts(itemsToRender = null) {
+      // المدير الفرعي loggedAdmin يجب أن يرى المنتجات أيضاً؛ الصلاحيات تحدد فقط ما يستطيع فعله عليها.
       const grid = document.getElementById('products-grid');
       if (!grid) return;
       grid.innerHTML = '';
-      if (!isAdmin && !loggedCustomer && !loggedDelegate) return;
+      if (!isAdmin && !loggedAdmin && !loggedCustomer && !loggedDelegate) {
+        updateProductsSortUI();
+        return;
+      }
 
       let list = itemsToRender;
       if (!list) {
@@ -2596,6 +3435,24 @@
         else if (activeCategory === 'new_arrivals') list = products.filter(p => p.isNew !== false);
         else list = products.filter(p => p.category === activeCategory);
       }
+
+      // النسخة الأساسية للعرض حتى لا نغيّر ترتيب مصفوفة products نفسها.
+      list = Array.isArray(list) ? [...list] : [];
+
+      const sortMode = getProductSortMode(activeCategory);
+      list.sort((a, b) => {
+        const timeA = getProductCreatedTime(a);
+        const timeB = getProductCreatedTime(b);
+
+        if (timeA !== timeB) {
+          return sortMode === 'newest' ? timeB - timeA : timeA - timeB;
+        }
+
+        // كسر التعادل بشكل ثابت عند غياب التاريخ.
+        return String(a?.name || '').localeCompare(String(b?.name || ''), 'ar');
+      });
+
+      updateProductsSortUI();
 
       if (!list || list.length === 0) {
         grid.innerHTML = '<p style="padding:15px; color:var(--text-muted); grid-column: 1 / -1; font-size:0.85rem; text-align:center;">لا توجد منتجات متاحة.</p>';
@@ -2616,12 +3473,12 @@
             <div class="product-title">${product.name}</div>
             <div class="product-description">${product.desc || ''}</div>
             <div class="product-price">${formatPrice(effectivePrice)} د.ع</div>
-            ${!isAdmin ? `<button class="add-btn" onclick="addToCart(${product.id})">إضافة للسلة 🛒</button>` : ''}
-            ${isAdmin ? `
+            ${!(isAdmin || loggedAdmin) ? `<button class="add-btn" onclick="addToCart(${product.id})">إضافة للسلة 🛒</button>` : ''}
+            ${(isAdmin || loggedAdmin) ? `
               <div class="card-admin-btns">
-                <button class="edit-btn" onclick="editProduct(${product.id})">تعديل</button>
-                ${(activeCategory === 'new_arrivals' || product.isNew !== false) ? `<button class="remove-new-btn" onclick="removeProductFromNewArrivals(${product.id})">إزالة من الجديد</button>` : ''}
-                <button class="delete-btn" onclick="deleteProduct(${product.id})">حذف</button>
+                ${hasAdminPermission('editProducts') ? `<button class="edit-btn" onclick="editProduct(${product.id})">تعديل</button>` : ''}
+                ${(hasAdminPermission('editProducts') && (activeCategory === 'new_arrivals' || product.isNew !== false)) ? `<button class="remove-new-btn" onclick="removeProductFromNewArrivals(${product.id})">إزالة من الجديد</button>` : ''}
+                ${hasAdminPermission('deleteProducts') ? `<button class="delete-btn" onclick="deleteProduct(${product.id})">حذف</button>` : ''}
               </div>
             ` : ''}
           </div>
@@ -2629,6 +3486,61 @@
         grid.appendChild(card);
       });
     }
+
+
+    function updateProductsSortUI() {
+      const sortbar = document.getElementById('products-sortbar');
+      const btn = document.getElementById('products-filter-btn');
+      const menu = document.getElementById('products-sort-menu');
+      const newestBtn = document.getElementById('sort-newest-btn');
+      const oldestBtn = document.getElementById('sort-oldest-btn');
+
+      const visible = isAdmin || loggedAdmin || loggedCustomer || loggedDelegate;
+      if (sortbar) sortbar.classList.toggle('hidden', !visible);
+
+      const mode = getProductSortMode(activeCategory);
+
+      if (newestBtn) newestBtn.classList.toggle('selected', mode === 'newest');
+      if (oldestBtn) oldestBtn.classList.toggle('selected', mode === 'oldest');
+      if (btn) btn.classList.toggle('active', mode !== getDefaultProductSort(activeCategory));
+      if (menu) menu.classList.toggle('open', productsSortMenuOpen);
+    }
+
+    function toggleProductsSortMenu(event) {
+      if (event) event.stopPropagation();
+      productsSortMenuOpen = !productsSortMenuOpen;
+      updateProductsSortUI();
+    }
+
+    function closeProductsSortMenu() {
+      if (!productsSortMenuOpen) return;
+      productsSortMenuOpen = false;
+      updateProductsSortUI();
+    }
+
+    function setProductsSort(mode) {
+      if (mode !== 'newest' && mode !== 'oldest') return;
+
+      productSortModes[activeCategory] = mode;
+      saveProductSortModes();
+
+      productsSortMenuOpen = false;
+      updateProductsSortUI();
+
+      const searchInput = document.getElementById('search-input');
+      if (searchInput && searchInput.value.trim() !== '') {
+        handleSearch();
+      } else {
+        renderProducts();
+      }
+    }
+
+    document.addEventListener('click', function(event) {
+      const sortbar = document.getElementById('products-sortbar');
+      if (sortbar && !sortbar.contains(event.target)) {
+        closeProductsSortMenu();
+      }
+    });
 
     function handleSearch() {
       const searchInput = document.getElementById('search-input');
@@ -3061,6 +3973,7 @@
     function closeReceiptModal() { document.getElementById('receipt-modal').classList.add('hidden'); }
 
     function openInvoicesModal() {
+      if ((isAdmin || loggedAdmin) && !requireAdminPermission('deleteInvoices')) return;
       renderInvoicesList();
       document.getElementById('invoices-modal').classList.remove('hidden');
     }
@@ -3161,6 +4074,7 @@
     }
 
     async function deleteInvoice(invoiceId) {
+      if (!requireAdminPermission('deleteInvoices')) return;
       if (confirm('تأكيد حذف هذه الفاتورة؟')) {
         invoices = invoices.filter(i => i.id !== invoiceId);
         saveData();
