@@ -1417,6 +1417,36 @@
 
         fcmMessaging = firebase.messaging();
 
+        // استقبال إشعارات FCM أثناء فتح التطبيق في الواجهة.
+        // عند الخلفية يتولى firebase-messaging-sw.js عرض إشعار النظام.
+        if (!window.__mustaqbalFcmForegroundListener) {
+          window.__mustaqbalFcmForegroundListener = true;
+          fcmMessaging.onMessage(async (payload) => {
+            try {
+              const notification = payload?.notification || {};
+              const data = payload?.data || {};
+              const title = notification.title || data.title || 'متجر المستقبل';
+              const body = notification.body || data.body || 'لديك إشعار جديد';
+              if (Notification.permission === 'granted') {
+                const registration = fcmServiceWorkerRegistration || await navigator.serviceWorker.getRegistration('./');
+                if (registration && registration.showNotification) {
+                  await registration.showNotification(title, {
+                    body,
+                    icon: data.icon || './favicon.ico',
+                    badge: data.badge || './favicon.ico',
+                    data: { url: data.url || './' }
+                  });
+                } else {
+                  new Notification(title, { body });
+                }
+              }
+              console.log('FCM foreground message received:', payload);
+            } catch (err) {
+              console.warn('تعذر عرض إشعار FCM أثناء فتح التطبيق:', err);
+            }
+          });
+        }
+
         const token = await fcmMessaging.getToken({
           vapidKey: FCM_VAPID_KEY,
           serviceWorkerRegistration: fcmServiceWorkerRegistration
@@ -2504,7 +2534,9 @@
         audience,
         subject,
         details,
-        createdAt: now
+        createdAt: now,
+        pushStatus: 'pending',
+        pushRequestedAt: now
       };
 
       const sendBtn = document.querySelector('#notification-form button[type=submit]');
@@ -2516,7 +2548,7 @@
         document.getElementById('notification-subject').value = '';
         document.getElementById('notification-details').value = '';
         renderAdminSentNotifications();
-        alert('تم إرسال الإشعار بنجاح ✅');
+        alert('تم حفظ الإشعار وإرساله إلى خدمة الإشعارات ✅');
       } catch (err) {
         console.error('خطأ إرسال الإشعار:', err);
         const code = err && err.code ? err.code : '';
