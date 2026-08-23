@@ -639,6 +639,32 @@
       color: var(--primary-dark);
     }
 
+    /* عداد الفواتير التي لم يفتحها المدير */
+    .invoice-unread-badge {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #bae6fd, #7dd3fc);
+      color: #0f172a;
+      border: 2px solid rgba(255,255,255,.95);
+      font-size: .68rem;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      box-shadow: 0 4px 12px rgba(14,165,233,.22);
+      z-index: 3;
+    }
+
+    .invoice-unread-badge.hidden {
+      display: none !important;
+    }
+
     .form-row {
       display: flex;
       flex-direction: column;
@@ -919,9 +945,10 @@
             <span>🛵</span>
             <span>حسابات المندوبين</span>
           </div>
-          <div class="admin-card-btn" onclick="openInvoicesModal()">
+          <div class="admin-card-btn" id="admin-invoices-card" onclick="openInvoicesModal()" style="position:relative;">
             <span>📄</span>
             <span>الفواتير السابقة</span>
+            <span id="admin-invoices-unread-badge" class="invoice-unread-badge hidden" aria-label="عدد الفواتير غير المفتوحة">0</span>
           </div>
           <div class="admin-card-btn" onclick="openProductStatsModal()">
             <span>📊</span>
@@ -1491,6 +1518,7 @@
         invoices.sort((a, b) => b.id.localeCompare(a.id));
         localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
         const invoicesModal = document.getElementById('invoices-modal');
+        updateUnreadInvoicesBadge();
         if (invoicesModal && !invoicesModal.classList.contains('hidden')) {
           renderInvoicesList();
         }
@@ -1751,6 +1779,24 @@
       localStorage.setItem('mustaqbal_product_sort_modes', JSON.stringify(productSortModes || {}));
     }
 
+    // عند الرجوع إلى التطبيق/إعادة فتحه:
+    // نعيد تلقائياً عرض جميع المنتجات من الأقدم إلى الأحدث،
+    // ولا نغيّر ترتيب الأقسام الأخرى الذي اختاره المستخدم.
+    function resetProductsToOldestOnReturn() {
+      activeCategory = 'all';
+      productSortModes = productSortModes || {};
+      productSortModes.all = 'oldest';
+      productsSortMenuOpen = false;
+      saveProductSortModes();
+
+      const searchInput = document.getElementById('search-input');
+      if (searchInput) searchInput.value = '';
+
+      if (typeof renderTabs === 'function') renderTabs();
+      if (typeof updateProductsSortUI === 'function') updateProductsSortUI();
+      if (typeof renderProducts === 'function') renderProducts();
+    }
+
     function getProductCreatedTime(product) {
       const raw = product && (product.createdAt ?? product.addedAt ?? product.created_at);
       const numericRaw = Number(raw);
@@ -1776,9 +1822,10 @@
     document.addEventListener('DOMContentLoaded', () => {
       initRealtimeListeners();
       checkInitialSessionState();
-      renderTabs();
-      renderProducts();
-      updateProductsSortUI();
+
+      // عند فتح التطبيق لأول مرة: جميع المنتجات من الأقدم إلى الأحدث.
+      resetProductsToOldestOnReturn();
+
       updateCartUI();
       populateCategorySelect();
       setupImageUploader();
@@ -1788,6 +1835,20 @@
       renderDelegateClientsList();
       monitorActiveSession();
       updateNotificationsBadge();
+    });
+
+    // إذا خرج التطبيق إلى الخلفية ثم عاد المستخدم إليه،
+    // نعيد تلقائياً تبويب "جميع المنتجات" مع عرض الأقدم أولاً.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        resetProductsToOldestOnReturn();
+      }
+    });
+
+    // يدعم أيضاً الرجوع من شاشة أخرى/المتصفح/إعادة تفعيل الصفحة.
+    window.addEventListener('pageshow', () => {
+      resetProductsToOldestOnReturn();
+      updateUnreadInvoicesBadge();
     });
 
     function checkInitialSessionState() {
@@ -1895,14 +1956,14 @@
             username:'admin', password:adminPassword, fullname:'المدير الرئيسي',
             permissions:getDefaultAdminPermissions()
           });
-          if (owner.deviceId && owner.deviceId !== deviceId) {
-            alert('حساب المدير الرئيسي مفتوح حالياً في متصفح أو تطبيق آخر! يرجى تسجيل الخروج منه أولاً.');
-            return;
-          }
+          // المدير الرئيسي (admin) هو الحساب الوحيد المسموح له بفتح عدة جلسات
+          // في أكثر من متصفح أو جهاز/تطبيق في الوقت نفسه.
+          // لذلك لا نربط حسابه بـ deviceId أو sessionToken على مستوى Firestore،
+          // حتى لا تقوم جلسة جديدة بإلغاء الجلسات الأخرى.
           adminSessionToken = 'adm_' + Math.random().toString(36).slice(2) + Date.now();
           owner.password = adminPassword;
-          owner.deviceId = deviceId;
-          owner.sessionToken = adminSessionToken;
+          owner.deviceId = null;
+          owner.sessionToken = null;
           owner.permissions = getDefaultAdminPermissions();
           await ownerRef.set(owner, {merge:true});
           loggedAdmin = owner;
@@ -2084,15 +2145,20 @@
       adminForceLogoutUnsubscribe = ref.onSnapshot((doc) => {
         if (!doc.exists || !loggedAdmin) return;
         const data = normalizeAdminAccount(doc.data());
-        if (data.deviceId && data.deviceId !== deviceId) {
-          alert('تم فتح حساب المدير من متصفح أو تطبيق آخر، لذلك تم تسجيل خروج هذه الجلسة.');
-          forceLogoutAdminLocal();
-          return;
-        }
-        if (data.sessionToken && initialToken && data.sessionToken !== initialToken) {
-          alert('تم تسجيل الدخول إلى حساب المدير من جلسة أخرى.');
-          forceLogoutAdminLocal();
-          return;
+        // المدير الرئيسي يمكنه العمل من عدة متصفحات/أجهزة في الوقت نفسه.
+        // أما المديرون الفرعيون فيبقون محصورين بجلسة واحدة كما هو معمول به.
+        const isMainAdminSession = String(username).toLowerCase() === 'admin';
+        if (!isMainAdminSession) {
+          if (data.deviceId && data.deviceId !== deviceId) {
+            alert('تم فتح حساب المدير من متصفح أو تطبيق آخر، لذلك تم تسجيل خروج هذه الجلسة.');
+            forceLogoutAdminLocal();
+            return;
+          }
+          if (data.sessionToken && initialToken && data.sessionToken !== initialToken) {
+            alert('تم تسجيل الدخول إلى حساب المدير من جلسة أخرى.');
+            forceLogoutAdminLocal();
+            return;
+          }
         }
         if (Number(data.forceLogoutAt||0) > Number(loggedAdmin.forceLogoutAt||0)) {
           alert('تم تعديل حساب المدير، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول مرة أخرى.');
@@ -3726,7 +3792,9 @@
         delegateUsername: loggedDelegate ? loggedDelegate.username : null,
         items: currentCart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, note: i.note || '' })),
         generalNote: generalNote,
-        total: totalAmount
+        total: totalAmount,
+        // الفاتورة الجديدة تكون غير مفتوحة لكل مدير حتى يقوم بفتحها بنفسه.
+        viewedByAdmins: {}
       };
 
       invoices.unshift(newInvoice);
@@ -3972,9 +4040,87 @@
 
     function closeReceiptModal() { document.getElementById('receipt-modal').classList.add('hidden'); }
 
+    // اسم المدير المستخدم لحفظ حالة فتح الفواتير بشكل مستقل لكل مدير.
+    function getCurrentAdminReadKey() {
+      if (isAdmin) return 'admin';
+      if (loggedAdmin && loggedAdmin.username) return String(loggedAdmin.username);
+      return '';
+    }
+
+    // تخزين الفواتير التي فتحها المدير الحالي بشكل مستقل عن بيانات الفاتورة نفسها.
+    // هذا يمنع onSnapshot من إعادة الفاتورة إلى حالة "جديدة" بعد إغلاقها.
+    function getInvoiceReadStorageKey() {
+      const adminKey = getCurrentAdminReadKey();
+      return adminKey ? 'mustaqbal_invoice_reads_' + adminKey : '';
+    }
+
+    function getReadInvoiceIds() {
+      const key = getInvoiceReadStorageKey();
+      if (!key) return [];
+      try {
+        const ids = JSON.parse(localStorage.getItem(key) || '[]');
+        return Array.isArray(ids) ? ids.map(String) : [];
+      } catch (e) { return []; }
+    }
+
+    function markInvoiceReadLocally(invoiceId) {
+      const key = getInvoiceReadStorageKey();
+      if (!key) return;
+      const ids = getReadInvoiceIds();
+      const id = String(invoiceId);
+      if (!ids.includes(id)) {
+        ids.push(id);
+        localStorage.setItem(key, JSON.stringify(ids.slice(-5000)));
+      }
+    }
+
+    // تحديث عداد الفواتير التي لم يفتحها المدير الحالي.
+    function updateUnreadInvoicesBadge() {
+      const badge = document.getElementById('admin-invoices-unread-badge');
+      if (!badge) return;
+
+      const adminKey = getCurrentAdminReadKey();
+      if (!adminKey || (!isAdmin && !loggedAdmin)) {
+        badge.classList.add('hidden');
+        badge.textContent = '0';
+        return;
+      }
+
+      const readIds = getReadInvoiceIds();
+      const unreadCount = invoices.filter(inv => !readIds.includes(String(inv.id))).length;
+
+      badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+      badge.classList.toggle('hidden', unreadCount === 0);
+    }
+
+    // تسجيل أن المدير الحالي فتح الفاتورة.
+    async function markInvoiceAsReadByCurrentAdmin(invoiceId) {
+      const adminKey = getCurrentAdminReadKey();
+      if (!adminKey) return;
+
+      const inv = invoices.find(i => String(i.id) === String(invoiceId));
+      if (!inv) return;
+
+      // الحفظ المحلي هو الأساس، لذلك يتغير العداد فوراً ولا تعيده onSnapshot إلى "جديدة".
+      markInvoiceReadLocally(invoiceId);
+      updateUnreadInvoicesBadge();
+
+      // نحاول أيضاً حفظ الحالة داخل الفاتورة في Firestore للتوافق مع النسخ الأخرى.
+      if (!inv.viewedByAdmins || typeof inv.viewedByAdmins !== 'object') inv.viewedByAdmins = {};
+      inv.viewedByAdmins[adminKey] = true;
+      try {
+        await db.collection('invoices').doc(String(invoiceId)).set({
+          viewedByAdmins: inv.viewedByAdmins
+        }, { merge: true });
+      } catch (err) {
+        console.warn('تعذر حفظ حالة فتح الفاتورة في Firestore، تم حفظها محلياً:', err);
+      }
+    }
+
     function openInvoicesModal() {
       if ((isAdmin || loggedAdmin) && !requireAdminPermission('deleteInvoices')) return;
       renderInvoicesList();
+      updateUnreadInvoicesBadge();
       document.getElementById('invoices-modal').classList.remove('hidden');
     }
 
@@ -3994,10 +4140,12 @@
           (inv.customer && inv.customer.username === 'مندوب: ' + loggedDelegate.username)
         );
         if (titleContainer) titleContainer.innerText = 'سجل فواتير الزبائن الخاصة بي';
-      } else if (isAdmin) {
+      } else if (isAdmin || loggedAdmin) {
         visibleInvoices = invoices;
         if (titleContainer) titleContainer.innerText = 'سجل جميع الفواتير السابقة للزبائن والمندوبين';
       }
+
+      updateUnreadInvoicesBadge();
 
       if (visibleInvoices.length === 0) {
         listContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد فواتير مسجلة.</p>';
@@ -4006,10 +4154,13 @@
 
       visibleInvoices.forEach(inv => {
         const div = document.createElement('div');
-        div.style.cssText = 'background:var(--bg-surface); border:1px solid var(--border-color); border-radius:var(--radius-sm); padding:10px; display:flex; justify-content:space-between; align-items:center; font-size:0.8rem;';
+        const adminKey = getCurrentAdminReadKey();
+        const readIds = getReadInvoiceIds();
+        const isUnreadForAdmin = !!adminKey && (isAdmin || loggedAdmin) && !readIds.includes(String(inv.id));
+        div.style.cssText = 'background:' + (isUnreadForAdmin ? '#eff6ff' : 'var(--bg-surface)') + '; border:1px solid ' + (isUnreadForAdmin ? '#93c5fd' : 'var(--border-color)') + '; border-radius:var(--radius-sm); padding:10px; display:flex; justify-content:space-between; align-items:center; font-size:0.8rem;';
         div.innerHTML = `
           <div>
-            <div style="font-weight:700; color:var(--primary-dark);">فاتورة: ${inv.id}</div>
+            <div style="font-weight:700; color:var(--primary-dark);">فاتورة: ${inv.id} ${isUnreadForAdmin ? '<span style="display:inline-flex;align-items:center;justify-content:center;background:#ef4444;color:#fff;border-radius:999px;padding:2px 7px;font-size:.62rem;margin-right:5px;">جديدة</span>' : ''}</div>
             <div style="color:var(--text-muted); font-size:0.75rem;">الزبون: ${inv.customer.name} | التاريخ: ${inv.date}</div>
             <div style="font-weight:bold; margin-top:2px;">المجموع: ${formatPrice(inv.total)} د.ع</div>
           </div>
@@ -4024,7 +4175,7 @@
       });
     }
 
-    function viewSavedInvoice(invoiceId) {
+    async function viewSavedInvoice(invoiceId) {
       const inv = invoices.find(i => String(i.id) === String(invoiceId));
 
       if (!inv) {
@@ -4032,6 +4183,7 @@
         return;
       }
 
+      await markInvoiceAsReadByCurrentAdmin(invoiceId);
       closeInvoicesModal();
       renderReceiptHTML(inv);
 
