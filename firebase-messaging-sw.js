@@ -13,45 +13,78 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
+// استقبال رسائل FCM عندما يكون الموقع في الخلفية
 messaging.onBackgroundMessage((payload) => {
   console.log(
     '[firebase-messaging-sw.js] Background message:',
     payload
   );
 
-  const notificationTitle =
-    payload.notification?.title || 'متجر المستقبل';
+  const notification = payload.notification || {};
+  const data = payload.data || {};
 
-  const notificationOptions = {
-    body: payload.notification?.body || '',
-    data: payload.data || {}
+  const title =
+    notification.title ||
+    data.title ||
+    'متجر المستقبل';
+
+  const body =
+    notification.body ||
+    data.body ||
+    '';
+
+  const options = {
+    body: body,
+
+    icon:
+      notification.icon ||
+      data.icon ||
+      '/almstaq/icon-192.png',
+
+    badge:
+      notification.badge ||
+      data.badge ||
+      '/almstaq/icon-192.png',
+
+    data: data,
+
+    tag:
+      data.notificationId ||
+      data.invoiceId ||
+      'mustaqbal-notification',
+
+    renotify: true
   };
 
-  self.registration.showNotification(
-    notificationTitle,
-    notificationOptions
+  return self.registration.showNotification(
+    title,
+    options
   );
 });
 
+
+// عند الضغط على الإشعار
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+
+  const targetUrl =
+    event.notification &&
+    event.notification.data &&
+    event.notification.data.url
+      ? event.notification.data.url
+      : 'https://alidelll626-sudo.github.io/almstaq/';
 
   event.waitUntil(
     clients.matchAll({
       type: 'window',
       includeUncontrolled: true
     }).then((clientList) => {
-      for (const client of clientList) {
-        if ('focus' in client) {
-          return client.focus();
-        }
-      }
 
-      if (clients.openWindow) {
-        return clients.openWindow(
-          'https://alidelll626-sudo.github.io/almstaq/'
-        );
-      }
-    })
-  );
-});
+      for (const client of clientList) {
+
+        try {
+
+          const clientUrl = new URL(client.url);
+          const target = new URL(targetUrl);
+
+          if (
