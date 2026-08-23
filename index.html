@@ -8,6 +8,7 @@
   <!-- مكتبات Firebase الأساسية وقاعدة البيانات -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
   <!-- مكتبة html2canvas لتحويل الفاتورة إلى صورة -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -424,35 +425,6 @@
     .add-btn:active {
       background: var(--primary);
       color: white;
-    }
-
-    /* تحكم كمية المنتج وملاحظته من بطاقة المنتج */
-    .product-cart-controls {
-      display:flex; align-items:center; justify-content:center; gap:14px;
-      width:100%; margin-top:5px; padding:2px 0;
-    }
-    .product-qty-btn {
-      width:36px; height:36px; border:1px solid #bae6fd;
-      background:var(--primary-light); color:var(--primary-dark);
-      border-radius:12px; display:inline-flex; align-items:center;
-      justify-content:center; cursor:pointer; font-size:1.35rem;
-      line-height:1; font-weight:900; transition:.15s ease;
-      box-shadow:0 3px 9px rgba(2,132,199,.10);
-    }
-    .product-qty-btn:active { transform:scale(.90); background:#bae6fd; }
-    .product-qty-value {
-      min-width:30px; text-align:center; font-size:1rem;
-      font-weight:900; color:var(--text-main);
-    }
-    .product-note-input {
-      width:100%; margin-top:4px; padding:8px 10px;
-      border:1px solid var(--border-color); border-radius:11px;
-      background:#f8fafc; color:var(--text-main); outline:none;
-      font-size:.72rem; line-height:1.4;
-    }
-    .product-note-input:focus {
-      border-color:#7dd3fc; background:#fff;
-      box-shadow:0 0 0 3px rgba(14,165,233,.08);
     }
 
     .card-admin-btns {
@@ -1412,6 +1384,67 @@
     }
     const db = firebase.firestore();
 
+    // ============================================================
+    // Firebase Cloud Messaging (Web Push)
+    // ------------------------------------------------------------
+    // مفتاح Web Push / VAPID العام الذي تم إنشاؤه من Firebase Console.
+    // لا يوجد هنا أي مفتاح سري؛ هذا المفتاح مخصص للاستخدام في الواجهة.
+    // ============================================================
+    const FCM_VAPID_KEY = "BKhpyeGB-wuM0DUYyFe5mayKraf7sKXS7BkvP_vLtS6Q3QyIdlaPZFtPytxcguxdDQi94wMKDHPi1yKYPBc0Z3Q";
+    let fcmMessaging = null;
+    let fcmServiceWorkerRegistration = null;
+
+    async function initPushNotificationsForCurrentUser() {
+      try {
+        if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+        if (!firebase.messaging) return;
+        if (!loggedCustomer && !loggedDelegate) return;
+
+        // إذا رفض المستخدم الإشعارات سابقاً لا نعيد إظهار الطلب.
+        if (Notification.permission === 'denied') return;
+
+        // تسجيل Service Worker الخاص بـ Firebase Messaging.
+        fcmServiceWorkerRegistration = await navigator.serviceWorker.register(
+          './firebase-messaging-sw.js',
+          { scope: './' }
+        );
+
+        // طلب الإذن فقط للمستخدم المسجل (زبون/مندوب).
+        if (Notification.permission === 'default') {
+          const permission = await Notification.requestPermission();
+          if (permission !== 'granted') return;
+        }
+
+        fcmMessaging = firebase.messaging();
+
+        const token = await fcmMessaging.getToken({
+          vapidKey: FCM_VAPID_KEY,
+          serviceWorkerRegistration: fcmServiceWorkerRegistration
+        });
+
+        if (!token) return;
+
+        const collectionName = loggedCustomer ? 'customers' : 'delegates';
+        const username = String(
+          loggedCustomer ? loggedCustomer.username : loggedDelegate.username
+        );
+
+        // نحفظ آخر Token لهذا الجهاز/الحساب حتى يمكن استخدامه لاحقاً
+        // لإرسال إشعارات Push فعلية عبر Firebase Cloud Messaging.
+        await db.collection(collectionName).doc(username).set({
+          fcmToken: token,
+          fcmTokenUpdatedAt: Date.now(),
+          pushEnabled: true
+        }, { merge: true });
+
+        localStorage.setItem('mustaqbal_fcm_token', token);
+        console.log('Firebase Cloud Messaging: تم تسجيل الجهاز بنجاح.');
+      } catch (err) {
+        // فشل الإشعارات لا يوقف المتجر ولا يؤثر على Firestore أو تسجيل الدخول.
+        console.warn('FCM Push غير متاح حالياً:', err);
+      }
+    }
+
     let deviceId = localStorage.getItem('mustaqbal_device_id');
     if (!deviceId) {
       deviceId = 'dev_' + Math.random().toString(36).substring(2) + Date.now();
@@ -1668,6 +1701,10 @@
       // الإشعارات للمستخدم الحالي فقط، بدلاً من تحميل مجموعة notifications كاملة.
       if (loggedCustomer || loggedDelegate) {
         await loadNotificationsFromFirestore(false);
+
+        // تفعيل إشعارات Push للمستخدم الحالي وحفظ FCM Token في حسابه.
+        // الخطأ هنا لا يمنع استمرار عمل التطبيق.
+        await initPushNotificationsForCurrentUser();
       }
 
       if (isAdmin || loggedAdmin) {
@@ -1808,7 +1845,7 @@
     }
 
     function formatPrice(amount) {
-      return Number(amount).toLocaleString('en-US');
+      return Number(amount).toLocaleString('ar-IQ');
     }
 
     let categories = JSON.parse(localStorage.getItem('mustaqbal_categories')) || [
@@ -2412,7 +2449,7 @@
       if (!ts) return '';
       const d = new Date(Number(ts));
       if (isNaN(d.getTime())) return '';
-      return d.toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' });
+      return d.toLocaleString('ar-IQ', { dateStyle:'medium', timeStyle:'short' });
     }
 
     function escapeNotificationHtml(value) {
@@ -3652,16 +3689,7 @@
             <div class="product-title">${product.name}</div>
             <div class="product-description">${product.desc || ''}</div>
             <div class="product-price">${formatPrice(effectivePrice)} د.ع</div>
-            ${!(isAdmin || loggedAdmin) ? `
-              <div class="product-cart-controls" data-product-id="${product.id}">
-                <button type="button" class="product-qty-btn" onclick="changeProductQty(${product.id}, -1)" aria-label="إنقاص الكمية">−</button>
-                <span class="product-qty-value" id="product-qty-${product.id}">0</span>
-                <button type="button" class="product-qty-btn" onclick="changeProductQty(${product.id}, 1)" aria-label="زيادة الكمية">+</button>
-              </div>
-              <input type="text" class="product-note-input" id="product-note-${product.id}"
-                placeholder="ملاحظة على هذا المنتج (اختياري)..." maxlength="300"
-                oninput="updateProductNote(${product.id}, this.value)">
-            ` : ''}
+            ${!(isAdmin || loggedAdmin) ? `<button class="add-btn" onclick="addToCart(${product.id})">إضافة للسلة 🛒</button>` : ''}
             ${(isAdmin || loggedAdmin) ? `
               <div class="card-admin-btns">
                 ${hasAdminPermission('editProducts') ? `<button class="edit-btn" onclick="editProduct(${product.id})">تعديل</button>` : ''}
@@ -3673,8 +3701,6 @@
         `;
         grid.appendChild(card);
       });
-
-      syncAllProductCardControls();
     }
 
 
@@ -3745,72 +3771,44 @@
       renderProducts(filtered);
     }
 
-    function addToCart(productId, change = 1, noteValue = null) {
-      if (isAdmin || loggedAdmin) return;
+    function addToCart(productId) {
+      if (isAdmin) return;
       const product = products.find(p => p.id === productId);
       if (!product) return;
 
       const effectivePrice = getCustomerProductPrice(product.price || 0);
       let currentCart = getCurrentCart();
-      let cartItem = currentCart.find(item => item.id === productId);
-
+      const cartItem = currentCart.find(item => item.id === productId);
+      
       if (cartItem) {
-        cartItem.qty += change;
+        cartItem.qty += 1;
         cartItem.price = effectivePrice;
-        if (noteValue !== null) cartItem.note = noteValue;
-      } else if (change > 0) {
-        currentCart.push({
-          ...product,
-          price: effectivePrice,
-          qty: change,
-          note: noteValue !== null ? noteValue : ''
-        });
+      } else {
+        currentCart.push({ ...product, price: effectivePrice, qty: 1, note: '' });
       }
 
-      currentCart = currentCart.filter(item => (item.qty || 0) > 0);
       setCurrentCart(currentCart);
       updateCartUI();
-      syncProductCardControls(productId);
-    }
-
-    function changeProductQty(productId, change) {
-      addToCart(productId, change);
-    }
-
-    function updateProductNote(productId, val) {
-      if (isAdmin || loggedAdmin) return;
-      const currentCart = getCurrentCart();
-      const item = currentCart.find(i => i.id === productId);
-      if (item) {
-        item.note = val;
-        setCurrentCart(currentCart);
-      }
-    }
-
-    function syncProductCardControls(productId) {
-      const currentCart = getCurrentCart();
-      const item = currentCart.find(i => i.id === productId);
-      const qtyEl = document.getElementById(`product-qty-${productId}`);
-      const noteEl = document.getElementById(`product-note-${productId}`);
-      if (qtyEl) qtyEl.textContent = item ? (item.qty || 0) : '0';
-      if (noteEl && document.activeElement !== noteEl) noteEl.value = item ? (item.note || '') : '';
-    }
-
-    function syncAllProductCardControls() {
-      if (isAdmin || loggedAdmin) return;
-      document.querySelectorAll('.product-cart-controls[data-product-id]').forEach(el => {
-        const id = Number(el.getAttribute('data-product-id'));
-        if (Number.isFinite(id)) syncProductCardControls(id);
-      });
     }
 
     function updateQty(id, change) {
-      addToCart(id, change);
+      let currentCart = getCurrentCart();
+      const item = currentCart.find(i => i.id === id);
+      if (!item) return;
+      item.qty += change;
+      if (item.qty <= 0) currentCart = currentCart.filter(i => i.id !== id);
+      setCurrentCart(currentCart);
+      updateCartUI();
       renderCartModal();
     }
 
     function updateCartItemNote(id, val) {
-      updateProductNote(id, val);
+      let currentCart = getCurrentCart();
+      const item = currentCart.find(i => i.id === id);
+      if (item) {
+        item.note = val;
+        setCurrentCart(currentCart);
+      }
     }
 
     function removeFromCart(productId) {
@@ -3905,6 +3903,9 @@
               <button type="button" style="background:none; border:none; cursor:pointer; color:var(--danger); font-size:0.9rem;" onclick="removeFromCart(${item.id})">🗑️</button>
             </div>
           </div>
+          <div>
+            <input type="text" class="compact-input" placeholder="ملاحظة حول هذا المنتج..." value="${item.note || ''}" oninput="updateCartItemNote(${item.id}, this.value)" style="font-size:0.75rem; padding:6px 10px;">
+          </div>
         `;
         cartItemsContainer.appendChild(div);
       });
@@ -3934,7 +3935,7 @@
 
       const newInvoice = {
         id: 'INV-' + Date.now(),
-        date: now.toLocaleString('en-US'),
+        date: now.toLocaleString('ar-IQ'),
         rawDate: isoDateString,
         createdAt: now.getTime(),
         customer: { name: custName, phone: custPhone, address: custAddress, username: accountSource },
@@ -3976,7 +3977,7 @@
           <tr>
             <td>
               <strong>${item.name || 'منتج غير معروف'}</strong>
-              ${item.note ? `<div style="font-size:0.7rem; color:#0369a1; margin-top:3px; background:#e0f2fe; padding:3px 6px; border-radius:6px;">الملاحظة: ${item.note}</div>` : ''}
+              ${item.note ? `<div style="font-size:0.7rem; color:#b45309; margin-top:3px; background:#fef3c7; padding:2px 6px; border-radius:4px;">ملاحظة المنتج: ${item.note}</div>` : ''}
             </td>
             <td style="text-align:center;">${qty}</td>
             <td style="text-align:left;">${formatPrice(price)}</td>
