@@ -406,94 +406,6 @@
       margin-top: auto;
     }
 
-    /* ===== تحكم كمية المنتج + ملاحظة المنتج داخل بطاقة المنتج ===== */
-    .product-cart-controls {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      margin-top: 9px;
-      direction: ltr;
-      gap: 0;
-      padding: 3px;
-      border-radius: 14px;
-      background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
-      border: 1px solid #bae6fd;
-      box-shadow: 0 3px 10px rgba(14,165,233,.10);
-      overflow: hidden;
-    }
-
-    .product-qty-btn {
-      width: 42px;
-      height: 38px;
-      border: 0;
-      background: #ffffff;
-      color: var(--primary-dark);
-      border-radius: 11px;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.35rem;
-      font-weight: 900;
-      line-height: 1;
-      box-shadow: 0 2px 6px rgba(15,23,42,.08);
-      transition: transform .15s ease, background .15s ease, color .15s ease, box-shadow .15s ease;
-    }
-
-    .product-qty-btn:hover:not(:disabled) {
-      background: var(--primary);
-      color: #fff;
-      box-shadow: 0 4px 10px rgba(14,165,233,.22);
-    }
-
-    .product-qty-btn:active {
-      transform: scale(.90);
-    }
-
-    .product-qty-btn:disabled {
-      opacity: .45;
-      cursor: not-allowed;
-    }
-
-    .product-qty-number {
-      min-width: 46px;
-      height: 38px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--primary-dark);
-      font-size: 1.05rem;
-      font-weight: 900;
-      background: transparent;
-      user-select: none;
-    }
-
-    .product-note-input {
-      width: 100%;
-      margin-top: 6px;
-      min-height: 36px;
-      padding: 7px 10px;
-      border: 1px solid var(--border-color);
-      border-radius: 10px;
-      background: #f8fafc;
-      color: var(--text-main);
-      font-size: .72rem;
-      outline: none;
-      resize: none;
-    }
-
-    .product-note-input:focus {
-      border-color: #7dd3fc;
-      background: #fff;
-      box-shadow: 0 0 0 3px rgba(14,165,233,.08);
-    }
-
-    .product-note-input::placeholder {
-      color: #94a3b8;
-    }
-
-    /* زر قديم احتياطي إن وُجد في نسخة قديمة من الواجهة */
     .add-btn {
       background: var(--primary-light);
       color: var(--primary-dark);
@@ -515,6 +427,64 @@
       background: var(--primary);
       color: white;
     }
+
+    /* ===== تجربة طلب عصرية داخل بطاقة المنتج ===== */
+    .product-order-box {
+      margin-top: 7px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .product-qty-control {
+      display: grid;
+      grid-template-columns: 42px 1fr 42px;
+      align-items: center;
+      min-height: 42px;
+      border: 1px solid #bae6fd;
+      border-radius: 14px;
+      overflow: hidden;
+      background: linear-gradient(135deg, #f0f9ff, #ffffff);
+      box-shadow: 0 6px 16px rgba(2,132,199,.09);
+    }
+    .product-qty-btn {
+      width: 42px;
+      height: 42px;
+      border: 0;
+      background: var(--primary);
+      color: #fff;
+      font-size: 1.35rem;
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform .16s ease, background .16s ease;
+    }
+    .product-qty-btn:active { transform: scale(.92); background: var(--primary-dark); }
+    .product-qty-value {
+      text-align: center;
+      color: var(--primary-dark);
+      font-size: 1rem;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+    }
+    .product-note-input {
+      width: 100%;
+      min-height: 42px;
+      padding: 8px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      background: #fff;
+      color: var(--text-main);
+      font-size: .74rem;
+      outline: none;
+      resize: vertical;
+    }
+    .product-note-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(2,132,199,.10);
+    }
+    .product-note-input::placeholder { color: #94a3b8; }
 
     .card-admin-btns {
       display: flex;
@@ -4167,23 +4137,17 @@
             <div class="product-price">${formatPrice(effectivePrice)} د.ع</div>
             ${!(isAdmin || loggedAdmin) ? (() => {
               const cartItem = getCurrentCart().find(item => item.id === product.id);
-              const cartQty = cartItem ? Number(cartItem.qty) || 0 : 0;
-              const cartNote = cartItem ? (cartItem.note || '') : '';
+              const qty = cartItem ? Number(cartItem.qty || 0) : 0;
+              const note = cartItem ? escapeHtml(cartItem.note || '') : '';
               return `
-                <div class="product-cart-controls" aria-label="التحكم بكمية المنتج">
-                  <button type="button" class="product-qty-btn" onclick="updateQty(${product.id}, 1)" aria-label="زيادة الكمية">+</button>
-                  <span class="product-qty-number">${cartQty}</span>
-                  <button type="button" class="product-qty-btn" onclick="updateQty(${product.id}, -1)" ${cartQty <= 0 ? 'disabled' : ''} aria-label="إنقاص الكمية">−</button>
-                </div>
-                <input
-                  type="text"
-                  class="product-note-input"
-                  placeholder="ملاحظة للمنتج (اختياري)..."
-                  value="${String(cartNote).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}"
-                  oninput="updateProductCardNote(${product.id}, this.value)"
-                  aria-label="ملاحظة المنتج"
-                >
-              `;
+                <div class="product-order-box">
+                  <div class="product-qty-control">
+                    <button type="button" class="product-qty-btn" onclick="updateProductQuantity(${product.id}, -1)" aria-label="إنقاص الكمية">−</button>
+                    <div class="product-qty-value">${qty}</div>
+                    <button type="button" class="product-qty-btn" onclick="updateProductQuantity(${product.id}, 1)" aria-label="زيادة الكمية">+</button>
+                  </div>
+                  <textarea class="product-note-input" rows="2" placeholder="أضف ملاحظة خاصة بهذا المنتج..." oninput="updateProductNote(${product.id}, this.value)">${note}</textarea>
+                </div>`;
             })() : ''}
             ${(isAdmin || loggedAdmin) ? `
               <div class="card-admin-btns">
@@ -4266,61 +4230,84 @@
       renderProducts(filtered);
     }
 
-    function addToCart(productId) {
-      // التوافق مع أي استدعاء قديم: إضافة وحدة واحدة فقط.
-      updateQty(productId, 1);
+    function escapeHtml(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[c]));
     }
 
-    function updateQty(id, change) {
-      if (isAdmin || loggedAdmin) return;
-
+    function updateProductQuantity(productId, change) {
       let currentCart = getCurrentCart();
-      const product = products.find(p => p.id === id);
-      let item = currentCart.find(i => i.id === id);
+      let item = currentCart.find(i => i.id === productId);
 
       if (!item) {
-        if (change <= 0 || !product) return;
-        const effectivePrice = getCustomerProductPrice(product.price || 0);
-        item = { ...product, price: effectivePrice, qty: 0, note: '' };
+        if (change <= 0) return;
+        const product = products.find(p => p.id === productId);
+        if (!product) return;
+        item = {
+          ...product,
+          price: getCustomerProductPrice(product.price || 0),
+          qty: 1,
+          note: ''
+        };
         currentCart.push(item);
-      }
-
-      item.qty += change;
-      item.price = getCustomerProductPrice(product ? (product.price || 0) : (item.price || 0));
-
-      if (item.qty <= 0) {
-        currentCart = currentCart.filter(i => i.id !== id);
+      } else {
+        item.qty = Math.max(0, Number(item.qty || 0) + Number(change || 0));
+        if (item.qty === 0) currentCart = currentCart.filter(i => i.id !== productId);
       }
 
       setCurrentCart(currentCart);
       updateCartUI();
-
-      // تحديث عداد + و - والكمية الظاهرة مباشرة داخل بطاقة المنتج.
       renderProducts();
-
-      // إذا كانت السلة مفتوحة، حدّثها أيضاً.
-      const cartModal = document.getElementById('cart-modal');
-      if (cartModal && !cartModal.classList.contains('hidden')) {
-        renderCartModal();
-      }
     }
 
-    function updateProductCardNote(id, val) {
-      if (isAdmin || loggedAdmin) return;
+    function updateProductNote(productId, value) {
+      const currentCart = getCurrentCart();
+      const item = currentCart.find(i => i.id === productId);
+      if (!item) return; // الملاحظة تظهر وتُحفظ فقط للمنتج الموجود في السلة.
+      item.note = String(value || '').slice(0, 500);
+      setCurrentCart(currentCart);
+    }
 
+    function addToCart(productId) {
+      if (isAdmin) return;
+      const product = products.find(p => p.id === productId);
+      if (!product) return;
+
+      const effectivePrice = getCustomerProductPrice(product.price || 0);
+      let currentCart = getCurrentCart();
+      const cartItem = currentCart.find(item => item.id === productId);
+      
+      if (cartItem) {
+        cartItem.qty += 1;
+        cartItem.price = effectivePrice;
+      } else {
+        currentCart.push({ ...product, price: effectivePrice, qty: 1, note: '' });
+      }
+
+      setCurrentCart(currentCart);
+      updateCartUI();
+    }
+
+    function updateQty(id, change) {
       let currentCart = getCurrentCart();
       const item = currentCart.find(i => i.id === id);
-
-      // الملاحظة مرتبطة بالمنتج الموجود في السلة، ولا توجد خانة ملاحظات ثانية في السلة.
-      if (item) {
-        item.note = String(val || '');
-        setCurrentCart(currentCart);
-      }
+      if (!item) return;
+      item.qty += change;
+      if (item.qty <= 0) currentCart = currentCart.filter(i => i.id !== id);
+      setCurrentCart(currentCart);
+      updateCartUI();
+      renderCartModal();
+      renderProducts();
     }
 
-    // التوافق مع النسخة السابقة إذا كانت هناك استدعاءات لهذه الدالة.
     function updateCartItemNote(id, val) {
-      updateProductCardNote(id, val);
+      let currentCart = getCurrentCart();
+      const item = currentCart.find(i => i.id === id);
+      if (item) {
+        item.note = val;
+        setCurrentCart(currentCart);
+      }
     }
 
     function removeFromCart(productId) {
@@ -4328,8 +4315,8 @@
       currentCart = currentCart.filter(item => item.id !== productId);
       setCurrentCart(currentCart);
       updateCartUI();
-      renderProducts();
       renderCartModal();
+      renderProducts();
     }
 
     function clearCart() {
@@ -4338,7 +4325,6 @@
       if (confirm('تأكيد إفراغ السلة؟')) {
         setCurrentCart([]);
         updateCartUI();
-        renderProducts();
         renderCartModal();
       }
     }
@@ -4351,7 +4337,7 @@
     }
 
     function openCartModal() {
-      if (isAdmin || loggedAdmin) return;
+      if (isAdmin) return;
       const selectWrap = document.getElementById('delegate-client-select-wrap');
       if (loggedDelegate) {
         if (selectWrap) selectWrap.classList.remove('hidden');
@@ -4376,7 +4362,7 @@
       const cartItemsContainer = document.getElementById('cart-items');
       const clearBtn = document.getElementById('clear-cart-btn');
       if (!cartItemsContainer) return;
-
+      
       cartItemsContainer.innerHTML = '';
       let total = 0;
       let currentCart = getCurrentCart();
@@ -4385,10 +4371,7 @@
       const query = cartSearchInput ? cartSearchInput.value.toLowerCase().trim() : '';
       let filteredCart = currentCart;
       if (query) {
-        filteredCart = currentCart.filter(item =>
-          item.name.toLowerCase().includes(query) ||
-          (item.note && item.note.toLowerCase().includes(query))
-        );
+        filteredCart = currentCart.filter(item => item.name.toLowerCase().includes(query) || (item.note && item.note.toLowerCase().includes(query)));
       }
 
       if (currentCart.length === 0) {
@@ -4420,7 +4403,6 @@
               <button type="button" style="background:none; border:none; cursor:pointer; color:var(--danger); font-size:0.9rem;" onclick="removeFromCart(${item.id})">🗑️</button>
             </div>
           </div>
-          ${item.note ? `<div style="font-size:.72rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:6px 9px;">ملاحظة المنتج: ${String(item.note).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>` : ''}
         `;
         cartItemsContainer.appendChild(div);
       });
