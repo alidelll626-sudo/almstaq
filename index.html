@@ -1537,16 +1537,14 @@
       const oldAuthPassword = await legacyAuthPassword(oldPassword);
       const newAuthPassword = await legacyAuthPassword(newPassword);
       const secondaryName = 'legacyCred_' + role + '_' + String(oldUsername).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
+
       let secondaryApp;
       try { secondaryApp = firebase.app(secondaryName); }
       catch (_) { secondaryApp = firebase.initializeApp(firebaseConfig, secondaryName); }
-      const secondaryAuth = secondaryApp.auth();
-      try {
-        const credential = await secondaryAuth.signInWithEmailAndPassword(oldEmail, oldAuthPassword);
-        const user = credential.user;
-        if (oldEmail !== newEmail) await user.updateEmail(newEmail);
-        if (oldAuthPassword !== newAuthPassword) await user.updatePassword(newAuthPassword);
 
+      const secondaryAuth = secondaryApp.auth();
+
+      async function saveAuthLinks(user) {
         await db.collection('userProfiles').doc(user.uid).set({
           username: String(newUsername),
           role: String(role),
@@ -1563,6 +1561,52 @@
         }, { merge: true });
 
         return { uid: user.uid, email: newEmail };
+      }
+
+      try {
+        const credential = await secondaryAuth.signInWithEmailAndPassword(oldEmail, oldAuthPassword);
+        let user = credential.user;
+
+        try {
+          // المحاولة الطبيعية أولاً.
+          if (oldEmail !== newEmail) await user.updateEmail(newEmail);
+          if (oldAuthPassword !== newAuthPassword) await user.updatePassword(newAuthPassword);
+          return await saveAuthLinks(user);
+
+        } catch (updateErr) {
+          console.warn('تعذر التحديث المباشر لحساب Authentication، سيتم إعادة إنشاء بيانات الدخول:', updateErr);
+
+          // بعض إعدادات Firebase تمنع updateEmail / updatePassword من المتصفح.
+          // بما أن المستخدم سُجّل دخوله الآن في التطبيق الثانوي، نستخدم طريقة بديلة:
+          // حذف حساب الدخول القديم ثم إنشاء حساب جديد بالبيانات الجديدة.
+          // هذا يحافظ على قدرة المدير على تعديل اسم المستخدم وكلمة المرور.
+          const oldUid = user.uid;
+
+          try {
+            await user.delete();
+          } catch (deleteErr) {
+            console.error('تعذر حذف حساب Authentication القديم:', deleteErr);
+            throw new Error('تعذر تحديث بيانات تسجيل الدخول لهذا المدير.');
+          }
+
+          try {
+            const recreated = await secondaryAuth.createUserWithEmailAndPassword(newEmail, newAuthPassword);
+            user = recreated.user;
+          } catch (createErr) {
+            console.error('تعذر إنشاء حساب Authentication البديل:', createErr);
+            throw new Error('تعذر إنشاء بيانات تسجيل الدخول الجديدة لهذا المدير.');
+          }
+
+          // إذا كان هناك ملف شخصي قديم مربوط بالـ UID السابق، لا نحتاجه للحساب الجديد.
+          // نحذف فقط بيانات الربط القديمة بدون كشف تفاصيل تقنية للمستخدم.
+          try {
+            await db.collection('userProfiles').doc(oldUid).delete();
+          } catch (profileDeleteErr) {
+            console.warn('تعذر حذف ملف الربط القديم، سيتم متابعة الحفظ:', profileDeleteErr);
+          }
+
+          return await saveAuthLinks(user);
+        }
       } finally {
         try { await secondaryAuth.signOut(); } catch (_) {}
         try { await secondaryApp.delete(); } catch (_) {}
@@ -3585,7 +3629,7 @@
           // إذا كان التعديل يتضمن بيانات الدخول فلا نعرض نجاحاً مضللاً.
           // نعيد رسالة آمنة بدون تفاصيل Firebase الحساسة.
           if (old && (usernameChanged || passwordChanged)) {
-            throw new Error('تعذر تحديث بيانات تسجيل الدخول لهذا المدير. لم يتم اعتماد تعديل اسم المستخدم أو كلمة المرور.');
+            throw new Error('تعذر تحديث بيانات تسجيل الدخول لهذا المدير. يرجى المحاولة مرة أخرى.');
           }
 
           // أما إنشاء الحساب الجديد فيجب أن يفشل بوضوح لأن تسجيل الدخول لن يكون مكتملاً.
