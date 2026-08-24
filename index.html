@@ -4,7 +4,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- BUILD: whatsapp-bottom-nav-final-v3-20260824 -->
+  <!-- BUILD: whatsapp-link-v4-20260824 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>متجر المستقبل للجملة</title>
@@ -1544,14 +1544,14 @@
           <div class="whatsapp-settings-hero">
             <div class="hero-icon">💬</div>
             <h4>رابط التواصل مع حساب واتساب الرسمي</h4>
-            <p>المدير الرئيسي يحدد رقم واتساب ورسالة افتتاحية واحدة. ستظهر الإعدادات تلقائياً للزبائن والمندوبين، وعند الضغط على الأيقونة يفتح تطبيق واتساب مباشرة على محادثة المتجر.</p>
+            <p>المدير الرئيسي يحدد رابط واتساب ورسالة افتتاحية واحدة. ستظهر الإعدادات تلقائياً للزبائن والمندوبين، وعند الضغط على الأيقونة يفتح تطبيق واتساب مباشرة على محادثة المتجر.</p>
           </div>
 
           <form id="whatsapp-settings-form" onsubmit="saveWhatsAppSettings(event)" class="form-row">
             <div>
-              <label class="field-label">رقم واتساب</label>
-              <input type="tel" id="whatsapp-business-number" class="compact-input" inputmode="tel" dir="ltr" placeholder="مثال: 9647XXXXXXXXX" required>
-              <small style="display:block;color:var(--text-muted);font-size:.68rem;margin-top:5px;line-height:1.6;">اكتب الرقم بصيغة دولية، ويفضل بدون + أو مسافات. مثال العراق: 9647XXXXXXXXX</small>
+              <label class="field-label">رابط واتساب</label>
+              <input type="url" id="whatsapp-business-link" class="compact-input" inputmode="url" dir="ltr" placeholder="https://wa.me/9647XXXXXXXXX" required>
+              <small style="display:block;color:var(--text-muted);font-size:.68rem;margin-top:5px;line-height:1.6;">ضع رابط واتساب المباشر، مثل: https://wa.me/9647XXXXXXXXX</small>
             </div>
             <div>
               <label class="field-label">الرسالة الافتتاحية</label>
@@ -1568,7 +1568,7 @@
             <div class="whatsapp-preview-icon">💬</div>
             <div>
               <div style="font-size:.72rem;color:var(--text-muted);">المعاينة</div>
-              <strong id="whatsapp-settings-preview">لم يتم ضبط رقم واتساب بعد</strong>
+              <strong id="whatsapp-settings-preview">لم يتم ضبط رابط واتساب بعد</strong>
             </div>
           </div>
 
@@ -2329,18 +2329,25 @@
       }
     }
 
-    function normalizeWhatsAppNumber(value) {
-      let number = String(value || '').trim();
-      number = number.replace(/[^\d+]/g, '');
-      if (number.startsWith('+')) number = number.slice(1);
-      return number;
+    function normalizeWhatsAppLink(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return '';
+      try {
+        const url = new URL(raw);
+        if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
+        if (!/wa\.me$|whatsapp\.com$/i.test(url.hostname)) return '';
+        return url.toString();
+      } catch (_) {
+        return '';
+      }
     }
 
     function buildWhatsAppUrl() {
-      const number = normalizeWhatsAppNumber(whatsappSettings && whatsappSettings.number);
-      if (!number) return '';
+      const baseLink = normalizeWhatsAppLink(whatsappSettings && whatsappSettings.link);
+      if (!baseLink) return '';
       const message = String((whatsappSettings && whatsappSettings.message) || '').trim();
-      return 'https://wa.me/' + number + (message ? '?text=' + encodeURIComponent(message) : '');
+      if (!message) return baseLink;
+      return baseLink + (baseLink.includes('?') ? '&' : '?') + 'text=' + encodeURIComponent(message);
     }
 
     function updateWhatsAppNavUI() {
@@ -2348,8 +2355,8 @@
       if (!btn) return;
       // زر واتساب عام: يظهر قبل تسجيل الدخول وبعده لجميع المستخدمين.
       btn.classList.remove('hidden');
-      btn.classList.toggle('configured', !!(whatsappSettings && whatsappSettings.enabled && normalizeWhatsAppNumber(whatsappSettings.number)));
-      btn.title = (whatsappSettings && whatsappSettings.enabled && normalizeWhatsAppNumber(whatsappSettings.number))
+      btn.classList.toggle('configured', !!(whatsappSettings && whatsappSettings.enabled && normalizeWhatsAppLink(whatsappSettings.link)));
+      btn.title = (whatsappSettings && whatsappSettings.enabled && normalizeWhatsAppLink(whatsappSettings.link))
         ? 'تواصل معنا عبر واتساب'
         : 'واتساب المتجر غير مفعّل حالياً';
     }
@@ -2357,13 +2364,13 @@
     async function loadWhatsAppSettings() {
       try {
         const cached = JSON.parse(localStorage.getItem('mustaqbal_whatsapp_settings') || 'null');
-        if (cached && typeof cached === 'object') whatsappSettings = { ...whatsappSettings, ...cached };
+        if (cached && typeof cached === 'object') whatsappSettings = { ...whatsappSettings, ...cached, link: cached.link || cached.number || '' };
 
         const ref = db.collection('storeSettings').doc('whatsapp');
         const snap = await ref.get();
         if (snap.exists) {
           whatsappSettings = {
-            number: String(snap.data().number || ''),
+            link: String(snap.data().link || ''),
             message: String(snap.data().message || ''),
             enabled: snap.data().enabled !== false,
             updatedAt: Number(snap.data().updatedAt || 0)
@@ -2387,7 +2394,7 @@
         if (!doc.exists) return;
         const data = doc.data() || {};
         whatsappSettings = {
-          number: String(data.number || ''),
+          link: String(data.link || ''),
           message: String(data.message || ''),
           enabled: data.enabled !== false,
           updatedAt: Number(data.updatedAt || 0)
@@ -2399,18 +2406,18 @@
     }
 
     function updateWhatsAppSettingsForm() {
-      const numberInput = document.getElementById('whatsapp-business-number');
+      const linkInput = document.getElementById('whatsapp-business-link');
       const messageInput = document.getElementById('whatsapp-default-message');
       const enabledInput = document.getElementById('whatsapp-enabled');
       const preview = document.getElementById('whatsapp-settings-preview');
-      if (numberInput) numberInput.value = whatsappSettings.number || '';
+      if (linkInput) linkInput.value = whatsappSettings.link || '';
       if (messageInput) messageInput.value = whatsappSettings.message || '';
       if (enabledInput) enabledInput.checked = whatsappSettings.enabled !== false;
       if (preview) {
-        const number = normalizeWhatsAppNumber(whatsappSettings.number);
-        preview.textContent = number
-          ? (whatsappSettings.enabled !== false ? 'واتساب مفعّل — ' + number : 'واتساب محفوظ لكنه غير مفعّل — ' + number)
-          : 'لم يتم ضبط رقم واتساب بعد';
+        const link = normalizeWhatsAppLink(whatsappSettings.link);
+        preview.textContent = link
+          ? (whatsappSettings.enabled !== false ? 'رابط واتساب مفعّل' : 'رابط واتساب محفوظ لكنه غير مفعّل')
+          : 'لم يتم ضبط رابط واتساب بعد';
       }
     }
 
@@ -2435,21 +2442,17 @@
         return;
       }
 
-      const number = normalizeWhatsAppNumber(document.getElementById('whatsapp-business-number').value);
+      const link = normalizeWhatsAppLink(document.getElementById('whatsapp-business-link').value);
       const message = document.getElementById('whatsapp-default-message').value.trim();
       const enabled = document.getElementById('whatsapp-enabled').checked;
 
-      if (!number) {
-        alert('يرجى إدخال رقم واتساب بصيغة دولية.');
-        return;
-      }
-      if (!/^\d{8,15}$/.test(number)) {
-        alert('رقم واتساب غير صحيح. استخدم الرقم الدولي فقط، من 8 إلى 15 رقماً.');
+      if (!link) {
+        alert('يرجى إدخال رابط واتساب صحيح، مثل https://wa.me/9647XXXXXXXXX');
         return;
       }
 
       const data = {
-        number,
+        link,
         message,
         enabled,
         updatedAt: Date.now(),
@@ -2488,7 +2491,7 @@
       }
       const url = buildWhatsAppUrl();
       if (!url) {
-        alert('لم يتم ضبط رقم واتساب المتجر من المدير الرئيسي بعد.');
+        alert('لم يتم ضبط رابط واتساب المتجر من المدير الرئيسي بعد.');
         return;
       }
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -2501,7 +2504,7 @@
       }
       const url = buildWhatsAppUrl();
       if (!url) {
-        alert('لم يتم ضبط رقم واتساب المتجر من المدير الرئيسي بعد.');
+        alert('لم يتم ضبط رابط واتساب المتجر من المدير الرئيسي بعد.');
         return;
       }
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -2514,7 +2517,7 @@
       }
       const url = buildWhatsAppUrl();
       if (!url) {
-        alert('أدخل رقم واتساب أولاً.');
+        alert('أدخل رابط واتساب أولاً.');
         return;
       }
       window.open(url, '_blank', 'noopener,noreferrer');
@@ -2742,7 +2745,7 @@
     let invoices = JSON.parse(localStorage.getItem('mustaqbal_invoices')) || [];
     let notifications = [];
     let notificationFilter = 'all';
-    let whatsappSettings = JSON.parse(localStorage.getItem('mustaqbal_whatsapp_settings') || '{"number":"","message":"","enabled":true}');
+    let whatsappSettings = JSON.parse(localStorage.getItem('mustaqbal_whatsapp_settings') || '{"link":"","message":"","enabled":true}');
     let whatsappSettingsUnsubscribe = null;
     let activeCategory = 'all';
 
