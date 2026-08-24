@@ -4,7 +4,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- BUILD: whatsapp-link-v4-20260824 -->
+  <!-- BUILD: whatsapp-link-pdf-fixed-v8-natural-row-pagination-20260825 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>متجر المستقبل للجملة</title>
@@ -5283,9 +5283,13 @@
           return;
         }
 
-        const canvas = await renderExportCanvas(invoiceElementId);
-        const { jsPDF } = window.jspdf;
+        const invoiceElement = document.getElementById(invoiceElementId);
+        if (!invoiceElement) throw new Error('لم يتم العثور على الفاتورة.');
+        if (typeof html2canvas !== 'function') {
+          throw new Error('مكتبة html2canvas غير محملة.');
+        }
 
+        const { jsPDF } = window.jspdf;
         const pdf = new jsPDF({
           orientation: 'portrait',
           unit: 'mm',
@@ -5297,54 +5301,186 @@
         const pageHeight = pdf.internal.pageSize.getHeight();
         const margin = 8;
         const usableWidth = pageWidth - margin * 2;
-        const ratio = usableWidth / canvas.width;
         const usableHeight = pageHeight - margin * 2;
 
-        const renderedHeight = canvas.height * ratio;
-        const imgData = canvas.toDataURL('image/jpeg', 0.92);
+        const waitPaint = () => new Promise(resolve => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        });
 
-        if (renderedHeight <= usableHeight) {
-          pdf.addImage(imgData, 'JPEG', margin, margin, usableWidth, renderedHeight, undefined, 'FAST');
-        } else {
-          const pageContentHeightPx = Math.max(1, Math.floor(usableHeight / ratio));
-          let sourceY = 0;
-          let pageIndex = 0;
+        await waitPaint();
+        try {
+          if (document.fonts && document.fonts.ready) await document.fonts.ready;
+        } catch (_) {}
+        await waitPaint();
 
-          while (sourceY < canvas.height) {
-            if (pageIndex > 0) pdf.addPage();
+        /*
+         * الإصلاح النهائي:
+         * بدلاً من تصوير كل صف في جدول مستقل ثم حساب ارتفاعاته بشكل منفصل،
+         * نصوّر الفاتورة كاملة مرة واحدة بنفس تخطيطها الحقيقي.
+         *
+         * بعد ذلك نأخذ مواقع نهاية الصفوف من DOM الأصلي، ونحوّلها إلى نقاط
+         * قص. كل صفحة تحتوي أكبر عدد ممكن من الصفوف الكاملة.
+         *
+         * بهذه الطريقة:
+         * - لا توجد فراغات ضخمة مصطنعة.
+         * - لا ينقسم صف بين صفحتين.
+         * - لا يتكرر عنوان الجدول قبل كل منتج.
+         * - تبقى الفاتورة بنفس شكلها الحقيقي.
+         */
 
-            const sliceHeightPx = Math.min(pageContentHeightPx, canvas.height - sourceY);
-            const pageCanvas = document.createElement('canvas');
+        const rect = invoiceElement.getBoundingClientRect();
+        const captureWidth = Math.max(
+          invoiceElement.scrollWidth || 0,
+          invoiceElement.clientWidth || 0,
+          rect.width || 0,
+          480
+        );
 
-            pageCanvas.width = canvas.width;
-            pageCanvas.height = sliceHeightPx;
+        // لقطة واحدة للفواتير، مع إزالة أي تأثير للـ viewport على العرض.
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = [
+          'position:fixed',
+          'left:-100000px',
+          'top:0',
+          `width:${captureWidth}px`,
+          'background:#ffffff',
+          'box-sizing:border-box',
+          'direction:rtl',
+          'overflow:visible',
+          'padding:0',
+          'margin:0'
+        ].join(';');
 
-            const ctx = pageCanvas.getContext('2d');
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        const clone = invoiceElement.cloneNode(true);
+        clone.style.width = '100%';
+        clone.style.maxWidth = 'none';
+        clone.style.height = 'auto';
+        clone.style.minHeight = '0';
+        clone.style.overflow = 'visible';
+        clone.style.margin = '0';
+        clone.style.boxSizing = 'border-box';
 
-            ctx.drawImage(
-              canvas,
-              0, sourceY, canvas.width, sliceHeightPx,
-              0, 0, canvas.width, sliceHeightPx
-            );
+        wrapper.appendChild(clone);
+        document.body.appendChild(wrapper);
 
-            const sliceData = pageCanvas.toDataURL('image/jpeg', 0.92);
-            const sliceHeightMm = sliceHeightPx * ratio;
+        let canvas;
+        try {
+          await waitPaint();
+          canvas = await html2canvas(wrapper, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#ffffff',
+            logging: false,
+            imageTimeout: 15000,
+            windowWidth: Math.max(document.documentElement.clientWidth, captureWidth)
+          });
+        } finally {
+          wrapper.remove();
+        }
 
-            pdf.addImage(
-              sliceData,
-              'JPEG',
-              margin,
-              margin,
-              usableWidth,
-              sliceHeightMm,
-              undefined,
-              'FAST'
-            );
+        if (!canvas || !canvas.width || !canvas.height) {
+          throw new Error('تعذر إنشاء صورة الفاتورة.');
+        }
 
-            sourceY += sliceHeightPx;
-            pageIndex++;
+        /*
+         * نستخدم DOM الأصلي لتحديد الحدود الطبيعية للصفوف.
+         * لأن canvas له نفس عرض الفاتورة، يمكن تحويل إحداثيات DOM إلى pixels
+         * في الصورة بدقة.
+         */
+        const table = invoiceElement.querySelector('.receipt-table');
+        const rows = table ? Array.from(table.querySelectorAll('tbody tr')) : [];
+
+        const invoiceRect = invoiceElement.getBoundingClientRect();
+        const scaleX = canvas.width / Math.max(invoiceElement.scrollWidth || invoiceRect.width, 1);
+        const scaleY = canvas.height / Math.max(invoiceElement.scrollHeight || invoiceRect.height, 1);
+
+        const naturalBreaks = [];
+
+        // كل نهاية صف هي نقطة قص آمنة.
+        rows.forEach(row => {
+          const r = row.getBoundingClientRect();
+          const bottom = Math.round((r.bottom - invoiceRect.top) * scaleY);
+          if (bottom > 0 && bottom < canvas.height) {
+            naturalBreaks.push(bottom);
+          }
+        });
+
+        // نهاية الفاتورة نقطة قص أخيرة.
+        naturalBreaks.push(canvas.height);
+
+        // إزالة التكرارات والترتيب.
+        const breaks = [...new Set(naturalBreaks.filter(n => n > 0))]
+          .sort((a, b) => a - b);
+
+        const pxPerMm = canvas.width / usableWidth;
+        const pageHeightPx = usableHeight * pxPerMm;
+
+        /*
+         * نبني الصفحات من الصورة الكبيرة:
+         * نختار آخر صف يمكن أن يدخل في الصفحة الحالية.
+         * لا نستخدم ارتفاعاً ثابتاً لكل صف ولا نضيف مساحة إضافية.
+         */
+        let startY = 0;
+        let breakIndex = 0;
+        let pageNumber = 0;
+
+        while (startY < canvas.height - 1) {
+          let endY = null;
+
+          for (let i = breakIndex; i < breaks.length; i++) {
+            const candidate = breaks[i];
+
+            if (candidate - startY <= pageHeightPx + 1) {
+              endY = candidate;
+              breakIndex = i + 1;
+            } else {
+              break;
+            }
+          }
+
+          // إذا لم يوجد صف كامل يتسع، نضطر لتقسيم العنصر الحالي فقط.
+          if (endY === null || endY <= startY) {
+            endY = Math.min(startY + pageHeightPx, canvas.height);
+          }
+
+          if (pageNumber > 0) {
+            pdf.addPage();
+          }
+
+          const sliceHeight = endY - startY;
+          const slice = document.createElement('canvas');
+          slice.width = canvas.width;
+          slice.height = Math.max(1, Math.ceil(sliceHeight));
+
+          const ctx = slice.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, slice.width, slice.height);
+          ctx.drawImage(
+            canvas,
+            0, startY, canvas.width, sliceHeight,
+            0, 0, canvas.width, sliceHeight
+          );
+
+          const sliceHeightMm = slice.height / pxPerMm;
+
+          pdf.addImage(
+            slice.toDataURL('image/jpeg', 0.94),
+            'JPEG',
+            margin,
+            margin,
+            usableWidth,
+            Math.min(sliceHeightMm, usableHeight),
+            undefined,
+            'FAST'
+          );
+
+          startY = endY;
+          pageNumber++;
+
+          // حماية من أي حلقة غير متوقعة.
+          if (pageNumber > 200) {
+            throw new Error('تعذر تقسيم الفاتورة إلى صفحات.');
           }
         }
 
@@ -5352,7 +5488,7 @@
 
       } catch (err) {
         console.error('خطأ في حفظ الفاتورة كـ PDF:', err);
-        alert('تعذر إنشاء ملف PDF. تأكد من اتصال الإنترنت ثم حاول مرة أخرى.');
+        alert('تعذر إنشاء ملف PDF. حاول مرة أخرى.');
       }
     }
 
