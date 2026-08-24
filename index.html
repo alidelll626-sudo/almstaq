@@ -8,6 +8,7 @@
   <!-- مكتبات Firebase الأساسية وقاعدة البيانات -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js"></script>
 
   <!-- مكتبة html2canvas لتحويل الفاتورة إلى صورة -->
@@ -992,10 +993,10 @@
         <hr style="border: 0; border-top: 1px solid var(--border-color);">
 
         <div id="owner-password-change-box">
-          <h2 style="font-size: 0.85rem; margin-bottom: 6px;">تغيير كلمة سر المدير</h2>
+          <h2 style="font-size: 0.85rem; margin-bottom: 6px;">إعادة تعيين كلمة سر المدير</h2>
           <form onsubmit="handleAdminPasswordChange(event)" style="display: flex; gap: 6px;">
             <input type="password" id="new-admin-pass" placeholder="كلمة المرور الجديدة" required class="compact-input" style="flex:1;">
-            <button type="submit" class="btn" style="padding: 6px 12px; font-size: 0.8rem;">تحديث</button>
+            <button type="submit" class="btn" style="padding: 6px 12px; font-size: 0.8rem;">إرسال رابط</button>
           </form>
         </div>
       </div>
@@ -1094,7 +1095,7 @@
         </div>
         <div class="modal-body">
           <form onsubmit="handleUnifiedLogin(event)" style="display: flex; flex-direction: column; gap: 10px;">
-            <input type="text" id="login-username" placeholder="اسم المستخدم" required class="compact-input">
+            <input type="text" id="login-username" placeholder="البريد الإلكتروني للمدير أو اسم المستخدم" required class="compact-input">
             <input type="password" id="login-password" placeholder="كلمة المرور" required class="compact-input">
             <button type="submit" class="btn" style="width: 100%; padding: 12px; margin-top: 5px;">دخول</button>
           </form>
@@ -1383,6 +1384,7 @@
       firebase.initializeApp(firebaseConfig);
     }
     const db = firebase.firestore();
+    const auth = firebase.auth();
 
     // ============================================================
     // Firebase Cloud Messaging (Web Push)
@@ -2119,25 +2121,51 @@
       const u = document.getElementById('login-username').value.trim();
       const p = document.getElementById('login-password').value.trim();
 
-      if (u === 'admin' && p === adminPassword) {
+      // المدير الرئيسي يسجل الدخول الآن عبر Firebase Authentication بالبريد الإلكتروني.
+      // الزبائن والمندوبون والمدراء الفرعيون يحتفظون بطريقة دخولهم الحالية.
+      if (u.includes('@')) {
         try {
+          const credential = await auth.signInWithEmailAndPassword(u, p);
+          const firebaseUser = credential.user;
           const ownerRef = db.collection('adminAccounts').doc('admin');
           const ownerSnap = await ownerRef.get();
-          const owner = normalizeAdminAccount(ownerSnap.exists ? ownerSnap.data() : {
-            username:'admin', password:adminPassword, fullname:'المدير الرئيسي',
-            permissions:getDefaultAdminPermissions()
-          });
+
+          if (!ownerSnap.exists) {
+            await auth.signOut();
+            alert('تعذر العثور على حساب المدير الرئيسي في قاعدة البيانات.');
+            return;
+          }
+
+          const ownerData = ownerSnap.data() || {};
+          if (String(ownerData.authUid || '') !== String(firebaseUser.uid)) {
+            await auth.signOut();
+            alert('هذا البريد الإلكتروني غير مرتبط بحساب المدير الرئيسي.');
+            return;
+          }
+
+          const owner = normalizeAdminAccount(ownerData);
           // المدير الرئيسي (admin) هو الحساب الوحيد المسموح له بفتح عدة جلسات
           // في أكثر من متصفح أو جهاز/تطبيق في الوقت نفسه.
-          // لذلك لا نربط حسابه بـ deviceId أو sessionToken على مستوى Firestore،
-          // حتى لا تقوم جلسة جديدة بإلغاء الجلسات الأخرى.
           adminSessionToken = 'adm_' + Math.random().toString(36).slice(2) + Date.now();
-          owner.password = adminPassword;
           owner.deviceId = null;
           owner.sessionToken = null;
           owner.permissions = getDefaultAdminPermissions();
-          await ownerRef.set(owner, {merge:true});
+          // لا نحفظ كلمة مرور Firebase Authentication داخل Firestore.
+          await ownerRef.set({
+            username: 'admin',
+            fullname: owner.fullname || 'المدير الرئيسي',
+            permissions: owner.permissions,
+            authUid: firebaseUser.uid,
+            authEmail: firebaseUser.email || u,
+            deviceId: null,
+            sessionToken: null,
+            accountUpdatedAt: Date.now()
+          }, {merge:true});
+
           loggedAdmin = owner;
+          loggedAdmin.username = 'admin';
+          loggedAdmin.authUid = firebaseUser.uid;
+          loggedAdmin.authEmail = firebaseUser.email || u;
           isAdmin = true;
           loggedCustomer = null;
           loggedDelegate = null;
@@ -2149,7 +2177,23 @@
           finishLoginProcess();
           startAdminSessionMonitor();
           return;
-        } catch (ownerErr) {
+        } catch (authErr) {
+          console.error('Firebase Authentication login error:', authErr);
+          let msg = 'تعذر تسجيل الدخول. تأكد من البريد الإلكتروني وكلمة المرور.';
+          if (authErr && authErr.code === 'auth/too-many-requests') msg = 'تمت محاولات كثيرة. حاول مرة أخرى لاحقًا.';
+          if (authErr && authErr.code === 'auth/user-not-found') msg = 'البريد الإلكتروني غير مسجل في Firebase Authentication.';
+          if (authErr && authErr.code === 'auth/wrong-password') msg = 'كلمة المرور غير صحيحة.';
+          if (authErr && authErr.code === 'auth/invalid-credential') msg = 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
+          alert(msg);
+          return;
+        }
+      }
+
+      if (u === 'admin') {
+        alert('المدير الرئيسي يسجل الدخول الآن بالبريد الإلكتروني المسجل في Firebase Authentication.');
+        return;
+      }
+
           console.error('خطأ في جلسة المدير الرئيسي:', ownerErr);
           alert('تعذر إنشاء جلسة المدير الرئيسي. تحقق من اتصال Firestore وقواعد الصلاحيات.');
           return;
@@ -3015,19 +3059,18 @@
     async function handleAdminPasswordChange(e) {
       if (!isAdmin) { alert('تغيير كلمة سر المدير الرئيسي متاح للمدير الرئيسي فقط.'); return; }
       e.preventDefault();
-      const newPass = document.getElementById('new-admin-pass').value.trim();
-      if (newPass) {
-        adminPassword = newPass;
-        localStorage.setItem('mustaqbal_admin_pass', adminPassword);
-        try {
-          const ownerRef = db.collection('adminAccounts').doc('admin');
-          const ownerSnap = await ownerRef.get();
-          if (ownerSnap.exists) {
-            await ownerRef.update({ password:newPass, forceLogoutAt:Date.now(), accountUpdatedAt:Date.now() });
-          }
-        } catch(err) {}
-        alert('تم تغيير كلمة سر المدير بنجاح!');
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser || !firebaseUser.email) {
+        alert('لا يوجد حساب Firebase Authentication للمدير الرئيسي.');
+        return;
+      }
+      try {
+        await auth.sendPasswordResetEmail(firebaseUser.email);
         document.getElementById('new-admin-pass').value = '';
+        alert('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريد المدير الرئيسي.');
+      } catch (err) {
+        console.error('Password reset error:', err);
+        alert('تعذر إرسال رابط إعادة تعيين كلمة المرور.');
       }
     }
 
