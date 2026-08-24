@@ -2639,7 +2639,7 @@
         if (!firebaseUser || !profileData || !signedInRole) {
           // رسالة تشخيصية واضحة: هذا يعني أن حساب Firebase Authentication أو userProfiles
           // لم يُنشأ بعد، وليس مجرد فشل في قفل الجلسة.
-          alert('تعذر تسجيل الدخول لأن الحساب لم تتم مزامنته بالكامل مع Firebase بعد.\n\nالحل: سجّل دخول المدير الرئيسي بالبريد الإلكتروني، ثم من لوحة المدير اضغط زر «إصلاح/مزامنة الحسابات» وأكمل العملية حتى تظهر نتيجة النجاح.\n\nملاحظة: إذا كانت المحاولات السابقة أنشأت نفس البريد الداخلي بكلمة مرور مختلفة، فلن يمكن إصلاح كلمة مرور Firebase من المتصفح؛ عندها يجب إعادة ضبط/حذف حساب Authentication القديم من Firebase Console أو عبر Admin SDK.');
+          alert('اسم المستخدم أو كلمة المرور غير صحيحة. يرجى التأكد من البيانات والمحاولة مرة أخرى.');
           return;
         }
 
@@ -3327,7 +3327,7 @@
       } catch (err) {
         console.error('تعذر قراءة حسابات المدراء من Firestore:', err);
         if (box) {
-          box.innerHTML = `<div class="notification-empty" style="color:#b91c1c;">تعذر قراءة حسابات المدراء من Firestore.<br><small>${escapeNotificationHtml(err && err.message ? err.message : err)}</small></div>`;
+          box.innerHTML = `<div class="notification-empty" style="color:#b91c1c;">تعذر تحميل الحسابات حالياً. يرجى المحاولة لاحقاً.</div>`;
         }
         return false;
       }
@@ -3441,7 +3441,7 @@
         const error = document.createElement('div');
         error.className = 'notification-empty';
         error.style.color = '#b91c1c';
-        error.textContent = 'تعذر عرض حسابات المدراء: ' + (err && err.message ? err.message : String(err));
+        error.textContent = 'تعذر عرض الحسابات حالياً. يرجى المحاولة لاحقاً.';
         box.appendChild(error);
       }
     }
@@ -3607,7 +3607,7 @@
         loadAdminAccountsFromFirestore().catch(err => console.warn('تعذر إعادة تحميل حسابات المدراء:', err));
       } catch(err) {
         console.error('خطأ أثناء حفظ حساب المدير:', err);
-        alert('تعذر حفظ حساب المدير: ' + (err && err.message ? err.message : 'تحقق من قواعد Firestore والاتصال.'));
+        alert('تعذر حفظ الحساب حالياً. يرجى المحاولة مرة أخرى.');
       }
     }
     async function deleteAdminAccount(username) {
@@ -3702,7 +3702,7 @@
         if (typeof loadDelegatesFromFirestore === 'function') loadDelegatesFromFirestore().catch(err => console.warn('تعذر إعادة تحميل المناديب:', err));
       } catch(err) {
         console.error('خطأ أثناء تحديث حساب المندوب:', err);
-        alert('تعذر حفظ تعديلات حساب المندوب: ' + (err && err.message ? err.message : 'تحقق من قواعد Firestore والاتصال.'));
+        alert('تعذر حفظ الحساب حالياً. يرجى المحاولة مرة أخرى.');
       }
     }
 
