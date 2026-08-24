@@ -428,90 +428,52 @@
       color: white;
     }
 
-    /* ===== تحكم كمية صغير، عصري وجذاب ===== */
+    /* ===== نفس تصميم الكمية والملاحظة من ملف المنتج-qty-notes ===== */
     .product-order-box {
-      margin-top: 5px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+      display:flex; flex-direction:column; gap:4px;
+      width:100%; margin-top:5px;
     }
-
     .product-qty-control {
-      width: fit-content;
-      min-width: 112px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: 30px 42px 30px;
-      align-items: center;
-      min-height: 30px;
-      border: 1px solid rgba(14,165,233,.22);
-      border-radius: 11px;
-      overflow: hidden;
-      background: linear-gradient(135deg, #ffffff, #f0f9ff);
-      box-shadow: 0 4px 12px rgba(2,132,199,.10);
+      display:flex; align-items:center; justify-content:center; gap:14px;
+      width:100%; margin-top:0; padding:2px 0;
     }
-
     .product-qty-btn {
-      width: 30px;
-      height: 30px;
-      border: 0;
-      border-radius: 9px;
-      background: var(--primary);
-      color: #fff;
-      font-size: 1rem;
-      line-height: 1;
-      font-weight: 800;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: transform .15s ease, background .15s ease, box-shadow .15s ease;
-      box-shadow: 0 2px 6px rgba(2,132,199,.18);
+      width:36px; height:36px; border:1px solid #bae6fd;
+      background:var(--primary-light); color:var(--primary-dark);
+      border-radius:12px; display:inline-flex; align-items:center;
+      justify-content:center; cursor:pointer; font-size:1.35rem;
+      line-height:1; font-weight:900; transition:.15s ease;
+      box-shadow:0 3px 9px rgba(2,132,199,.10);
     }
-
-    .product-qty-btn:hover {
-      background: var(--primary-dark);
-      transform: translateY(-1px);
-    }
-
-    .product-qty-btn:active {
-      transform: scale(.90);
-      box-shadow: none;
-    }
-
+    .product-qty-btn:hover { background:#bae6fd; }
+    .product-qty-btn:active { transform:scale(.90); background:#bae6fd; }
     .product-qty-value {
-      text-align: center;
-      color: var(--primary-dark);
-      font-size: .82rem;
-      font-weight: 900;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: .2px;
+      min-width:30px; text-align:center; font-size:1rem;
+      font-weight:900; color:var(--text-main);
+      font-variant-numeric:tabular-nums;
     }
-
     .product-note-input {
-      width: 100%;
-      min-height: 32px;
-      padding: 6px 8px;
-      border: 1px solid rgba(148,163,184,.35);
-      border-radius: 10px;
-      background: #fff;
-      color: var(--text-main);
-      font-size: .68rem;
-      line-height: 1.35;
-      outline: none;
-      resize: vertical;
-      transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+      width:100%; margin-top:4px; padding:8px 10px;
+      border:1px solid var(--border-color); border-radius:11px;
+      background:#f8fafc; color:var(--text-main); outline:none;
+      font-size:.72rem; line-height:1.4; resize:vertical;
+      min-height:34px;
     }
-
     .product-note-input:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 2px rgba(2,132,199,.09);
-      transform: translateY(-1px);
+      border-color:#7dd3fc; background:#fff;
+      box-shadow:0 0 0 3px rgba(14,165,233,.08);
     }
+    .product-note-input::placeholder { color:#94a3b8; }
 
-    .product-note-input::placeholder {
-      color: #94a3b8;
-      font-size: .66rem;
+    .cart-item-note {
+      width:100%; margin-top:2px; padding:8px 10px;
+      border:1px solid var(--border-color); border-radius:11px;
+      background:#f8fafc; color:var(--text-main); outline:none;
+      font-size:.72rem; line-height:1.4; resize:vertical; min-height:34px;
+    }
+    .cart-item-note:focus {
+      border-color:#7dd3fc; background:#fff;
+      box-shadow:0 0 0 3px rgba(14,165,233,.08);
     }
 
     .card-admin-btns {
@@ -4419,18 +4381,19 @@
         div.className = 'cart-item';
         div.style.cssText = 'display:flex; flex-direction:column; gap:6px; padding:10px; background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border-color);';
         div.innerHTML = `
-          <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-            <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; width:100%; gap:8px;">
+            <div style="min-width:0; flex:1;">
               <div style="font-weight:700; font-size:0.85rem;">${item.name}</div>
               <div style="font-size:0.75rem; color:var(--text-muted);">${formatPrice(item.price)} × ${item.qty} = <strong>${formatPrice(itemTotal)} د.ع</strong></div>
             </div>
             <div class="qty-controls">
               <button type="button" class="qty-btn" onclick="updateQty(${item.id}, -1)">-</button>
-              <span style="font-weight:bold; font-size:0.85rem;">${item.qty}</span>
+              <span style="font-weight:bold; font-size:0.85rem; min-width:22px; text-align:center;">${item.qty}</span>
               <button type="button" class="qty-btn" onclick="updateQty(${item.id}, 1)">+</button>
               <button type="button" style="background:none; border:none; cursor:pointer; color:var(--danger); font-size:0.9rem;" onclick="removeFromCart(${item.id})">🗑️</button>
             </div>
           </div>
+          <textarea class="cart-item-note" rows="2" maxlength="500" placeholder="ملاحظة على هذا المنتج (اختياري)..." oninput="updateCartItemNote(${item.id}, this.value)">${escapeHtml(item.note || '')}</textarea>
         `;
         cartItemsContainer.appendChild(div);
       });
@@ -4530,7 +4493,7 @@
           <tr>
             <td>
               <strong>${item.name || 'منتج غير معروف'}</strong>
-              ${item.note ? `<div style="font-size:0.7rem; color:#b45309; margin-top:3px; background:#fef3c7; padding:2px 6px; border-radius:4px;">ملاحظة المنتج: ${item.note}</div>` : ''}
+              ${item.note ? `<div style="font-size:0.72rem; color:#475569; margin-top:5px; background:#f8fafc; border:1px solid #e2e8f0; padding:5px 8px; border-radius:8px; line-height:1.5;">📝 ${item.note}</div>` : ''}
             </td>
             <td style="text-align:center;">${qty}</td>
             <td style="text-align:left;">${formatPrice(price)}</td>
