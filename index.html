@@ -1752,6 +1752,60 @@
     let activeSessionUnsubscribe = null;
 
     // ============================================================
+    // جلسة حصرية للحسابات غير المدير الرئيسي
+    // ------------------------------------------------------------
+    // sessionToken محفوظ في Firestore وليس localStorage، لذلك يبقى
+    // القفل موحداً حتى لو تم فتح الحساب من موقع آخر أو تطبيق آخر.
+    // المدير الرئيسي (admin) مستثنى من هذا النظام ويمكنه فتح عدة جلسات.
+    // ============================================================
+    function createExclusiveSessionToken(prefix) {
+      return String(prefix || 'sess') + '_' + Math.random().toString(36).slice(2) + '_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    }
+
+    async function acquireExclusiveSession(collectionName, username, sessionToken) {
+      const ref = db.collection(collectionName).doc(String(username));
+      try {
+        await db.runTransaction(async (tx) => {
+          const snap = await tx.get(ref);
+          if (snap.exists) {
+            const data = snap.data() || {};
+            if (String(data.sessionToken || '').trim()) {
+              const err = new Error('SESSION_ALREADY_ACTIVE');
+              err.code = 'SESSION_ALREADY_ACTIVE';
+              throw err;
+            }
+          }
+          tx.set(ref, {
+            sessionToken: String(sessionToken),
+            sessionDeviceId: String(deviceId),
+            sessionStartedAt: Date.now()
+          }, { merge: true });
+        });
+        return true;
+      } catch (err) {
+        if (err && err.code === 'SESSION_ALREADY_ACTIVE') return false;
+        throw err;
+      }
+    }
+
+    async function releaseExclusiveSession(collectionName, username, sessionToken) {
+      if (!username || !sessionToken) return;
+      const ref = db.collection(collectionName).doc(String(username));
+      try {
+        const snap = await ref.get();
+        if (snap.exists && String(snap.data().sessionToken || '') === String(sessionToken)) {
+          await ref.update({
+            sessionToken: '',
+            sessionDeviceId: '',
+            sessionStartedAt: null
+          });
+        }
+      } catch (err) {
+        console.warn('تعذر تحرير جلسة الحساب:', err);
+      }
+    }
+
+    // ============================================================
     // Firestore performance optimization
     // ------------------------------------------------------------
     // نراقب فقط البيانات الأساسية التي تحتاج تحديثاً فورياً (الأقسام
@@ -2028,17 +2082,26 @@
         activeSessionUnsubscribe = db.collection('customers').doc(String(loggedCustomer.username)).onSnapshot(doc => {
           if (doc.exists) {
             const data = doc.data();
+            if (data.sessionToken && String(data.sessionToken) !== String(loggedCustomer.sessionToken || '')) {
+              alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو تطبيق آخر!');
+              handleLogout();
+              return;
+            }
             if (data.deviceId && data.deviceId !== deviceId) {
               alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر!');
               handleLogout();
               return;
             }
+            // أي تعديل من المدير الرئيسي على حساب الزبون (الاسم، كلمة السر،
+            // الخصم أو اسم المستخدم) يلغي الجلسة الحالية فوراً.
             if (
+              Number(data.forceLogoutAt || 0) > Number(loggedCustomer.forceLogoutAt || 0) ||
               data.password !== loggedCustomer.password || 
               data.discount !== loggedCustomer.discount || 
-              data.fullname !== loggedCustomer.fullname
+              data.fullname !== loggedCustomer.fullname ||
+              data.username !== loggedCustomer.username
             ) {
-              alert('تم تحديث معلومات حسابك من قبل إدارة المتجر. يرجى إعادة تسجيل الدخول لمتابعة الاستخدام.');
+              alert('تم تعديل معلومات حسابك من قبل المدير الرئيسي، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول مرة أخرى بالمعلومات الجديدة.');
               handleLogout();
               return;
             }
@@ -2051,16 +2114,24 @@
         activeSessionUnsubscribe = db.collection('delegates').doc(String(loggedDelegate.username)).onSnapshot(doc => {
           if (doc.exists) {
             const data = doc.data();
+            if (data.sessionToken && String(data.sessionToken) !== String(loggedDelegate.sessionToken || '')) {
+              alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو تطبيق آخر!');
+              handleLogout();
+              return;
+            }
             if (data.deviceId && data.deviceId !== deviceId) {
               alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر!');
               handleLogout();
               return;
             }
+            // أي تعديل من المدير الرئيسي على حساب المندوب يلغي الجلسة الحالية فوراً.
             if (
+              Number(data.forceLogoutAt || 0) > Number(loggedDelegate.forceLogoutAt || 0) ||
               data.password !== loggedDelegate.password || 
-              data.fullname !== loggedDelegate.fullname
+              data.fullname !== loggedDelegate.fullname ||
+              data.username !== loggedDelegate.username
             ) {
-              alert('تم تحديث معلومات حسابك من قبل إدارة المتجر. يرجى إعادة تسجيل الدخول لمتابعة الاستخدام.');
+              alert('تم تعديل معلومات حسابك من قبل المدير الرئيسي، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول مرة أخرى بالمعلومات الجديدة.');
               handleLogout();
               return;
             }
@@ -2502,10 +2573,20 @@
           const adminDoc = await db.collection('adminAccounts').doc(u).get();
           if (!adminDoc.exists) { await auth.signOut(); alert('تعذر العثور على حساب المدير.'); return; }
           sessionData = Object.assign({}, adminDoc.data() || {}, {authUid:firebaseUser.uid, authEmail:firebaseUser.email || legacyAuthEmail(u,'admin'), deviceId});
-          if (sessionData.deviceId && sessionData.deviceId !== deviceId) { await auth.signOut(); alert('هذا الحساب مفتوح حالياً في جهاز أو متصفح آخر! يرجى تسجيل الخروج منه أولاً.'); return; }
-          adminSessionToken='adm_'+Math.random().toString(36).slice(2)+Date.now();
-          sessionData.sessionToken=adminSessionToken;
-          await db.collection('adminAccounts').doc(u).set({deviceId,sessionToken:adminSessionToken},{merge:true});
+          if (String(u).toLowerCase() !== 'admin') {
+            adminSessionToken=createExclusiveSessionToken('adm');
+            const acquiredAdminSession = await acquireExclusiveSession('adminAccounts', u, adminSessionToken);
+            if (!acquiredAdminSession) {
+              await auth.signOut();
+              alert('هذا الحساب مفتوح حالياً في جهاز أو تطبيق آخر! يرجى تسجيل الخروج منه أولاً.');
+              return;
+            }
+            sessionData.sessionToken=adminSessionToken;
+          } else {
+            adminSessionToken=createExclusiveSessionToken('adm');
+            sessionData.deviceId=null;
+            sessionData.sessionToken=null;
+          }
           loggedAdmin=normalizeAdminAccount(sessionData); isAdmin=false; loggedCustomer=null; loggedDelegate=null;
           localStorage.setItem('loggedAdmin',JSON.stringify(loggedAdmin)); localStorage.setItem('mustaqbal_admin_session_token',adminSessionToken); localStorage.removeItem('loggedCustomer'); localStorage.removeItem('loggedDelegate'); localStorage.setItem('isAdmin','false');
           finishLoginProcess(); startAdminSessionMonitor();
@@ -2513,8 +2594,14 @@
           const delDoc = await db.collection('delegates').doc(u).get();
           if (!delDoc.exists) { await auth.signOut(); alert('تعذر العثور على حساب المندوب.'); return; }
           sessionData=Object.assign({},delDoc.data()||{},{authUid:firebaseUser.uid,authEmail:firebaseUser.email || legacyAuthEmail(u,'delegate'),deviceId});
-          if (sessionData.deviceId && sessionData.deviceId !== deviceId) { await auth.signOut(); alert('هذا الحساب مفتوح حالياً في جهاز أو متصفح آخر! يرجى تسجيل الخروج منه أولاً.'); return; }
-          await db.collection('delegates').doc(u).set({deviceId},{merge:true});
+          const delegateSessionToken = createExclusiveSessionToken('del');
+          const acquiredDelegateSession = await acquireExclusiveSession('delegates', u, delegateSessionToken);
+          if (!acquiredDelegateSession) {
+            await auth.signOut();
+            alert('هذا الحساب مفتوح حالياً في جهاز أو تطبيق آخر! يرجى تسجيل الخروج منه أولاً.');
+            return;
+          }
+          sessionData.sessionToken = delegateSessionToken;
           loggedDelegate=sessionData; loggedCustomer=null; isAdmin=false;
           localStorage.setItem('loggedDelegate',JSON.stringify(loggedDelegate)); localStorage.removeItem('loggedCustomer'); localStorage.setItem('isAdmin','false');
           finishLoginProcess(); startDelegateForceLogoutMonitor();
@@ -2522,8 +2609,14 @@
           const custDoc = await db.collection('customers').doc(u).get();
           if (!custDoc.exists) { await auth.signOut(); alert('تعذر العثور على حساب الزبون.'); return; }
           sessionData=Object.assign({},custDoc.data()||{},{authUid:firebaseUser.uid,authEmail:firebaseUser.email || legacyAuthEmail(u,'customer'),deviceId});
-          if (sessionData.deviceId && sessionData.deviceId !== deviceId) { await auth.signOut(); alert('هذا الحساب مفتوح حالياً في جهاز أو متصفح آخر! يرجى تسجيل الخروج منه أولاً.'); return; }
-          await db.collection('customers').doc(u).set({deviceId},{merge:true});
+          const customerSessionToken = createExclusiveSessionToken('cus');
+          const acquiredCustomerSession = await acquireExclusiveSession('customers', u, customerSessionToken);
+          if (!acquiredCustomerSession) {
+            await auth.signOut();
+            alert('هذا الحساب مفتوح حالياً في جهاز أو تطبيق آخر! يرجى تسجيل الخروج منه أولاً.');
+            return;
+          }
+          sessionData.sessionToken = customerSessionToken;
           loggedCustomer=sessionData; loggedDelegate=null; isAdmin=false;
           localStorage.setItem('loggedCustomer',JSON.stringify(loggedCustomer)); localStorage.removeItem('loggedDelegate'); localStorage.setItem('isAdmin','false');
           finishLoginProcess();
@@ -2541,14 +2634,14 @@
         if (adminDoc.exists) {
           const foundAdmin = normalizeAdminAccount(adminDoc.data());
           if (foundAdmin.password === p) {
-            if (foundAdmin.deviceId && foundAdmin.deviceId !== deviceId) {
-              alert('هذا الحساب مفتوح حالياً في متصفح أو تطبيق آخر! يرجى تسجيل الخروج منه أولاً.');
+            adminSessionToken = createExclusiveSessionToken('adm');
+            const acquiredAdminSession = await acquireExclusiveSession('adminAccounts', u, adminSessionToken);
+            if (!acquiredAdminSession) {
+              alert('هذا الحساب مفتوح حالياً في جهاز أو تطبيق آخر! يرجى تسجيل الخروج منه أولاً.');
               return;
             }
-            adminSessionToken = 'adm_' + Math.random().toString(36).slice(2) + Date.now();
             foundAdmin.deviceId = deviceId;
             foundAdmin.sessionToken = adminSessionToken;
-            await db.collection('adminAccounts').doc(u).set(foundAdmin, {merge:true});
             adminAccounts = adminAccounts.filter(a => a.username !== u);
             adminAccounts.push(foundAdmin);
             localStorage.setItem('mustaqbal_admin_accounts', JSON.stringify(adminAccounts));
@@ -2575,13 +2668,15 @@
         if (delDoc.exists) {
           const foundDelegate = delDoc.data();
           if (foundDelegate.password === p) {
-            if (foundDelegate.deviceId && foundDelegate.deviceId !== deviceId) {
+            const delegateSessionToken = createExclusiveSessionToken('del');
+            const acquiredDelegateSession = await acquireExclusiveSession('delegates', u, delegateSessionToken);
+            if (!acquiredDelegateSession) {
               alert('هذا الحساب مفتوح حالياً في جهاز أو متصفح آخر! يرجى تسجيل الخروج منه أولاً.');
               return;
             }
             loggedDelegate = foundDelegate;
             loggedDelegate.deviceId = deviceId;
-            await db.collection('delegates').doc(u).update({ deviceId: deviceId });
+            loggedDelegate.sessionToken = delegateSessionToken;
 
             loggedCustomer = null;
             isAdmin = false;
@@ -2602,13 +2697,15 @@
         if (custDoc.exists) {
           const foundCustomer = custDoc.data();
           if (foundCustomer.password === p) {
-            if (foundCustomer.deviceId && foundCustomer.deviceId !== deviceId) {
-              alert('هذا الحساب مفتوح حالياً في جهاز أو متصفح آخر! يرجى تسجيل الخروج منه أولاً.');
+            const customerSessionToken = createExclusiveSessionToken('cus');
+            const acquiredCustomerSession = await acquireExclusiveSession('customers', u, customerSessionToken);
+            if (!acquiredCustomerSession) {
+              alert('هذا الحساب مفتوح حالياً في جهاز أو تطبيق آخر! يرجى تسجيل الخروج منه أولاً.');
               return;
             }
             loggedCustomer = foundCustomer;
             loggedCustomer.deviceId = deviceId;
-            await db.collection('customers').doc(u).update({ deviceId: deviceId });
+            loggedCustomer.sessionToken = customerSessionToken;
 
             loggedDelegate = null;
             isAdmin = false;
@@ -2648,7 +2745,22 @@
       lastDelegateForceLogoutAt = Number(loggedDelegate.forceLogoutAt || 0);
 
       delegateForceLogoutUnsubscribe = delegateRef.onSnapshot((doc) => {
-        if (!doc.exists || !loggedDelegate) return;
+        if (!loggedDelegate) return;
+        if (!doc.exists) {
+          loggedDelegate = null;
+          delegateCart = [];
+          localStorage.removeItem('loggedDelegate');
+          localStorage.removeItem('mustaqbal_delegate_cart');
+          localStorage.setItem('isAdmin', 'false');
+          stopDelegateForceLogoutMonitor();
+          try { auth.signOut(); } catch (_) {}
+          alert('تم تعديل اسم مستخدم حسابك من قبل المدير الرئيسي، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول بالمعلومات الجديدة.');
+          checkInitialSessionState();
+          renderTabs();
+          renderProducts();
+          updateCartUI();
+          return;
+        }
 
         const data = doc.data() || {};
         const serverForceLogoutAt = Number(data.forceLogoutAt || 0);
@@ -2667,8 +2779,9 @@
           localStorage.setItem('isAdmin', 'false');
 
           stopDelegateForceLogoutMonitor();
+          try { auth.signOut(); } catch (_) {}
 
-          alert('تم تعديل معلومات حسابك من قبل المدير، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول مرة أخرى.');
+          alert('تم تعديل معلومات حسابك من قبل المدير الرئيسي، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول مرة أخرى بالمعلومات الجديدة.');
 
           checkInitialSessionState();
           renderTabs();
@@ -2694,7 +2807,14 @@
       const ref = db.collection('adminAccounts').doc(username);
       const initialToken = String(loggedAdmin.sessionToken || adminSessionToken || '');
       adminForceLogoutUnsubscribe = ref.onSnapshot((doc) => {
-        if (!doc.exists || !loggedAdmin) return;
+        if (!loggedAdmin) return;
+        if (!doc.exists) {
+          if (String(username).toLowerCase() !== 'admin') {
+            alert('تم تعديل اسم مستخدم حساب المدير الفرعي من قبل المدير الرئيسي، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول بالمعلومات الجديدة.');
+            forceLogoutAdminLocal();
+          }
+          return;
+        }
         const data = normalizeAdminAccount(doc.data());
         // المدير الرئيسي يمكنه العمل من عدة متصفحات/أجهزة في الوقت نفسه.
         // أما المديرون الفرعيون فيبقون محصورين بجلسة واحدة كما هو معمول به.
@@ -2735,6 +2855,7 @@
       localStorage.removeItem('mustaqbal_admin_session_token');
       isAdmin = false;
       localStorage.setItem('isAdmin','false');
+      try { auth.signOut(); } catch (_) {}
       checkInitialSessionState();
       renderProducts();
     }
@@ -2799,8 +2920,10 @@
 
       try {
         if (loggedCustomer) {
+          await releaseExclusiveSession('customers', String(loggedCustomer.username), String(loggedCustomer.sessionToken || ''));
           await db.collection('customers').doc(String(loggedCustomer.username)).update({ deviceId: "" });
         } else if (loggedDelegate) {
+          await releaseExclusiveSession('delegates', String(loggedDelegate.username), String(loggedDelegate.sessionToken || ''));
           await db.collection('delegates').doc(String(loggedDelegate.username)).update({ deviceId: "" });
         } else if (loggedAdmin) {
           const ref = db.collection('adminAccounts').doc(String(loggedAdmin.username));
@@ -2811,6 +2934,7 @@
         }
       } catch(err) {}
 
+      try { await auth.signOut(); } catch (err) {}
       stopAdminSessionMonitor();
       isAdmin = false;
       loggedAdmin = null;
@@ -2895,7 +3019,7 @@
 
     async function handleNotificationSubmit(e) {
       e.preventDefault();
-      if (!isAdmin) return alert('هذه العملية متاحة للمدير فقط.');
+      if (!requireAdminPermission('sendNotifications')) return;
       const audience = document.getElementById('notification-audience').value;
       const subject = document.getElementById('notification-subject').value.trim();
       const details = document.getElementById('notification-details').value.trim();
@@ -3352,7 +3476,10 @@
       let old = editFlag ? adminAccounts.find(a => a.username === editFlag) : null;
       const usernameChanged = !!editFlag && editFlag !== username;
       const passwordChanged = !!old && old.password !== password;
-      const forceLogoutAt = (usernameChanged || passwordChanged) ? Date.now() : Number(old && old.forceLogoutAt || 0);
+      // أي تعديل على حساب المدير الفرعي (الاسم، كلمة السر، الصلاحيات أو اسم المستخدم)
+      // يلغي جلسته الحالية فوراً. المدير الرئيسي admin مستثنى من هذا النظام.
+      const wasEditingAdmin = !!editFlag;
+      const forceLogoutAt = wasEditingAdmin ? Date.now() : 0;
       const account = normalizeAdminAccount({
         username, password, fullname,
         permissions:getSelectedAdminPermissions(),
@@ -3386,7 +3513,9 @@
         // ظاهرة ولا تختفي الحسابات التي تم حفظها بنجاح.
         await loadAdminAccountsFromFirestore();
         resetAdminAccountForm();
-        alert(usernameChanged || passwordChanged ? 'تم تعديل الحساب والصلاحيات بنجاح، وسيتم تسجيل خروج المدير إذا كان متصلاً.' : 'تم إنشاء حساب المدير وحفظ صلاحياته بنجاح.');
+        alert(wasEditingAdmin
+          ? 'تم تعديل حساب المدير الفرعي بنجاح، وسيتم تسجيل خروجه تلقائياً من جلسته الحالية. يجب عليه تسجيل الدخول مرة أخرى بالمعلومات الجديدة.'
+          : 'تم إنشاء حساب المدير وحفظ صلاحياته بنجاح.');
       } catch(err) {
         console.error(err);
         alert('تعذر حفظ حساب المدير. تحقق من اتصال Firestore وقواعد الصلاحيات.');
@@ -3724,15 +3853,30 @@
       if (!username) return;
 
       let existingDeviceId = "";
+      let oldCust = null;
       if (editFlag) {
-        const oldCust = customers.find(c => c.username === editFlag);
+        oldCust = customers.find(c => c.username === editFlag) || null;
         if (oldCust && oldCust.deviceId) existingDeviceId = oldCust.deviceId;
         customers = customers.filter(c => c.username !== editFlag);
         if (editFlag !== username) {
           try { await db.collection('customers').doc(String(editFlag)).delete(); } catch(err){}
         }
       }
-      const custData = { username, password, fullname, discount, deviceId: existingDeviceId };
+
+      // أي تعديل على حساب زبون موجود يرسل أمر تسجيل خروج فوري للجلسة الحالية.
+      const wasEditingCustomer = !!editFlag;
+      const customerForceLogoutAt = wasEditingCustomer ? Date.now() : 0;
+      const custData = {
+        username,
+        password,
+        fullname,
+        discount,
+        deviceId: existingDeviceId,
+        ...(wasEditingCustomer ? {
+          forceLogoutAt: customerForceLogoutAt,
+          accountUpdatedAt: customerForceLogoutAt
+        } : {})
+      };
 
       customers.push(custData);
       saveData();
@@ -3742,7 +3886,7 @@
       try {
         await db.collection('customers').doc(String(username)).set(custData, { merge: true });
         try {
-          const previousCustomer = (typeof oldCust !== 'undefined') ? oldCust : null;
+          const previousCustomer = oldCust;
           if (previousCustomer && previousCustomer.authUid && previousCustomer.password && previousCustomer.password !== password && editFlag === username) {
             await syncLegacyAuthPassword(username, previousCustomer.password, password, 'customer');
           } else if (!custData.authUid) {
