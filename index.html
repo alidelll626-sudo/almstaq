@@ -2121,7 +2121,7 @@
       const u = document.getElementById('login-username').value.trim();
       const p = document.getElementById('login-password').value.trim();
 
-      // المدير الرئيسي يسجل الدخول الآن عبر Firebase Authentication بالبريد الإلكتروني.
+      // المدير الرئيسي يسجل الدخول عبر Firebase Authentication بالبريد الإلكتروني.
       // الزبائن والمندوبون والمدراء الفرعيون يحتفظون بطريقة دخولهم الحالية.
       if (u.includes('@')) {
         try {
@@ -2144,12 +2144,11 @@
           }
 
           const owner = normalizeAdminAccount(ownerData);
-          // المدير الرئيسي (admin) هو الحساب الوحيد المسموح له بفتح عدة جلسات
-          // في أكثر من متصفح أو جهاز/تطبيق في الوقت نفسه.
           adminSessionToken = 'adm_' + Math.random().toString(36).slice(2) + Date.now();
           owner.deviceId = null;
           owner.sessionToken = null;
           owner.permissions = getDefaultAdminPermissions();
+
           // لا نحفظ كلمة مرور Firebase Authentication داخل Firestore.
           await ownerRef.set({
             username: 'admin',
@@ -2192,12 +2191,6 @@
       if (u === 'admin') {
         alert('المدير الرئيسي يسجل الدخول الآن بالبريد الإلكتروني المسجل في Firebase Authentication.');
         return;
-      }
-
-          console.error('خطأ في جلسة المدير الرئيسي:', ownerErr);
-          alert('تعذر إنشاء جلسة المدير الرئيسي. تحقق من اتصال Firestore وقواعد الصلاحيات.');
-          return;
-        }
       }
 
       try {
