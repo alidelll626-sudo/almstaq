@@ -4015,10 +4015,28 @@
         viewedByAdmins: {}
       };
 
+      // حفظ الفاتورة في Firestore أولاً. لا نعرض نجاح الفاتورة ولا نضيفها
+      // إلى القائمة المحلية إذا فشل الحفظ، حتى لا تظهر للمستخدم وكأنها محفوظة وهي ليست كذلك.
+      try {
+        await db.collection('invoices').doc(String(newInvoice.id)).set(newInvoice);
+      } catch (err) {
+        console.error('فشل حفظ الفاتورة في Firestore:', err);
+        const code = err && err.code ? String(err.code) : '';
+        let msg = 'تعذر حفظ الفاتورة في قاعدة البيانات.';
+        if (code === 'permission-denied') {
+          msg += '\n\nالسبب: قواعد Firestore تمنع إنشاء الفاتورة في مجموعة invoices.';
+        } else if (code === 'unavailable') {
+          msg += '\n\nالسبب: تعذر الاتصال بخدمة Firestore. تحقق من الإنترنت.';
+        } else if (code) {
+          msg += '\n\nرمز الخطأ: ' + code;
+        }
+        alert(msg);
+        return;
+      }
+
+      // بعد نجاح Firestore فقط نحفظها محلياً ونفتح الإيصال.
       invoices.unshift(newInvoice);
       saveData();
-      try { await db.collection('invoices').doc(String(newInvoice.id)).set(newInvoice); } catch (err) {}
-
       renderReceiptHTML(newInvoice);
       setCurrentCart([]);
       updateCartUI();
