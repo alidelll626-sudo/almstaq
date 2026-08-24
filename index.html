@@ -918,16 +918,6 @@
     .notification-openable:active { transform:scale(.99); }
     .notification-openable:focus { outline:3px solid rgba(59,130,246,.25); outline-offset:2px; }
 
-  
-    /* استخدام الأرقام الإنجليزية في جميع عناصر الواجهة والأرقام الديناميكية */
-    html, body, input, textarea, select, button {
-      font-variant-numeric: lining-nums tabular-nums;
-    }
-    input[type="number"], input[type="date"], .product-qty-value,
-    .cart-badge, .invoice-unread-badge, .notification-badge {
-      font-variant-numeric: lining-nums tabular-nums;
-    }
-
   </style>
 </head>
 <body>
@@ -2153,7 +2143,7 @@
     }
 
     function formatPrice(amount) {
-      return Number(amount).toLocaleString('ar-IQ');
+      return Number(amount).toLocaleString('en-US');
     }
 
     let categories = JSON.parse(localStorage.getItem('mustaqbal_categories')) || [
@@ -2869,7 +2859,7 @@
       if (!ts) return '';
       const d = new Date(Number(ts));
       if (isNaN(d.getTime())) return '';
-      return d.toLocaleString('ar-IQ', { dateStyle:'medium', timeStyle:'short' });
+      return d.toLocaleString('en-US', { dateStyle:'medium', timeStyle:'short' });
     }
 
     function escapeNotificationHtml(value) {
@@ -4443,7 +4433,7 @@
         id: 'INV-' + Date.now(),
         ownerUid: firebaseUser.uid,
         ownerRole: loggedCustomer ? 'customer' : 'delegate',
-        date: now.toLocaleString('ar-IQ'),
+        date: now.toLocaleString('en-US'),
         rawDate: isoDateString,
         createdAt: now.getTime(),
         customer: { name: custName, phone: custPhone, address: custAddress, username: accountSource },
