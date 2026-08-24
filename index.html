@@ -3334,116 +3334,10 @@
     }
 
     async function forceRenderAdminAccountsFromFirestore() {
-      const box = document.getElementById('admin-accounts-list');
-      const badge = document.getElementById('admin-accounts-count');
-      if (!box) return;
-
-      try {
-        const snapshot = await db.collection('adminAccounts').get({ source: 'server' });
-        const docs = [];
-
-        snapshot.forEach(doc => {
-          const data = doc.data() || {};
-          const docId = String(doc.id || '').trim();
-          if (!docId || docId.toLowerCase() === 'admin') return;
-          docs.push({
-            id: docId,
-            username: String(data.username || docId),
-            fullname: String(data.fullname || data.name || data.username || docId),
-            permissions: data.permissions && typeof data.permissions === 'object' ? data.permissions : {}
-          });
-        });
-
-        if (badge) badge.textContent = String(docs.length);
-
-        // Clear only this list, then create real DOM elements.
-        box.replaceChildren();
-        box.style.display = 'flex';
-        box.style.flexDirection = 'column';
-        box.style.gap = '10px';
-        box.style.maxHeight = 'none';
-        box.style.overflow = 'visible';
-        box.scrollTop = 0;
-        box.style.visibility = 'visible';
-        box.style.opacity = '1';
-
-        if (!docs.length) {
-          const empty = document.createElement('div');
-          empty.className = 'notification-empty';
-          empty.textContent = 'لا توجد حسابات مدراء فرعية.';
-          box.appendChild(empty);
-          return;
-        }
-
-        const labels = {
-          addProducts:'إضافة منتجات',
-          editProducts:'التعديل على المنتجات',
-          deleteProducts:'حذف المنتجات',
-          createCustomers:'إنشاء حسابات الزبائن',
-          createDelegates:'إنشاء حسابات المندوبين',
-          deleteInvoices:'حذف الفواتير السابقة',
-          sendNotifications:'إرسال الإشعارات'
-        };
-
-        docs.forEach(a => {
-          const card = document.createElement('div');
-          card.className = 'admin-account-card';
-          card.style.cssText = 'display:flex !important;visibility:visible !important;opacity:1 !important;background:#fff !important;color:#111 !important;';
-
-          const top = document.createElement('div');
-          top.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:8px;';
-
-          const name = document.createElement('strong');
-          name.textContent = '👨‍💼 ' + a.fullname;
-
-          const user = document.createElement('span');
-          user.className = 'notification-chip';
-          user.textContent = '@' + a.username;
-
-          top.appendChild(name);
-          top.appendChild(user);
-
-          const perms = document.createElement('div');
-          perms.style.cssText = 'font-size:.72rem;color:var(--text-muted);line-height:1.7;';
-          const active = Object.keys(labels)
-            .filter(k => a.permissions[k] === true)
-            .map(k => labels[k]);
-          perms.textContent = 'الصلاحيات: ' + (active.length ? active.join('، ') : 'لا توجد صلاحيات محددة');
-
-          const actions = document.createElement('div');
-          actions.className = 'admin-account-actions';
-
-          const edit = document.createElement('button');
-          edit.type = 'button';
-          edit.className = 'btn btn-secondary';
-          edit.textContent = '✏️ تعديل';
-          edit.addEventListener('click', () => editAdminAccount(a.username));
-
-          const del = document.createElement('button');
-          del.type = 'button';
-          del.className = 'btn btn-danger';
-          del.textContent = '🗑️ حذف';
-          del.addEventListener('click', () => deleteAdminAccount(a.username));
-
-          actions.appendChild(edit);
-          actions.appendChild(del);
-
-          card.appendChild(top);
-          card.appendChild(perms);
-          card.appendChild(actions);
-          box.appendChild(card);
-        });
-
-        console.log('تم رسم حسابات المدراء مباشرة من Firestore:', docs.map(x => x.username));
-      } catch (err) {
-        console.error('فشل عرض حسابات المدراء مباشرة:', err);
-        box.replaceChildren();
-        const error = document.createElement('div');
-        error.className = 'notification-empty';
-        error.style.color = '#b91c1c';
-        error.textContent = 'تعذر عرض الحسابات حالياً. يرجى المحاولة لاحقاً.';
-        box.appendChild(error);
-      }
+      // استخدم دالة التحميل الموحدة حتى تكون قائمة الشاشة وذاكرة adminAccounts
+      // متطابقتين دائماً. النسخة السابقة كانت ترسم الحسابات فقط بدون تحديث
+      // adminAccounts، لذلك كان زر «تعديل» يبحث في بيانات قديمة أو فارغة.
+      return await loadAdminAccountsFromFirestore();
     }
 
     async function openAdminAccountsModal() {
@@ -3468,17 +3362,50 @@
       document.getElementById('save-admin-account-btn').innerText = 'إنشاء حساب المدير';
       setAdminPermissionCheckboxes({});
     }
-    function editAdminAccount(username) {
+    async function editAdminAccount(username) {
       if (!isAdmin) return alert('متاح للمدير الرئيسي فقط.');
-      const a = adminAccounts.find(x => x.username === username);
-      if (!a) return;
-      document.getElementById('edit-admin-username-flag').value = a.username;
-      document.getElementById('new-admin-username').value = a.username;
-      document.getElementById('new-admin-password').value = a.password;
-      document.getElementById('new-admin-fullname').value = a.fullname;
-      setAdminPermissionCheckboxes(a.permissions);
-      document.getElementById('save-admin-account-btn').innerText = 'تحديث حساب المدير';
+
+      const key = String(username || '').trim();
+      if (!key) return;
+
+      try {
+        let a = adminAccounts.find(x => String(x.username) === key);
+
+        // لا نعتمد على الذاكرة فقط؛ اجلب أحدث نسخة من Firestore.
+        const snap = await db.collection('adminAccounts').doc(key).get({ source: 'server' });
+        if (snap.exists) {
+          const data = snap.data() || {};
+          a = normalizeAdminAccount({
+            ...data,
+            username: data.username || snap.id,
+            fullname: data.fullname || data.name || snap.id
+          });
+          a.__docId = snap.id;
+
+          const index = adminAccounts.findIndex(x =>
+            String(x.username) === key || String(x.__docId || '') === key
+          );
+          if (index >= 0) adminAccounts[index] = a;
+          else adminAccounts.push(a);
+        }
+
+        if (!a) {
+          alert('تعذر العثور على بيانات حساب المدير. حدّث القائمة ثم حاول مرة أخرى.');
+          return;
+        }
+
+        document.getElementById('edit-admin-username-flag').value = String(a.__docId || a.username);
+        document.getElementById('new-admin-username').value = a.username || '';
+        document.getElementById('new-admin-password').value = a.password || '';
+        document.getElementById('new-admin-fullname').value = a.fullname || '';
+        setAdminPermissionCheckboxes(a.permissions || {});
+        document.getElementById('save-admin-account-btn').innerText = 'تحديث حساب المدير';
+      } catch (err) {
+        console.error('تعذر تحميل حساب المدير للتعديل:', err);
+        alert('تعذر تحميل بيانات الحساب للتعديل حالياً. يرجى المحاولة مرة أخرى.');
+      }
     }
+
     function renderAdminAccountsList() {
       const box = document.getElementById('admin-accounts-list');
       const badge = document.getElementById('admin-accounts-count');
@@ -3545,44 +3472,87 @@
     async function handleAdminAccountSubmit(e) {
       e.preventDefault();
       if (!isAdmin) return alert('إدارة حسابات المدراء متاحة للمدير الرئيسي فقط.');
+
       const username = document.getElementById('new-admin-username').value.trim();
       const password = document.getElementById('new-admin-password').value.trim();
       const fullname = document.getElementById('new-admin-fullname').value.trim();
       const editFlag = document.getElementById('edit-admin-username-flag').value.trim();
-      if (!username || !password || !fullname) return alert('أكمل جميع بيانات الحساب.');
-      if (username === 'admin') return alert('لا يمكن استخدام اسم المستخدم admin لهذا الحساب.');
 
-      const old = editFlag ? adminAccounts.find(a => String(a.username) === String(editFlag)) : null;
-      if (editFlag && !old) return alert('تعذر العثور على بيانات حساب المدير المراد تعديله. حدّث القائمة ثم حاول مرة أخرى.');
-      if (!editFlag && adminAccounts.some(a => String(a.username) === String(username))) return alert('اسم المستخدم مستخدم مسبقاً.');
-      if (editFlag && editFlag !== username && adminAccounts.some(a => String(a.username) === String(username))) return alert('اسم المستخدم الجديد مستخدم مسبقاً.');
+      if (!username || !password || !fullname) {
+        return alert('أكمل جميع بيانات الحساب.');
+      }
+      if (username.toLowerCase() === 'admin') {
+        return alert('لا يمكن استخدام اسم المستخدم admin لهذا الحساب.');
+      }
 
-      const usernameChanged = !!editFlag && editFlag !== username;
-      const passwordChanged = !!old && old.password !== password;
-      const now = Date.now();
-      const account = normalizeAdminAccount({
-        ...(old || {}),
-        username, password, fullname,
-        permissions: getSelectedAdminPermissions(),
-        deviceId: editFlag ? '' : ((old && old.deviceId) || ''),
-        sessionToken: editFlag ? '' : ((old && old.sessionToken) || ''),
-        sessionDeviceId: editFlag ? '' : ((old && old.sessionDeviceId) || ''),
-        sessionStartedAt: editFlag ? null : ((old && old.sessionStartedAt) || null),
-        forceLogoutAt: editFlag ? now : ((old && old.forceLogoutAt) || 0),
-        accountUpdatedAt: now
-      });
-      delete account.__docId;
+      const saveBtn = document.getElementById('save-admin-account-btn');
+      const originalText = saveBtn.innerText;
+      saveBtn.disabled = true;
+      saveBtn.innerText = editFlag ? 'جارٍ تحديث الحساب...' : 'جارٍ إنشاء الحساب...';
 
       try {
+        // اجلب النسخة الحقيقية عند التعديل، ولا تعتمد على بيانات الواجهة القديمة.
+        let old = null;
+        if (editFlag) {
+          const oldSnap = await db.collection('adminAccounts').doc(editFlag).get({ source: 'server' });
+          if (!oldSnap.exists) {
+            throw new Error('حساب المدير المراد تعديله لم يعد موجوداً.');
+          }
+          old = normalizeAdminAccount({
+            ...(oldSnap.data() || {}),
+            username: (oldSnap.data() || {}).username || oldSnap.id,
+            fullname: (oldSnap.data() || {}).fullname || (oldSnap.data() || {}).name || oldSnap.id
+          });
+          old.__docId = oldSnap.id;
+        } else {
+          const duplicateSnap = await db.collection('adminAccounts').doc(username).get({ source: 'server' });
+          if (duplicateSnap.exists) {
+            throw new Error('اسم المستخدم مستخدم مسبقاً.');
+          }
+        }
+
+        if (editFlag && editFlag !== username) {
+          const duplicateSnap = await db.collection('adminAccounts').doc(username).get({ source: 'server' });
+          if (duplicateSnap.exists) {
+            throw new Error('اسم المستخدم الجديد مستخدم مسبقاً.');
+          }
+        }
+
+        const usernameChanged = !!old && String(old.username) !== username;
+        const passwordChanged = !!old && String(old.password) !== password;
+        const now = Date.now();
+
+        const account = normalizeAdminAccount({
+          ...(old || {}),
+          username,
+          password,
+          fullname,
+          permissions: getSelectedAdminPermissions(),
+          // عند تعديل الحساب لا نحذف بيانات المصادقة والجلسة بلا سبب.
+          deviceId: old?.deviceId || '',
+          sessionToken: old?.sessionToken || '',
+          sessionDeviceId: old?.sessionDeviceId || '',
+          sessionStartedAt: old?.sessionStartedAt || null,
+          forceLogoutAt: (usernameChanged || passwordChanged) ? now : (old?.forceLogoutAt || 0),
+          accountUpdatedAt: now
+        });
+        delete account.__docId;
+
+        // حفظ بيانات الحساب أولاً.
+        const targetRef = db.collection('adminAccounts').doc(username);
         const batch = db.batch();
-        const newRef = db.collection('adminAccounts').doc(String(username));
-        batch.set(newRef, account, { merge: true });
-        if (usernameChanged) batch.delete(db.collection('adminAccounts').doc(String(editFlag)));
+        batch.set(targetRef, account, { merge: true });
+        if (editFlag && editFlag !== username) {
+          batch.delete(db.collection('adminAccounts').doc(editFlag));
+        }
         await batch.commit();
 
+        // مزامنة Firebase Authentication.
         try {
-          if (old && old.authUid && (passwordChanged || usernameChanged)) {
-            const synced = await syncLegacyAuthCredentials(editFlag, old.password, username, password, 'admin');
+          if (old && old.authUid && (usernameChanged || passwordChanged)) {
+            const synced = await syncLegacyAuthCredentials(
+              old.username, old.password, username, password, 'admin'
+            );
             account.authUid = synced.uid;
             account.authEmail = synced.email;
           } else if (!account.authUid) {
@@ -3590,26 +3560,41 @@
             account.authUid = uid;
             account.authEmail = legacyAuthEmail(username, 'admin');
           }
+
+          if (account.authUid || account.authEmail) {
+            await targetRef.set({
+              authUid: account.authUid || null,
+              authEmail: account.authEmail || null
+            }, { merge: true });
+          }
         } catch (authSyncErr) {
-          console.error('تعذر مزامنة حساب المدير مع Firebase Authentication:', authSyncErr);
-          alert('تم حفظ بيانات المدير في Firestore لكن تعذر تحديث بيانات تسجيل الدخول في Firebase. لم يتم اعتماد رسالة نجاح كاملة. الخطأ: ' + (authSyncErr.message || authSyncErr.code || 'غير معروف'));
+          console.error('تم حفظ الحساب لكن فشلت مزامنة Firebase Authentication:', authSyncErr);
+          // لا نعتبر Firestore فاشلاً إذا نجح الحفظ.
+          await loadAdminAccountsFromFirestore();
+          resetAdminAccountForm();
+          alert('تم حفظ بيانات المدير في Firestore، لكن تعذر مزامنة تسجيل الدخول. راجع Firebase Authentication.');
           return;
         }
 
-        await db.collection('adminAccounts').doc(String(username)).set({ authUid: account.authUid || null, authEmail: account.authEmail || null }, { merge: true });
-        adminAccounts = adminAccounts.filter(a => String(a.username) !== String(editFlag) && String(a.username) !== String(username));
-        adminAccounts.push(account);
-        adminAccounts.sort((a,b) => String(a.fullname || '').localeCompare(String(b.fullname || ''), 'ar'));
-        localStorage.setItem('mustaqbal_admin_accounts', JSON.stringify(adminAccounts));
-        renderAdminAccountsList();
+        // أعد التحميل من Firestore بعد كل إنشاء/تعديل لضمان أن القائمة تعرض
+        // نفس البيانات المحفوظة فعلياً.
+        await loadAdminAccountsFromFirestore();
         resetAdminAccountForm();
         alert(editFlag ? 'تم تعديل حساب المدير الفرعي وحفظ التعديلات بنجاح.' : 'تم إنشاء حساب المدير وحفظه بنجاح.');
-        loadAdminAccountsFromFirestore().catch(err => console.warn('تعذر إعادة تحميل حسابات المدراء:', err));
-      } catch(err) {
+      } catch (err) {
         console.error('خطأ أثناء حفظ حساب المدير:', err);
-        alert('تعذر حفظ الحساب حالياً. يرجى المحاولة مرة أخرى.');
+        alert(err.message || 'تعذر حفظ الحساب حالياً. يرجى المحاولة مرة أخرى.');
+      } finally {
+        saveBtn.disabled = false;
+        if (document.getElementById('edit-admin-username-flag').value.trim()) {
+          saveBtn.innerText = 'تحديث حساب المدير';
+        } else {
+          saveBtn.innerText = 'إنشاء حساب المدير';
+        }
+        // إذا تم إغلاق/إعادة ضبط النموذج أثناء الحفظ لا نعيد النص القديم.
       }
     }
+
     async function deleteAdminAccount(username) {
       if (!isAdmin) return alert('متاح للمدير الرئيسي فقط.');
       if (!confirm('تأكيد حذف حساب المدير؟')) return;
