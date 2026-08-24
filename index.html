@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <!-- BUILD: subadmin-fix-v4-20260824 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>متجر المستقبل للجملة</title>
@@ -1531,7 +1535,10 @@
 
     // مزامنة اسم المستخدم وكلمة المرور مع Firebase Authentication.
     // ضرورية لأن اسم المستخدم يتحول داخلياً إلى بريد Firebase مختلف.
-    async function syncLegacyAuthCredentials(oldUsername, oldPassword, newUsername, newPassword, role) {
+    // مزامنة موحدة لبيانات الدخول لكل الحسابات القديمة.
+    // لا نعتمد على authUid الموجود في Firestore، لأن بعض الحسابات القديمة
+    // تم إنشاؤها في Authentication قبل حفظ authUid/authEmail.
+    async function syncLegacyAuthCredentials(oldUsername, oldPassword, newUsername, newPassword, role, sourceData) {
       const oldEmail = legacyAuthEmail(oldUsername, role);
       const newEmail = legacyAuthEmail(newUsername, role);
       const oldAuthPassword = await legacyAuthPassword(oldPassword);
@@ -1544,74 +1551,68 @@
 
       const secondaryAuth = secondaryApp.auth();
 
-      async function saveAuthLinks(user) {
-        await db.collection('userProfiles').doc(user.uid).set({
+      async function writeLinks(user) {
+        const uid = user.uid;
+        const col = role === 'customer' ? 'customers' : role === 'delegate' ? 'delegates' : 'adminAccounts';
+
+        await db.collection('userProfiles').doc(uid).set({
           username: String(newUsername),
           role: String(role),
           authEmail: newEmail,
-          authUid: user.uid,
+          authUid: uid,
           active: true,
+          fullname: String((sourceData && (sourceData.fullname || sourceData.name)) || newUsername),
+          permissions: (sourceData && sourceData.permissions && typeof sourceData.permissions === 'object') ? sourceData.permissions : {},
           accountUpdatedAt: Date.now()
         }, { merge: true });
 
-        const col = role === 'customer' ? 'customers' : role === 'delegate' ? 'delegates' : 'adminAccounts';
-        await db.collection(col).doc(String(newUsername)).set({
-          authUid: user.uid,
-          authEmail: newEmail
-        }, { merge: true });
-
-        return { uid: user.uid, email: newEmail };
+        return { uid, email: newEmail, collection: col };
       }
 
       try {
-        const credential = await secondaryAuth.signInWithEmailAndPassword(oldEmail, oldAuthPassword);
-        let user = credential.user;
-
+        let user;
         try {
-          // المحاولة الطبيعية أولاً.
-          if (oldEmail !== newEmail) await user.updateEmail(newEmail);
-          if (oldAuthPassword !== newAuthPassword) await user.updatePassword(newAuthPassword);
-          return await saveAuthLinks(user);
-
-        } catch (updateErr) {
-          console.warn('تعذر التحديث المباشر لحساب Authentication، سيتم إعادة إنشاء بيانات الدخول:', updateErr);
-
-          // بعض إعدادات Firebase تمنع updateEmail / updatePassword من المتصفح.
-          // بما أن المستخدم سُجّل دخوله الآن في التطبيق الثانوي، نستخدم طريقة بديلة:
-          // حذف حساب الدخول القديم ثم إنشاء حساب جديد بالبيانات الجديدة.
-          // هذا يحافظ على قدرة المدير على تعديل اسم المستخدم وكلمة المرور.
-          const oldUid = user.uid;
-
-          try {
-            await user.delete();
-          } catch (deleteErr) {
-            console.error('تعذر حذف حساب Authentication القديم:', deleteErr);
-            throw new Error('تعذر تحديث بيانات تسجيل الدخول لهذا المدير.');
+          const credential = await secondaryAuth.signInWithEmailAndPassword(oldEmail, oldAuthPassword);
+          user = credential.user;
+        } catch (signInErr) {
+          // إذا لم يكن الحساب موجوداً أصلاً، ننشئه بالبيانات الجديدة.
+          if (signInErr && signInErr.code === 'auth/user-not-found') {
+            const created = await secondaryAuth.createUserWithEmailAndPassword(newEmail, newAuthPassword);
+            return await writeLinks(created.user);
           }
-
-          try {
-            const recreated = await secondaryAuth.createUserWithEmailAndPassword(newEmail, newAuthPassword);
-            user = recreated.user;
-          } catch (createErr) {
-            console.error('تعذر إنشاء حساب Authentication البديل:', createErr);
-            throw new Error('تعذر إنشاء بيانات تسجيل الدخول الجديدة لهذا المدير.');
-          }
-
-          // إذا كان هناك ملف شخصي قديم مربوط بالـ UID السابق، لا نحتاجه للحساب الجديد.
-          // نحذف فقط بيانات الربط القديمة بدون كشف تفاصيل تقنية للمستخدم.
-          try {
-            await db.collection('userProfiles').doc(oldUid).delete();
-          } catch (profileDeleteErr) {
-            console.warn('تعذر حذف ملف الربط القديم، سيتم متابعة الحفظ:', profileDeleteErr);
-          }
-
-          return await saveAuthLinks(user);
+          // الحساب موجود لكن كلمة المرور القديمة لا تطابق Authentication.
+          // لا نغيّر كلمة مرور مستخدم آخر من المتصفح بدون معرفة كلمة المرور القديمة.
+          throw signInErr;
         }
+
+        const oldUid = user.uid;
+
+        // تعديل البريد الداخلي عند تغيير اسم المستخدم.
+        if (oldEmail !== newEmail) {
+          try {
+            await user.updateEmail(newEmail);
+          } catch (emailErr) {
+            // إذا منع Firebase updateEmail، نحذف الحساب بعد تسجيل الدخول الأخير
+            // ثم ننشئ الحساب الجديد. هذا المسار لا يحتاج Cloud Function.
+            await user.delete();
+            const recreated = await secondaryAuth.createUserWithEmailAndPassword(newEmail, newAuthPassword);
+            try { await db.collection('userProfiles').doc(oldUid).delete(); } catch (_) {}
+            return await writeLinks(recreated.user);
+          }
+        }
+
+        // تعديل كلمة المرور بعد تسجيل الدخول مباشرة.
+        if (oldAuthPassword !== newAuthPassword) {
+          await user.updatePassword(newAuthPassword);
+        }
+
+        return await writeLinks(user);
       } finally {
         try { await secondaryAuth.signOut(); } catch (_) {}
         try { await secondaryApp.delete(); } catch (_) {}
       }
     }
+
 
     async function migrateAllLegacyAccountsToAuth() {
       if (legacyMigrationRunning) return;
@@ -3521,44 +3522,27 @@
       const password = document.getElementById('new-admin-password').value.trim();
       const fullname = document.getElementById('new-admin-fullname').value.trim();
       const editFlag = document.getElementById('edit-admin-username-flag').value.trim();
-
-      if (!username || !password || !fullname) {
-        return alert('أكمل جميع بيانات الحساب.');
-      }
-      if (username.toLowerCase() === 'admin') {
-        return alert('لا يمكن استخدام اسم المستخدم admin لهذا الحساب.');
-      }
+      if (!username || !password || !fullname) return alert('أكمل جميع بيانات الحساب.');
+      if (username.toLowerCase() === 'admin') return alert('لا يمكن استخدام اسم المستخدم admin لهذا الحساب.');
 
       const saveBtn = document.getElementById('save-admin-account-btn');
       saveBtn.disabled = true;
       saveBtn.innerText = editFlag ? 'جارٍ تحديث الحساب...' : 'جارٍ إنشاء الحساب...';
 
       try {
-        // اجلب النسخة الحقيقية عند التعديل، ولا تعتمد على بيانات الواجهة القديمة.
         let old = null;
         if (editFlag) {
-          const oldSnap = await db.collection('adminAccounts').doc(editFlag).get({ source: 'server' });
-          if (!oldSnap.exists) {
-            throw new Error('حساب المدير المراد تعديله لم يعد موجوداً.');
-          }
-          old = normalizeAdminAccount({
-            ...(oldSnap.data() || {}),
-            username: (oldSnap.data() || {}).username || oldSnap.id,
-            fullname: (oldSnap.data() || {}).fullname || (oldSnap.data() || {}).name || oldSnap.id
-          });
-          old.__docId = oldSnap.id;
+          const snap = await db.collection('adminAccounts').doc(editFlag).get({ source: 'server' });
+          if (!snap.exists) throw new Error('حساب المدير المراد تعديله لم يعد موجوداً.');
+          old = normalizeAdminAccount({ ...(snap.data() || {}), username: (snap.data() || {}).username || snap.id });
         } else {
-          const duplicateSnap = await db.collection('adminAccounts').doc(username).get({ source: 'server' });
-          if (duplicateSnap.exists) {
-            throw new Error('اسم المستخدم مستخدم مسبقاً.');
-          }
+          const duplicate = await db.collection('adminAccounts').doc(username).get({ source: 'server' });
+          if (duplicate.exists) throw new Error('اسم المستخدم مستخدم مسبقاً.');
         }
 
         if (editFlag && editFlag !== username) {
-          const duplicateSnap = await db.collection('adminAccounts').doc(username).get({ source: 'server' });
-          if (duplicateSnap.exists) {
-            throw new Error('اسم المستخدم الجديد مستخدم مسبقاً.');
-          }
+          const duplicate = await db.collection('adminAccounts').doc(username).get({ source: 'server' });
+          if (duplicate.exists) throw new Error('اسم المستخدم الجديد مستخدم مسبقاً.');
         }
 
         const usernameChanged = !!old && String(old.username) !== username;
@@ -3567,11 +3551,8 @@
 
         const account = normalizeAdminAccount({
           ...(old || {}),
-          username,
-          password,
-          fullname,
+          username, password, fullname,
           permissions: getSelectedAdminPermissions(),
-          // عند تعديل الحساب لا نحذف بيانات المصادقة والجلسة بلا سبب.
           deviceId: old?.deviceId || '',
           sessionToken: old?.sessionToken || '',
           sessionDeviceId: old?.sessionDeviceId || '',
@@ -3581,79 +3562,42 @@
         });
         delete account.__docId;
 
-        // حفظ بيانات الحساب أولاً.
-        const targetRef = db.collection('adminAccounts').doc(username);
-        const batch = db.batch();
-        batch.set(targetRef, account, { merge: true });
-        if (editFlag && editFlag !== username) {
-          batch.delete(db.collection('adminAccounts').doc(editFlag));
+        // إنشاء/تحديث Authentication أولاً. عند التعديل لا نعتمد على authUid.
+        let authInfo;
+        if (!old) {
+          const uid = await migrateLegacyAccountToAuth(username, password, 'admin', account);
+          authInfo = { uid, email: legacyAuthEmail(username, 'admin') };
+        } else if (usernameChanged || passwordChanged) {
+          authInfo = await syncLegacyAuthCredentials(old.username, old.password, username, password, 'admin', account);
+        } else {
+          authInfo = { uid: old.authUid || null, email: old.authEmail || null };
         }
+
+        account.authUid = authInfo.uid || account.authUid || null;
+        account.authEmail = authInfo.email || account.authEmail || legacyAuthEmail(username, 'admin');
+
+        const batch = db.batch();
+        batch.set(db.collection('adminAccounts').doc(username), account, { merge: true });
+        if (editFlag && editFlag !== username) batch.delete(db.collection('adminAccounts').doc(editFlag));
         await batch.commit();
 
-        // مزامنة Firebase Authentication.
-        // مهم: عند تعديل الاسم أو الصلاحيات فقط لا نحاول إنشاء حساب Auth جديد.
-        // النسخة السابقة كانت تحاول ترحيل الحساب في كل تعديل عندما تكون authUid
-        // غير موجودة في Firestore، حتى لو كان الحساب موجوداً فعلياً في Authentication،
-        // فتفشل العملية برسالة مزامنة رغم نجاح حفظ التعديل.
-        try {
-          if (!old) {
-            // إنشاء حساب جديد: أنشئ حساب Authentication مرة واحدة فقط.
-            const uid = await migrateLegacyAccountToAuth(username, password, 'admin', account);
-            account.authUid = uid;
-            account.authEmail = legacyAuthEmail(username, 'admin');
-
-          } else if (usernameChanged || passwordChanged) {
-            // تعديل بيانات الدخول: حاول أولاً مزامنة الحساب الموجود فعلياً.
-            const synced = await syncLegacyAuthCredentials(
-              old.username, old.password, username, password, 'admin'
-            );
-            account.authUid = synced.uid;
-            account.authEmail = synced.email;
-
-          } else {
-            // لا يوجد تغيير في اسم المستخدم أو كلمة المرور، لذلك لا نلمس
-            // Firebase Authentication إطلاقاً.
-            account.authUid = old.authUid || account.authUid || null;
-            account.authEmail = old.authEmail || account.authEmail || null;
-          }
-
-          if (account.authUid || account.authEmail) {
-            await targetRef.set({
-              authUid: account.authUid || null,
-              authEmail: account.authEmail || null
-            }, { merge: true });
-          }
-        } catch (authSyncErr) {
-          console.error('فشلت مزامنة Firebase Authentication:', authSyncErr);
-
-          // إذا كان التعديل يتضمن بيانات الدخول فلا نعرض نجاحاً مضللاً.
-          // نعيد رسالة آمنة بدون تفاصيل Firebase الحساسة.
-          if (old && (usernameChanged || passwordChanged)) {
-            throw new Error('تعذر تحديث بيانات تسجيل الدخول لهذا المدير. يرجى المحاولة مرة أخرى.');
-          }
-
-          // أما إنشاء الحساب الجديد فيجب أن يفشل بوضوح لأن تسجيل الدخول لن يكون مكتملاً.
-          if (!old) {
-            throw new Error('تعذر إنشاء حساب تسجيل الدخول للمدير حالياً.');
-          }
+        // userProfiles وبيانات الربط تكون دائماً متزامنة.
+        if (account.authUid) {
+          await db.collection('userProfiles').doc(account.authUid).set({
+            username, role: 'admin', authUid: account.authUid, authEmail: account.authEmail,
+            active: true, fullname, permissions: account.permissions || {}, accountUpdatedAt: now
+          }, { merge: true });
         }
 
-        // أعد التحميل من Firestore بعد كل إنشاء/تعديل لضمان أن القائمة تعرض
-        // نفس البيانات المحفوظة فعلياً.
         await loadAdminAccountsFromFirestore();
         resetAdminAccountForm();
-        alert(editFlag ? 'تم تعديل حساب المدير الفرعي وحفظ التعديلات بنجاح.' : 'تم إنشاء حساب المدير وحفظه بنجاح.');
+        alert(editFlag ? 'تم تعديل حساب المدير الفرعي ومزامنة بيانات تسجيل الدخول بنجاح.' : 'تم إنشاء حساب المدير ومزامنة تسجيل الدخول بنجاح.');
       } catch (err) {
         console.error('خطأ أثناء حفظ حساب المدير:', err);
-        alert(err.message || 'تعذر حفظ الحساب حالياً. يرجى المحاولة مرة أخرى.');
+        alert('تعذر حفظ أو مزامنة بيانات تسجيل الدخول. يرجى التأكد من كلمة المرور الحالية للحساب ثم المحاولة.');
       } finally {
         saveBtn.disabled = false;
-        if (document.getElementById('edit-admin-username-flag').value.trim()) {
-          saveBtn.innerText = 'تحديث حساب المدير';
-        } else {
-          saveBtn.innerText = 'إنشاء حساب المدير';
-        }
-        // إذا تم إغلاق/إعادة ضبط النموذج أثناء الحفظ لا نعيد النص القديم.
+        saveBtn.innerText = document.getElementById('edit-admin-username-flag').value.trim() ? 'تحديث حساب المدير' : 'إنشاء حساب المدير';
       }
     }
 
@@ -3687,69 +3631,81 @@
     async function handleDelegateMgmtSubmit(e) {
       e.preventDefault();
       if (!requireAdminPermission('createDelegates')) return;
+
       const username = document.getElementById('new-del-username').value.trim();
       const password = document.getElementById('new-del-password').value.trim();
       const fullname = document.getElementById('new-del-fullname').value.trim();
       const editFlag = document.getElementById('edit-del-username-flag').value.trim();
       if (!username || !password || !fullname) return alert('أكمل جميع بيانات حساب المندوب.');
 
-      const oldDel = editFlag ? delegates.find(d => String(d.username) === String(editFlag)) : null;
-      if (editFlag && !oldDel) return alert('تعذر العثور على حساب المندوب المراد تعديله. حدّث القائمة ثم حاول مرة أخرى.');
-      if (!editFlag && delegates.some(d => String(d.username) === String(username))) return alert('اسم المستخدم مستخدم مسبقاً.');
-      if (editFlag && editFlag !== username && delegates.some(d => String(d.username) === String(username))) return alert('اسم المستخدم الجديد مستخدم مسبقاً.');
-
-      const wasEditingDelegate = !!editFlag;
-      const usernameChanged = wasEditingDelegate && editFlag !== username;
-      const passwordChanged = !!oldDel && oldDel.password !== password;
-      const now = Date.now();
-      const delData = {
-        ...(oldDel || {}),
-        username, password, fullname,
-        clients: oldDel && Array.isArray(oldDel.clients) ? oldDel.clients : [],
-        deviceId: wasEditingDelegate ? '' : ((oldDel && oldDel.deviceId) || ''),
-        sessionToken: wasEditingDelegate ? '' : ((oldDel && oldDel.sessionToken) || ''),
-        sessionDeviceId: wasEditingDelegate ? '' : ((oldDel && oldDel.sessionDeviceId) || ''),
-        sessionStartedAt: wasEditingDelegate ? null : ((oldDel && oldDel.sessionStartedAt) || null),
-        forceLogoutAt: wasEditingDelegate ? now : ((oldDel && oldDel.forceLogoutAt) || 0),
-        accountUpdatedAt: now
-      };
-      delete delData.__docId;
-
       try {
-        // أولاً نزامن Firebase Authentication، ثم نحفظ Firestore.
-        // بهذا لا تظهر بيانات حساب جديد في Firestore إذا فشل إنشاء/تحديث تسجيل الدخول.
-        try {
-          if (oldDel && oldDel.authUid && (passwordChanged || usernameChanged)) {
-            const synced = await syncLegacyAuthCredentials(editFlag, oldDel.password, username, password, 'delegate');
-            delData.authUid = synced.uid;
-            delData.authEmail = synced.email;
-          } else if (!delData.authUid) {
-            const uid = await migrateLegacyAccountToAuth(username, password, 'delegate', delData);
-            delData.authUid = uid;
-            delData.authEmail = legacyAuthEmail(username, 'delegate');
-          }
-        } catch (authSyncErr) {
-          console.error('تعذر مزامنة حساب المندوب مع Firebase Authentication:', authSyncErr);
-          alert('تعذر إنشاء أو تحديث بيانات تسجيل دخول المندوب، لذلك لم يتم حفظ العملية نهائياً. السبب: ' + (authSyncErr.message || authSyncErr.code || 'غير معروف'));
-          return;
+        let oldDel = null;
+        if (editFlag) {
+          const snap = await db.collection('delegates').doc(editFlag).get({ source: 'server' });
+          if (!snap.exists) throw new Error('تعذر العثور على حساب المندوب المراد تعديله.');
+          oldDel = { ...(snap.data() || {}), username: (snap.data() || {}).username || snap.id };
+        } else {
+          const duplicate = await db.collection('delegates').doc(username).get({ source: 'server' });
+          if (duplicate.exists) throw new Error('اسم المستخدم مستخدم مسبقاً.');
         }
 
+        if (editFlag && editFlag !== username) {
+          const duplicate = await db.collection('delegates').doc(username).get({ source: 'server' });
+          if (duplicate.exists) throw new Error('اسم المستخدم الجديد مستخدم مسبقاً.');
+        }
+
+        const usernameChanged = !!oldDel && String(oldDel.username) !== username;
+        const passwordChanged = !!oldDel && String(oldDel.password) !== password;
+        const now = Date.now();
+
+        const delData = {
+          ...(oldDel || {}),
+          username, password, fullname,
+          clients: Array.isArray(oldDel?.clients) ? oldDel.clients : [],
+          deviceId: (usernameChanged || passwordChanged) ? '' : (oldDel?.deviceId || ''),
+          sessionToken: (usernameChanged || passwordChanged) ? '' : (oldDel?.sessionToken || ''),
+          sessionDeviceId: (usernameChanged || passwordChanged) ? '' : (oldDel?.sessionDeviceId || ''),
+          sessionStartedAt: (usernameChanged || passwordChanged) ? null : (oldDel?.sessionStartedAt || null),
+          forceLogoutAt: (usernameChanged || passwordChanged) ? now : (oldDel?.forceLogoutAt || 0),
+          accountUpdatedAt: now
+        };
+        delete delData.__docId;
+
+        let authInfo;
+        if (!oldDel) {
+          const uid = await migrateLegacyAccountToAuth(username, password, 'delegate', delData);
+          authInfo = { uid, email: legacyAuthEmail(username, 'delegate') };
+        } else if (usernameChanged || passwordChanged) {
+          authInfo = await syncLegacyAuthCredentials(oldDel.username, oldDel.password, username, password, 'delegate', delData);
+        } else {
+          authInfo = { uid: oldDel.authUid || null, email: oldDel.authEmail || null };
+        }
+
+        delData.authUid = authInfo.uid || delData.authUid || null;
+        delData.authEmail = authInfo.email || delData.authEmail || legacyAuthEmail(username, 'delegate');
+
         const batch = db.batch();
-        batch.set(db.collection('delegates').doc(String(username)), delData, { merge: true });
-        if (usernameChanged) batch.delete(db.collection('delegates').doc(String(editFlag)));
+        batch.set(db.collection('delegates').doc(username), delData, { merge: true });
+        if (editFlag && editFlag !== username) batch.delete(db.collection('delegates').doc(editFlag));
         await batch.commit();
 
-        await db.collection('delegates').doc(String(username)).set({ authUid: delData.authUid || null, authEmail: delData.authEmail || null }, { merge: true });
+        if (delData.authUid) {
+          await db.collection('userProfiles').doc(delData.authUid).set({
+            username, role: 'delegate', authUid: delData.authUid, authEmail: delData.authEmail,
+            active: true, fullname, accountUpdatedAt: now
+          }, { merge: true });
+        }
+
         delegates = delegates.filter(d => String(d.username) !== String(editFlag) && String(d.username) !== String(username));
         delegates.push(delData);
         saveData();
         renderAdminDelegatesList();
         resetDelegateMgmtForm();
-        alert(wasEditingDelegate ? 'تم تعديل حساب المندوب وحفظ جميع التعديلات بنجاح.' : 'تم حفظ حساب المندوب بنجاح.');
-        if (typeof loadDelegatesFromFirestore === 'function') loadDelegatesFromFirestore().catch(err => console.warn('تعذر إعادة تحميل المناديب:', err));
-      } catch(err) {
-        console.error('خطأ أثناء تحديث حساب المندوب:', err);
-        alert('تعذر حفظ الحساب حالياً. يرجى المحاولة مرة أخرى.');
+        alert(editFlag ? 'تم تعديل حساب المندوب ومزامنة كلمة المرور بنجاح.' : 'تم إنشاء حساب المندوب ومزامنة تسجيل الدخول بنجاح.');
+        if (typeof loadDelegatesFromFirestore === 'function') await loadDelegatesFromFirestore();
+      } catch (err) {
+        console.error('خطأ أثناء حفظ حساب المندوب:', err);
+        alert('تعذر حفظ أو مزامنة بيانات تسجيل دخول المندوب. يرجى التأكد من كلمة المرور الحالية ثم المحاولة.');
       }
     }
 
@@ -3983,63 +3939,82 @@
     async function handleCustomerMgmtSubmit(e) {
       if (!requireAdminPermission('createCustomers')) return;
       e.preventDefault();
+
       const username = document.getElementById('new-cust-username').value.trim();
       const password = document.getElementById('new-cust-password').value.trim();
       const fullname = document.getElementById('new-cust-fullname').value.trim();
       const discountInput = document.getElementById('new-cust-discount');
       const discount = discountInput ? parseFloat(discountInput.value) || 0 : 0;
-      const editFlag = document.getElementById('edit-cust-username-flag').value;
-
-      if (!username) return;
-
-      let existingDeviceId = "";
-      let oldCust = null;
-      if (editFlag) {
-        oldCust = customers.find(c => c.username === editFlag) || null;
-        if (oldCust && oldCust.deviceId) existingDeviceId = oldCust.deviceId;
-        customers = customers.filter(c => c.username !== editFlag);
-        if (editFlag !== username) {
-          try { await db.collection('customers').doc(String(editFlag)).delete(); } catch(err){}
-        }
-      }
-
-      // أي تعديل على حساب زبون موجود يرسل أمر تسجيل خروج فوري للجلسة الحالية.
-      const wasEditingCustomer = !!editFlag;
-      const customerForceLogoutAt = wasEditingCustomer ? Date.now() : 0;
-      const custData = {
-        username,
-        password,
-        fullname,
-        discount,
-        // تعديل الحساب يبطل الجلسة القديمة بالكامل، ويجبر الزبون
-        // على تسجيل الدخول من جديد بالمعلومات الجديدة.
-        deviceId: wasEditingCustomer ? '' : existingDeviceId,
-        sessionToken: wasEditingCustomer ? '' : (oldCust && oldCust.sessionToken ? oldCust.sessionToken : ''),
-        sessionDeviceId: wasEditingCustomer ? '' : (oldCust && oldCust.sessionDeviceId ? oldCust.sessionDeviceId : ''),
-        sessionStartedAt: wasEditingCustomer ? null : (oldCust && oldCust.sessionStartedAt ? oldCust.sessionStartedAt : null),
-        ...(wasEditingCustomer ? {
-          forceLogoutAt: customerForceLogoutAt,
-          accountUpdatedAt: customerForceLogoutAt
-        } : {})
-      };
-
-      customers.push(custData);
-      saveData();
-      renderAdminCustomersList();
-      resetCustomerMgmtForm();
+      const editFlag = document.getElementById('edit-cust-username-flag').value.trim();
+      if (!username || !password || !fullname) return alert('أكمل جميع بيانات حساب الزبون.');
 
       try {
-        await db.collection('customers').doc(String(username)).set(custData, { merge: true });
-        try {
-          const previousCustomer = oldCust;
-          if (previousCustomer && previousCustomer.authUid && previousCustomer.password && previousCustomer.password !== password && editFlag === username) {
-            await syncLegacyAuthPassword(username, previousCustomer.password, password, 'customer');
-          } else if (!custData.authUid) {
-            await migrateLegacyAccountToAuth(username, password, 'customer', custData);
-          }
-        } catch (authSyncErr) { console.warn('تعذر مزامنة حساب الزبون مع Firebase Authentication:', authSyncErr); }
-        alert('تم حفظ حساب الزبون بنجاح.');
-      } catch(err) {}
+        let oldCust = null;
+        if (editFlag) {
+          const snap = await db.collection('customers').doc(editFlag).get({ source: 'server' });
+          if (!snap.exists) throw new Error('تعذر العثور على حساب الزبون المراد تعديله.');
+          oldCust = { ...(snap.data() || {}), username: (snap.data() || {}).username || snap.id };
+        } else {
+          const duplicate = await db.collection('customers').doc(username).get({ source: 'server' });
+          if (duplicate.exists) throw new Error('اسم المستخدم مستخدم مسبقاً.');
+        }
+
+        if (editFlag && editFlag !== username) {
+          const duplicate = await db.collection('customers').doc(username).get({ source: 'server' });
+          if (duplicate.exists) throw new Error('اسم المستخدم الجديد مستخدم مسبقاً.');
+        }
+
+        const usernameChanged = !!oldCust && String(oldCust.username) !== username;
+        const passwordChanged = !!oldCust && String(oldCust.password) !== password;
+        const now = Date.now();
+
+        const custData = {
+          ...(oldCust || {}),
+          username, password, fullname, discount,
+          deviceId: (usernameChanged || passwordChanged) ? '' : (oldCust?.deviceId || ''),
+          sessionToken: (usernameChanged || passwordChanged) ? '' : (oldCust?.sessionToken || ''),
+          sessionDeviceId: (usernameChanged || passwordChanged) ? '' : (oldCust?.sessionDeviceId || ''),
+          sessionStartedAt: (usernameChanged || passwordChanged) ? null : (oldCust?.sessionStartedAt || null),
+          forceLogoutAt: (usernameChanged || passwordChanged) ? now : (oldCust?.forceLogoutAt || 0),
+          accountUpdatedAt: now
+        };
+        delete custData.__docId;
+
+        let authInfo;
+        if (!oldCust) {
+          const uid = await migrateLegacyAccountToAuth(username, password, 'customer', custData);
+          authInfo = { uid, email: legacyAuthEmail(username, 'customer') };
+        } else if (usernameChanged || passwordChanged) {
+          authInfo = await syncLegacyAuthCredentials(oldCust.username, oldCust.password, username, password, 'customer', custData);
+        } else {
+          authInfo = { uid: oldCust.authUid || null, email: oldCust.authEmail || null };
+        }
+
+        custData.authUid = authInfo.uid || custData.authUid || null;
+        custData.authEmail = authInfo.email || custData.authEmail || legacyAuthEmail(username, 'customer');
+
+        const batch = db.batch();
+        batch.set(db.collection('customers').doc(username), custData, { merge: true });
+        if (editFlag && editFlag !== username) batch.delete(db.collection('customers').doc(editFlag));
+        await batch.commit();
+
+        if (custData.authUid) {
+          await db.collection('userProfiles').doc(custData.authUid).set({
+            username, role: 'customer', authUid: custData.authUid, authEmail: custData.authEmail,
+            active: true, fullname, accountUpdatedAt: now
+          }, { merge: true });
+        }
+
+        customers = customers.filter(c => String(c.username) !== String(editFlag) && String(c.username) !== String(username));
+        customers.push(custData);
+        saveData();
+        renderAdminCustomersList();
+        resetCustomerMgmtForm();
+        alert(editFlag ? 'تم تعديل حساب الزبون ومزامنة كلمة المرور بنجاح.' : 'تم إنشاء حساب الزبون ومزامنة تسجيل الدخول بنجاح.');
+      } catch (err) {
+        console.error('خطأ أثناء حفظ حساب الزبون:', err);
+        alert('تعذر حفظ أو مزامنة بيانات تسجيل دخول الزبون. يرجى التأكد من كلمة المرور الحالية ثم المحاولة.');
+      }
     }
 
     function editCustomer(username) {
