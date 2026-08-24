@@ -1508,6 +1508,47 @@
       }
     }
 
+
+    // مزامنة اسم المستخدم وكلمة المرور مع Firebase Authentication.
+    // ضرورية لأن اسم المستخدم يتحول داخلياً إلى بريد Firebase مختلف.
+    async function syncLegacyAuthCredentials(oldUsername, oldPassword, newUsername, newPassword, role) {
+      const oldEmail = legacyAuthEmail(oldUsername, role);
+      const newEmail = legacyAuthEmail(newUsername, role);
+      const oldAuthPassword = await legacyAuthPassword(oldPassword);
+      const newAuthPassword = await legacyAuthPassword(newPassword);
+      const secondaryName = 'legacyCred_' + role + '_' + String(oldUsername).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
+      let secondaryApp;
+      try { secondaryApp = firebase.app(secondaryName); }
+      catch (_) { secondaryApp = firebase.initializeApp(firebaseConfig, secondaryName); }
+      const secondaryAuth = secondaryApp.auth();
+      try {
+        const credential = await secondaryAuth.signInWithEmailAndPassword(oldEmail, oldAuthPassword);
+        const user = credential.user;
+        if (oldEmail !== newEmail) await user.updateEmail(newEmail);
+        if (oldAuthPassword !== newAuthPassword) await user.updatePassword(newAuthPassword);
+
+        await db.collection('userProfiles').doc(user.uid).set({
+          username: String(newUsername),
+          role: String(role),
+          authEmail: newEmail,
+          authUid: user.uid,
+          active: true,
+          accountUpdatedAt: Date.now()
+        }, { merge: true });
+
+        const col = role === 'customer' ? 'customers' : role === 'delegate' ? 'delegates' : 'adminAccounts';
+        await db.collection(col).doc(String(newUsername)).set({
+          authUid: user.uid,
+          authEmail: newEmail
+        }, { merge: true });
+
+        return { uid: user.uid, email: newEmail };
+      } finally {
+        try { await secondaryAuth.signOut(); } catch (_) {}
+        try { await secondaryApp.delete(); } catch (_) {}
+      }
+    }
+
     async function migrateAllLegacyAccountsToAuth() {
       if (legacyMigrationRunning) return;
 
@@ -3520,10 +3561,22 @@
         await batch.commit();
 
         try {
-          if (old && old.authUid && passwordChanged && !usernameChanged) await syncLegacyAuthPassword(username, old.password, password, 'admin');
-          else if (!account.authUid) await migrateLegacyAccountToAuth(username, password, 'admin', account);
-        } catch (authSyncErr) { console.warn('تعذر مزامنة حساب المدير مع Firebase Authentication:', authSyncErr); }
+          if (old && old.authUid && (passwordChanged || usernameChanged)) {
+            const synced = await syncLegacyAuthCredentials(editFlag, old.password, username, password, 'admin');
+            account.authUid = synced.uid;
+            account.authEmail = synced.email;
+          } else if (!account.authUid) {
+            const uid = await migrateLegacyAccountToAuth(username, password, 'admin', account);
+            account.authUid = uid;
+            account.authEmail = legacyAuthEmail(username, 'admin');
+          }
+        } catch (authSyncErr) {
+          console.error('تعذر مزامنة حساب المدير مع Firebase Authentication:', authSyncErr);
+          alert('تم حفظ بيانات المدير في Firestore لكن تعذر تحديث بيانات تسجيل الدخول في Firebase. لم يتم اعتماد رسالة نجاح كاملة. الخطأ: ' + (authSyncErr.message || authSyncErr.code || 'غير معروف'));
+          return;
+        }
 
+        await db.collection('adminAccounts').doc(String(username)).set({ authUid: account.authUid || null, authEmail: account.authEmail || null }, { merge: true });
         adminAccounts = adminAccounts.filter(a => String(a.username) !== String(editFlag) && String(a.username) !== String(username));
         adminAccounts.push(account);
         adminAccounts.sort((a,b) => String(a.fullname || '').localeCompare(String(b.fullname || ''), 'ar'));
@@ -3602,10 +3655,22 @@
         await batch.commit();
 
         try {
-          if (oldDel && oldDel.authUid && passwordChanged && !usernameChanged) await syncLegacyAuthPassword(username, oldDel.password, password, 'delegate');
-          else if (!delData.authUid) await migrateLegacyAccountToAuth(username, password, 'delegate', delData);
-        } catch (authSyncErr) { console.warn('تعذر مزامنة حساب المندوب مع Firebase Authentication:', authSyncErr); }
+          if (oldDel && oldDel.authUid && (passwordChanged || usernameChanged)) {
+            const synced = await syncLegacyAuthCredentials(editFlag, oldDel.password, username, password, 'delegate');
+            delData.authUid = synced.uid;
+            delData.authEmail = synced.email;
+          } else if (!delData.authUid) {
+            const uid = await migrateLegacyAccountToAuth(username, password, 'delegate', delData);
+            delData.authUid = uid;
+            delData.authEmail = legacyAuthEmail(username, 'delegate');
+          }
+        } catch (authSyncErr) {
+          console.error('تعذر مزامنة حساب المندوب مع Firebase Authentication:', authSyncErr);
+          alert('تم حفظ بيانات المندوب في Firestore لكن تعذر تحديث بيانات تسجيل الدخول في Firebase. لم يتم اعتماد رسالة نجاح كاملة. الخطأ: ' + (authSyncErr.message || authSyncErr.code || 'غير معروف'));
+          return;
+        }
 
+        await db.collection('delegates').doc(String(username)).set({ authUid: delData.authUid || null, authEmail: delData.authEmail || null }, { merge: true });
         delegates = delegates.filter(d => String(d.username) !== String(editFlag) && String(d.username) !== String(username));
         delegates.push(delData);
         saveData();
