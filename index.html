@@ -4,7 +4,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- BUILD: subadmin-fix-v4-20260824 -->
+  <!-- BUILD: whatsapp-contact-v2-login-precontact-20260824 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>متجر المستقبل للجملة</title>
@@ -843,6 +843,86 @@
 
 
 
+
+    .prelogin-whatsapp-btn {
+      width:100%; display:flex; align-items:center; gap:11px; text-align:right;
+      padding:12px 13px; margin-top:2px; border:1px solid #86efac;
+      border-radius:17px; background:linear-gradient(135deg,#f0fdf4,#ffffff);
+      color:#166534; cursor:pointer; box-shadow:0 7px 18px rgba(22,163,74,.10);
+      transition:transform .18s ease, box-shadow .18s ease;
+    }
+    .prelogin-whatsapp-btn:active { transform:scale(.985); }
+    .prelogin-whatsapp-icon { width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;background:#dcfce7;font-size:1.45rem;flex:none; }
+    .prelogin-whatsapp-btn span:nth-child(2) { flex:1; display:flex; flex-direction:column; gap:2px; }
+    .prelogin-whatsapp-btn strong { font-size:.82rem; font-weight:900; }
+    .prelogin-whatsapp-btn small { font-size:.65rem; color:#64748b; line-height:1.45; }
+    .prelogin-whatsapp-arrow { font-size:1.5rem; color:#16a34a; line-height:1; transform:rotate(180deg); }
+
+    /* ===== زر واتساب وإدارة بيانات التواصل ===== */
+    .whatsapp-nav-item {
+      position: relative;
+      min-width: 66px;
+      color: #16a34a !important;
+    }
+    .whatsapp-nav-item .nav-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.55rem;
+      background: linear-gradient(145deg,#dcfce7,#bbf7d0);
+      border: 1px solid #86efac;
+      box-shadow: 0 7px 18px rgba(22,163,74,.18);
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .whatsapp-nav-item:active .nav-icon {
+      transform: scale(.92);
+      box-shadow: 0 4px 10px rgba(22,163,74,.14);
+    }
+    .whatsapp-nav-item .whatsapp-label {
+      font-weight: 850;
+      margin-top: 2px;
+    }
+    .whatsapp-nav-item.configured .nav-icon {
+      animation: whatsappPulse 2.6s ease-in-out infinite;
+    }
+    @keyframes whatsappPulse {
+      0%,100% { box-shadow: 0 7px 18px rgba(22,163,74,.18); }
+      50% { box-shadow: 0 9px 24px rgba(22,163,74,.32); }
+    }
+    .whatsapp-admin-card {
+      background: linear-gradient(145deg,#f0fdf4,#ecfdf5);
+      border-color: #bbf7d0;
+    }
+    .whatsapp-admin-card span:last-child { color:#15803d !important; }
+    .whatsapp-settings-hero {
+      background: linear-gradient(135deg,#16a34a,#15803d);
+      color:#fff;
+      border-radius:20px;
+      padding:18px;
+      box-shadow:0 12px 28px rgba(22,163,74,.18);
+    }
+    .whatsapp-settings-hero .hero-icon {
+      width:52px;height:52px;border-radius:16px;
+      display:flex;align-items:center;justify-content:center;
+      background:rgba(255,255,255,.18);
+      font-size:1.7rem;margin-bottom:10px;
+    }
+    .whatsapp-settings-hero h4 { font-size:1rem;font-weight:900;margin-bottom:5px; }
+    .whatsapp-settings-hero p { font-size:.75rem;line-height:1.7;opacity:.92; }
+    .whatsapp-preview {
+      display:flex;align-items:center;gap:10px;
+      padding:11px 12px;background:#f0fdf4;
+      border:1px solid #bbf7d0;border-radius:14px;
+    }
+    .whatsapp-preview-icon {
+      width:38px;height:38px;border-radius:12px;
+      display:flex;align-items:center;justify-content:center;
+      background:#dcfce7;font-size:1.2rem;
+    }
+
     /* ===== نظام الإشعارات العصري ===== */
     .notification-bell-wrap { position: relative; display:inline-flex; }
     .notification-badge {
@@ -947,6 +1027,11 @@
         <h2 style="color: var(--text-main); font-size: 1.2rem; font-weight: 800;">أهلاً بك في متجر المستقبل</h2>
         <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; max-width: 280px;">سجل الدخول الآن لاستعراض المنتجات وتصفح العروض الخاصة بالمتجر.</p>
         <button class="btn" style="width: 100%; padding: 12px; font-size: 0.95rem; margin-top: 10px;" onclick="openLoginModal()">تسجيل الدخول</button>
+        <button type="button" class="prelogin-whatsapp-btn" onclick="openWhatsAppContactPreLogin()" aria-label="تواصل معنا عبر واتساب">
+          <span class="prelogin-whatsapp-icon">💬</span>
+          <span><strong>تواصل معنا عبر واتساب</strong><small>للاستفسار والمساعدة قبل تسجيل الدخول</small></span>
+          <span class="prelogin-whatsapp-arrow">‹</span>
+        </button>
       </div>
 
       <div class="search-box hidden" id="search-bar-container">
@@ -1011,6 +1096,10 @@
           <div class="admin-card-btn" onclick="openAdminNotificationsModal()">
             <span>🔔</span>
             <span>إرسال الإشعارات</span>
+          </div>
+          <div class="admin-card-btn whatsapp-admin-card" id="admin-whatsapp-card" onclick="openAdminWhatsAppModal()">
+            <span>💬</span>
+            <span>إدارة واتساب</span>
           </div>
           <div class="admin-card-btn" id="admin-accounts-card" onclick="openAdminAccountsModal()">
             <span>👨‍💼</span>
@@ -1085,6 +1174,10 @@
         <span class="nav-icon notification-bell-wrap">🔔<span class="notification-badge hidden" id="notifications-badge">0</span></span>
         <span>الإشعارات</span>
       </button>
+      <button class="nav-item hidden whatsapp-nav-item" id="nav-whatsapp-btn" onclick="openWhatsAppContact()" aria-label="تواصل معنا عبر واتساب" title="تواصل معنا عبر واتساب">
+        <span class="nav-icon">💬</span>
+        <span class="whatsapp-label">واتساب</span>
+      </button>
     </nav>
 
     <!-- نافذة إدارة حسابات الزبائن للمدير -->
@@ -1147,10 +1240,15 @@
         </div>
         <div class="modal-body">
           <form onsubmit="handleUnifiedLogin(event)" style="display: flex; flex-direction: column; gap: 10px;">
-            <input type="text" id="login-username" placeholder="البريد الإلكتروني للمدير أو اسم المستخدم" required class="compact-input">
+            <input type="text" id="login-username" placeholder="اسم المستخدم" required class="compact-input">
             <input type="password" id="login-password" placeholder="كلمة المرور" required class="compact-input">
             <button type="submit" class="btn" style="width: 100%; padding: 12px; margin-top: 5px;">دخول</button>
           </form>
+          <button type="button" class="prelogin-whatsapp-btn" onclick="openWhatsAppContactPreLogin()" style="margin-top:14px;">
+            <span class="prelogin-whatsapp-icon">💬</span>
+            <span><strong>تواصل معنا عبر واتساب</strong><small>يمكنك التواصل معنا مباشرة دون تسجيل الدخول</small></span>
+            <span class="prelogin-whatsapp-arrow">‹</span>
+          </button>
         </div>
       </div>
     </div>
@@ -1397,6 +1495,50 @@
             <span class="notification-chip">من: إدارة المتجر</span>
             <span id="notification-view-status" class="notification-chip" style="background:#dcfce7;color:#166534;">تمت القراءة</span>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- نافذة إدارة واتساب للمدير الرئيسي -->
+    <div id="admin-whatsapp-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>💬 إدارة واتساب المتجر</h3>
+          <button class="close-modal" onclick="closeAdminWhatsAppModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="whatsapp-settings-hero">
+            <div class="hero-icon">💬</div>
+            <h4>رابط التواصل مع حساب واتساب الرسمي</h4>
+            <p>المدير الرئيسي يحدد رقم واتساب ورسالة افتتاحية واحدة. ستظهر الإعدادات تلقائياً للزبائن والمندوبين، وعند الضغط على الأيقونة يفتح تطبيق واتساب مباشرة على محادثة المتجر.</p>
+          </div>
+
+          <form id="whatsapp-settings-form" onsubmit="saveWhatsAppSettings(event)" class="form-row">
+            <div>
+              <label class="field-label">رقم واتساب</label>
+              <input type="tel" id="whatsapp-business-number" class="compact-input" inputmode="tel" dir="ltr" placeholder="مثال: 9647XXXXXXXXX" required>
+              <small style="display:block;color:var(--text-muted);font-size:.68rem;margin-top:5px;line-height:1.6;">اكتب الرقم بصيغة دولية، ويفضل بدون + أو مسافات. مثال العراق: 9647XXXXXXXXX</small>
+            </div>
+            <div>
+              <label class="field-label">الرسالة الافتتاحية</label>
+              <textarea id="whatsapp-default-message" class="compact-input" maxlength="1000" placeholder="السلام عليكم، أريد الاستفسار عن منتجات متجر المستقبل..." style="resize:vertical;min-height:100px;line-height:1.7;"></textarea>
+            </div>
+            <label style="display:flex;align-items:center;gap:9px;padding:11px 12px;background:#f8fafc;border:1px solid var(--border-color);border-radius:14px;font-size:.78rem;font-weight:800;">
+              <input type="checkbox" id="whatsapp-enabled" style="width:18px;height:18px;accent-color:#16a34a;">
+              تفعيل زر واتساب للزبائن والمندوبين
+            </label>
+            <button type="submit" class="btn" style="width:100%;padding:12px;background:linear-gradient(135deg,#16a34a,#15803d);">💾 حفظ إعدادات واتساب</button>
+          </form>
+
+          <div class="whatsapp-preview">
+            <div class="whatsapp-preview-icon">💬</div>
+            <div>
+              <div style="font-size:.72rem;color:var(--text-muted);">المعاينة</div>
+              <strong id="whatsapp-settings-preview">لم يتم ضبط رقم واتساب بعد</strong>
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-secondary" style="width:100%;" onclick="testWhatsAppContact()">🔗 اختبار فتح واتساب</button>
         </div>
       </div>
     </div>
@@ -2153,8 +2295,202 @@
       }
     }
 
+    function normalizeWhatsAppNumber(value) {
+      let number = String(value || '').trim();
+      number = number.replace(/[^\d+]/g, '');
+      if (number.startsWith('+')) number = number.slice(1);
+      return number;
+    }
+
+    function buildWhatsAppUrl() {
+      const number = normalizeWhatsAppNumber(whatsappSettings && whatsappSettings.number);
+      if (!number) return '';
+      const message = String((whatsappSettings && whatsappSettings.message) || '').trim();
+      return 'https://wa.me/' + number + (message ? '?text=' + encodeURIComponent(message) : '');
+    }
+
+    function updateWhatsAppNavUI() {
+      const btn = document.getElementById('nav-whatsapp-btn');
+      if (!btn) return;
+      const visibleForUsers = !!(loggedCustomer || loggedDelegate);
+      btn.classList.toggle('hidden', !visibleForUsers);
+      btn.classList.toggle('configured', !!(whatsappSettings && whatsappSettings.enabled && normalizeWhatsAppNumber(whatsappSettings.number)));
+      btn.title = (whatsappSettings && whatsappSettings.enabled && normalizeWhatsAppNumber(whatsappSettings.number))
+        ? 'تواصل معنا عبر واتساب'
+        : 'واتساب المتجر غير مفعّل حالياً';
+    }
+
+    async function loadWhatsAppSettings() {
+      try {
+        const cached = JSON.parse(localStorage.getItem('mustaqbal_whatsapp_settings') || 'null');
+        if (cached && typeof cached === 'object') whatsappSettings = { ...whatsappSettings, ...cached };
+
+        const ref = db.collection('storeSettings').doc('whatsapp');
+        const snap = await ref.get();
+        if (snap.exists) {
+          whatsappSettings = {
+            number: String(snap.data().number || ''),
+            message: String(snap.data().message || ''),
+            enabled: snap.data().enabled !== false,
+            updatedAt: Number(snap.data().updatedAt || 0)
+          };
+          localStorage.setItem('mustaqbal_whatsapp_settings', JSON.stringify(whatsappSettings));
+        }
+      } catch (err) {
+        console.warn('تعذر تحميل إعدادات واتساب:', err);
+      }
+      updateWhatsAppNavUI();
+      updateWhatsAppSettingsForm();
+      return whatsappSettings;
+    }
+
+    function startWhatsAppSettingsRealtime() {
+      if (whatsappSettingsUnsubscribe) {
+        try { whatsappSettingsUnsubscribe(); } catch (_) {}
+        whatsappSettingsUnsubscribe = null;
+      }
+      whatsappSettingsUnsubscribe = db.collection('storeSettings').doc('whatsapp').onSnapshot((doc) => {
+        if (!doc.exists) return;
+        const data = doc.data() || {};
+        whatsappSettings = {
+          number: String(data.number || ''),
+          message: String(data.message || ''),
+          enabled: data.enabled !== false,
+          updatedAt: Number(data.updatedAt || 0)
+        };
+        localStorage.setItem('mustaqbal_whatsapp_settings', JSON.stringify(whatsappSettings));
+        updateWhatsAppNavUI();
+        updateWhatsAppSettingsForm();
+      }, (err) => console.warn('تعذر مزامنة إعدادات واتساب:', err));
+    }
+
+    function updateWhatsAppSettingsForm() {
+      const numberInput = document.getElementById('whatsapp-business-number');
+      const messageInput = document.getElementById('whatsapp-default-message');
+      const enabledInput = document.getElementById('whatsapp-enabled');
+      const preview = document.getElementById('whatsapp-settings-preview');
+      if (numberInput) numberInput.value = whatsappSettings.number || '';
+      if (messageInput) messageInput.value = whatsappSettings.message || '';
+      if (enabledInput) enabledInput.checked = whatsappSettings.enabled !== false;
+      if (preview) {
+        const number = normalizeWhatsAppNumber(whatsappSettings.number);
+        preview.textContent = number
+          ? (whatsappSettings.enabled !== false ? 'واتساب مفعّل — ' + number : 'واتساب محفوظ لكنه غير مفعّل — ' + number)
+          : 'لم يتم ضبط رقم واتساب بعد';
+      }
+    }
+
+    async function openAdminWhatsAppModal() {
+      if (!isAdmin) {
+        alert('إدارة واتساب متاحة للمدير الرئيسي فقط.');
+        return;
+      }
+      document.getElementById('admin-whatsapp-modal').classList.remove('hidden');
+      await loadWhatsAppSettings();
+      updateWhatsAppSettingsForm();
+    }
+
+    function closeAdminWhatsAppModal() {
+      document.getElementById('admin-whatsapp-modal').classList.add('hidden');
+    }
+
+    async function saveWhatsAppSettings(e) {
+      e.preventDefault();
+      if (!isAdmin) {
+        alert('إدارة واتساب متاحة للمدير الرئيسي فقط.');
+        return;
+      }
+
+      const number = normalizeWhatsAppNumber(document.getElementById('whatsapp-business-number').value);
+      const message = document.getElementById('whatsapp-default-message').value.trim();
+      const enabled = document.getElementById('whatsapp-enabled').checked;
+
+      if (!number) {
+        alert('يرجى إدخال رقم واتساب بصيغة دولية.');
+        return;
+      }
+      if (!/^\d{8,15}$/.test(number)) {
+        alert('رقم واتساب غير صحيح. استخدم الرقم الدولي فقط، من 8 إلى 15 رقماً.');
+        return;
+      }
+
+      const data = {
+        number,
+        message,
+        enabled,
+        updatedAt: Date.now(),
+        updatedBy: 'admin'
+      };
+
+      const saveBtn = document.querySelector('#whatsapp-settings-form button[type="submit"]');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.dataset.oldText = saveBtn.innerText;
+        saveBtn.innerText = 'جاري الحفظ...';
+      }
+
+      try {
+        await db.collection('storeSettings').doc('whatsapp').set(data, { merge: true });
+        whatsappSettings = data;
+        localStorage.setItem('mustaqbal_whatsapp_settings', JSON.stringify(whatsappSettings));
+        updateWhatsAppNavUI();
+        updateWhatsAppSettingsForm();
+        alert('تم حفظ إعدادات واتساب بنجاح، وستظهر للزبائن والمندوبين تلقائياً. ✅');
+      } catch (err) {
+        console.error('تعذر حفظ إعدادات واتساب:', err);
+        alert('تعذر حفظ إعدادات واتساب في السحابة. تأكد من صلاحيات Firestore لمجموعة storeSettings ثم حاول مرة أخرى.');
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.innerText = saveBtn.dataset.oldText || '💾 حفظ إعدادات واتساب';
+        }
+      }
+    }
+
+    function openWhatsAppContactPreLogin() {
+      if (!whatsappSettings || whatsappSettings.enabled === false) {
+        alert('واتساب المتجر غير مفعّل حالياً.');
+        return;
+      }
+      const url = buildWhatsAppUrl();
+      if (!url) {
+        alert('لم يتم ضبط رقم واتساب المتجر من المدير الرئيسي بعد.');
+        return;
+      }
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+    function openWhatsAppContact() {
+      if (!loggedCustomer && !loggedDelegate) return;
+      if (!whatsappSettings || whatsappSettings.enabled === false) {
+        alert('واتساب المتجر غير مفعّل حالياً.');
+        return;
+      }
+      const url = buildWhatsAppUrl();
+      if (!url) {
+        alert('لم يتم ضبط رقم واتساب المتجر من المدير الرئيسي بعد.');
+        return;
+      }
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+    function testWhatsAppContact() {
+      if (!whatsappSettings || whatsappSettings.enabled === false) {
+        alert('فعّل زر واتساب أولاً.');
+        return;
+      }
+      const url = buildWhatsAppUrl();
+      if (!url) {
+        alert('أدخل رقم واتساب أولاً.');
+        return;
+      }
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
     async function refreshOnLoginData() {
       startCoreRealtimeListeners();
+      await loadWhatsAppSettings();
+      startWhatsAppSettingsRealtime();
 
       // الإشعارات للمستخدم الحالي فقط، بدلاً من تحميل مجموعة notifications كاملة.
       if (loggedCustomer || loggedDelegate) {
@@ -2373,6 +2709,8 @@
     let invoices = JSON.parse(localStorage.getItem('mustaqbal_invoices')) || [];
     let notifications = [];
     let notificationFilter = 'all';
+    let whatsappSettings = JSON.parse(localStorage.getItem('mustaqbal_whatsapp_settings') || '{"number":"","message":"","enabled":true}');
+    let whatsappSettingsUnsubscribe = null;
     let activeCategory = 'all';
 
     // ترتيب كل تبويب محفوظ بشكل مستقل:
@@ -2450,6 +2788,9 @@
       renderAdminAccountsList();
       renderDelegateClientsList();
       monitorActiveSession();
+      await loadWhatsAppSettings();
+      if (loggedCustomer || loggedDelegate) startWhatsAppSettingsRealtime();
+      updateWhatsAppNavUI();
       updateNotificationsBadge();
     });
 
@@ -2487,6 +2828,7 @@
       const navInvoicesBtn = document.getElementById('nav-invoices-btn');
       const navDelegatesClientsBtn = document.getElementById('nav-delegates-clients-btn');
       const navNotificationsBtn = document.getElementById('nav-notifications-btn');
+      const navWhatsAppBtn = document.getElementById('nav-whatsapp-btn');
       const openCartBtn = document.getElementById('open-cart-btn');
 
       const isLogged = isAdmin || loggedAdmin || loggedCustomer || loggedDelegate;
@@ -2508,6 +2850,7 @@
           if (navInvoicesBtn) navInvoicesBtn.classList.add('hidden');
           if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
           if (navNotificationsBtn) navNotificationsBtn.classList.add('hidden');
+          if (navWhatsAppBtn) navWhatsAppBtn.classList.add('hidden');
         } else if (loggedDelegate) {
           if (displaySpan) displaySpan.innerText = `مندوب: ${loggedDelegate.fullname || loggedDelegate.username}`;
           if (adminPanel) adminPanel.classList.add('hidden');
@@ -2517,7 +2860,9 @@
           if (navInvoicesBtn) navInvoicesBtn.classList.remove('hidden');
           if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.remove('hidden');
           if (navNotificationsBtn) navNotificationsBtn.classList.remove('hidden');
+          if (navWhatsAppBtn) navWhatsAppBtn.classList.remove('hidden');
           applyAdminPermissionsUI();
+          updateWhatsAppNavUI();
           updateNotificationsBadge();
         } else {
           if (displaySpan && loggedCustomer) displaySpan.innerText = `${loggedCustomer.fullname || loggedCustomer.username}`;
@@ -2528,6 +2873,8 @@
           if (navInvoicesBtn) navInvoicesBtn.classList.remove('hidden');
           if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
           if (navNotificationsBtn) navNotificationsBtn.classList.remove('hidden');
+          if (navWhatsAppBtn) navWhatsAppBtn.classList.remove('hidden');
+          updateWhatsAppNavUI();
           updateNotificationsBadge();
         }
       } else {
@@ -2544,6 +2891,7 @@
         if (navInvoicesBtn) navInvoicesBtn.classList.add('hidden');
         if (navDelegatesClientsBtn) navDelegatesClientsBtn.classList.add('hidden');
         if (navNotificationsBtn) navNotificationsBtn.classList.add('hidden');
+        if (navWhatsAppBtn) navWhatsAppBtn.classList.add('hidden');
         if (openCartBtn) openCartBtn.classList.add('hidden');
       }
 
@@ -3007,6 +3355,8 @@
       const delCard = document.querySelector('[onclick="openAdminDelegatesModal()"]');
       const invCard = document.querySelector('[onclick="openInvoicesModal()"]');
       const notifCard = document.querySelector('[onclick="openAdminNotificationsModal()"]');
+      const whatsappCard = document.getElementById('admin-whatsapp-card');
+      if (whatsappCard) whatsappCard.classList.toggle('hidden', !isAdmin);
       if (custCard) custCard.classList.toggle('hidden', !hasAdminPermission('createCustomers'));
       if (delCard) delCard.classList.toggle('hidden', !hasAdminPermission('createDelegates'));
       if (invCard) invCard.classList.toggle('hidden', !hasAdminPermission('deleteInvoices'));
@@ -3041,6 +3391,10 @@
         activeSessionUnsubscribe = null;
       }
       stopRealtimeListeners();
+      if (whatsappSettingsUnsubscribe) {
+        try { whatsappSettingsUnsubscribe(); } catch (_) {}
+        whatsappSettingsUnsubscribe = null;
+      }
 
       try {
         if (loggedCustomer) {
