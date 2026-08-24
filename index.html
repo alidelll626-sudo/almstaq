@@ -3486,7 +3486,6 @@
       }
 
       const saveBtn = document.getElementById('save-admin-account-btn');
-      const originalText = saveBtn.innerText;
       saveBtn.disabled = true;
       saveBtn.innerText = editFlag ? 'جارٍ تحديث الحساب...' : 'جارٍ إنشاء الحساب...';
 
@@ -3548,17 +3547,30 @@
         await batch.commit();
 
         // مزامنة Firebase Authentication.
+        // مهم: عند تعديل الاسم أو الصلاحيات فقط لا نحاول إنشاء حساب Auth جديد.
+        // النسخة السابقة كانت تحاول ترحيل الحساب في كل تعديل عندما تكون authUid
+        // غير موجودة في Firestore، حتى لو كان الحساب موجوداً فعلياً في Authentication،
+        // فتفشل العملية برسالة مزامنة رغم نجاح حفظ التعديل.
         try {
-          if (old && old.authUid && (usernameChanged || passwordChanged)) {
+          if (!old) {
+            // إنشاء حساب جديد: أنشئ حساب Authentication مرة واحدة فقط.
+            const uid = await migrateLegacyAccountToAuth(username, password, 'admin', account);
+            account.authUid = uid;
+            account.authEmail = legacyAuthEmail(username, 'admin');
+
+          } else if (usernameChanged || passwordChanged) {
+            // تعديل بيانات الدخول: حاول أولاً مزامنة الحساب الموجود فعلياً.
             const synced = await syncLegacyAuthCredentials(
               old.username, old.password, username, password, 'admin'
             );
             account.authUid = synced.uid;
             account.authEmail = synced.email;
-          } else if (!account.authUid) {
-            const uid = await migrateLegacyAccountToAuth(username, password, 'admin', account);
-            account.authUid = uid;
-            account.authEmail = legacyAuthEmail(username, 'admin');
+
+          } else {
+            // لا يوجد تغيير في اسم المستخدم أو كلمة المرور، لذلك لا نلمس
+            // Firebase Authentication إطلاقاً.
+            account.authUid = old.authUid || account.authUid || null;
+            account.authEmail = old.authEmail || account.authEmail || null;
           }
 
           if (account.authUid || account.authEmail) {
@@ -3568,12 +3580,18 @@
             }, { merge: true });
           }
         } catch (authSyncErr) {
-          console.error('تم حفظ الحساب لكن فشلت مزامنة Firebase Authentication:', authSyncErr);
-          // لا نعتبر Firestore فاشلاً إذا نجح الحفظ.
-          await loadAdminAccountsFromFirestore();
-          resetAdminAccountForm();
-          alert('تم حفظ بيانات المدير في Firestore، لكن تعذر مزامنة تسجيل الدخول. راجع Firebase Authentication.');
-          return;
+          console.error('فشلت مزامنة Firebase Authentication:', authSyncErr);
+
+          // إذا كان التعديل يتضمن بيانات الدخول فلا نعرض نجاحاً مضللاً.
+          // نعيد رسالة آمنة بدون تفاصيل Firebase الحساسة.
+          if (old && (usernameChanged || passwordChanged)) {
+            throw new Error('تعذر تحديث بيانات تسجيل الدخول لهذا المدير. لم يتم اعتماد تعديل اسم المستخدم أو كلمة المرور.');
+          }
+
+          // أما إنشاء الحساب الجديد فيجب أن يفشل بوضوح لأن تسجيل الدخول لن يكون مكتملاً.
+          if (!old) {
+            throw new Error('تعذر إنشاء حساب تسجيل الدخول للمدير حالياً.');
+          }
         }
 
         // أعد التحميل من Firestore بعد كل إنشاء/تعديل لضمان أن القائمة تعرض
