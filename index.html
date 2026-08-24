@@ -4,7 +4,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- BUILD: whatsapp-link-pdf-fixed-v8-natural-row-pagination-20260825 -->
+  <!-- BUILD: whatsapp-link-pdf-fixed-v9-invoice-front-invoices-list-stays-open-20260825 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>متجر المستقبل للجملة</title>
@@ -572,6 +572,21 @@
     .modal.hidden {
       display: none;
       opacity: 0;
+    }
+
+    /* نافذة الفاتورة يجب أن تظهر دائماً أمام أي نافذة أخرى، ومنها قائمة الفواتير */
+    #receipt-modal {
+      z-index: 3000 !important;
+      align-items: center;
+    }
+
+    #receipt-modal .modal-content {
+      max-width: 720px;
+      width: calc(100% - 20px);
+      max-height: 92vh;
+      border-radius: var(--radius-lg);
+      position: relative;
+      z-index: 3001;
     }
 
     .modal-content {
@@ -4973,7 +4988,12 @@
 
     function updateCartUI() {
       let currentCart = getCurrentCart();
-      const totalItems = currentCart.reduce((acc, item) => acc + (item.qty || 0), 0);
+
+      // عداد السلة يعرض عدد الأصناف/المنتجات المختلفة في السلة،
+      // وليس مجموع الكميات.
+      // مثال: منتج A × 5 + منتج B × 3 = العداد 2.
+      const totalItems = currentCart.length;
+
       const cartCountElem = document.getElementById('cart-count');
       if (cartCountElem) cartCountElem.innerText = totalItems;
     }
@@ -5492,7 +5512,16 @@
       }
     }
 
-    function closeReceiptModal() { document.getElementById('receipt-modal').classList.add('hidden'); }
+    function closeReceiptModal() {
+      const modal = document.getElementById('receipt-modal');
+      if (modal) modal.classList.add('hidden');
+
+      // إذا كانت قائمة الفواتير مفتوحة قبل عرض الفاتورة، تبقى مفتوحة.
+      const invoicesModal = document.getElementById('invoices-modal');
+      if (invoicesModal && !invoicesModal.classList.contains('hidden')) {
+        invoicesModal.style.zIndex = '1000';
+      }
+    }
 
     // اسم المدير المستخدم لحفظ حالة فتح الفواتير بشكل مستقل لكل مدير.
     function getCurrentAdminReadKey() {
@@ -5639,7 +5668,9 @@
       }
 
       await markInvoiceAsReadByCurrentAdmin(invoiceId);
-      closeInvoicesModal();
+
+      // لا نغلق قائمة الفواتير.
+      // تبقى قائمة الفواتير خلف الفاتورة، وعند إغلاق الفاتورة تعود القائمة للواجهة مباشرة.
       renderReceiptHTML(inv);
 
       const modal = document.getElementById('receipt-modal');
