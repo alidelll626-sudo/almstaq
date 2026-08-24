@@ -1756,6 +1756,7 @@
     // sessionToken محفوظ في Firestore وليس localStorage، لذلك يبقى
     // القفل موحداً حتى لو تم فتح الحساب من موقع آخر أو تطبيق آخر.
     // المدير الرئيسي (admin) مستثنى من هذا النظام ويمكنه فتح عدة جلسات.
+    // المدير الفرعي والمندوب والزبون: جلسة واحدة فقط، ولا يُسمح بجلسة جديدة حتى يتم تسجيل الخروج صراحةً.
     // ============================================================
     function createExclusiveSessionToken(prefix) {
       return String(prefix || 'sess') + '_' + Math.random().toString(36).slice(2) + '_' + Date.now() + '_' + Math.random().toString(36).slice(2);
@@ -2588,13 +2589,12 @@
           sessionData = Object.assign({}, adminDoc.data() || {}, {authUid:firebaseUser.uid, authEmail:firebaseUser.email || legacyAuthEmail(u,'admin'), deviceId});
           if (String(u).toLowerCase() !== 'admin') {
             adminSessionToken=createExclusiveSessionToken('adm');
-            // قفل الجلسة محاولة إضافية فقط: لا نمنع تسجيل الدخول إذا كانت قواعد Firestore
-            // لا تسمح بتحديث حقول الجلسة للحساب الثانوي.
-            try {
-              const acquiredAdminSession = await acquireExclusiveSession('adminAccounts', u, adminSessionToken);
-              if (!acquiredAdminSession) console.warn('تعذر تأكيد قفل جلسة المدير الفرعي، سيتم المتابعة بتسجيل الدخول.');
-            } catch (sessionErr) {
-              console.warn('تعذر حفظ قفل جلسة المدير الفرعي بسبب الصلاحيات أو الاتصال:', sessionErr);
+            // المدير الفرعي: قفل صارم لجلسة واحدة فقط في جميع المواقع والتطبيقات.
+            const acquiredAdminSession = await acquireExclusiveSession('adminAccounts', u, adminSessionToken);
+            if (!acquiredAdminSession) {
+              await auth.signOut();
+              alert('هذا الحساب مفتوح حالياً في موقع أو تطبيق آخر. يجب تسجيل الخروج من الجلسة الحالية أولاً قبل تسجيل الدخول هنا.');
+              return;
             }
             sessionData.sessionToken=adminSessionToken;
           } else {
@@ -2610,12 +2610,12 @@
           if (!delDoc.exists) { await auth.signOut(); alert('تعذر العثور على حساب المندوب.'); return; }
           sessionData=Object.assign({},delDoc.data()||{},{authUid:firebaseUser.uid,authEmail:firebaseUser.email || legacyAuthEmail(u,'delegate'),deviceId});
           const delegateSessionToken = createExclusiveSessionToken('del');
-          // لا نجعل قفل الجلسة سبباً لفشل تسجيل الدخول إذا منعت القواعد تحديثه.
-          try {
-            const acquiredDelegateSession = await acquireExclusiveSession('delegates', u, delegateSessionToken);
-            if (!acquiredDelegateSession) console.warn('تعذر تأكيد قفل جلسة المندوب، سيتم المتابعة بتسجيل الدخول.');
-          } catch (sessionErr) {
-            console.warn('تعذر حفظ قفل جلسة المندوب بسبب الصلاحيات أو الاتصال:', sessionErr);
+          // المندوب: قفل صارم لجلسة واحدة فقط في جميع المواقع والتطبيقات.
+          const acquiredDelegateSession = await acquireExclusiveSession('delegates', u, delegateSessionToken);
+          if (!acquiredDelegateSession) {
+            await auth.signOut();
+            alert('هذا الحساب مفتوح حالياً في موقع أو تطبيق آخر. يجب تسجيل الخروج من الجلسة الحالية أولاً قبل تسجيل الدخول هنا.');
+            return;
           }
           sessionData.sessionToken = delegateSessionToken;
           loggedDelegate=sessionData; loggedCustomer=null; isAdmin=false;
@@ -2626,12 +2626,12 @@
           if (!custDoc.exists) { await auth.signOut(); alert('تعذر العثور على حساب الزبون.'); return; }
           sessionData=Object.assign({},custDoc.data()||{},{authUid:firebaseUser.uid,authEmail:firebaseUser.email || legacyAuthEmail(u,'customer'),deviceId});
           const customerSessionToken = createExclusiveSessionToken('cus');
-          // لا نجعل قفل الجلسة سبباً لفشل تسجيل الدخول إذا منعت القواعد تحديثه.
-          try {
-            const acquiredCustomerSession = await acquireExclusiveSession('customers', u, customerSessionToken);
-            if (!acquiredCustomerSession) console.warn('تعذر تأكيد قفل جلسة الزبون، سيتم المتابعة بتسجيل الدخول.');
-          } catch (sessionErr) {
-            console.warn('تعذر حفظ قفل جلسة الزبون بسبب الصلاحيات أو الاتصال:', sessionErr);
+          // الزبون: قفل صارم لجلسة واحدة فقط في جميع المواقع والتطبيقات.
+          const acquiredCustomerSession = await acquireExclusiveSession('customers', u, customerSessionToken);
+          if (!acquiredCustomerSession) {
+            await auth.signOut();
+            alert('هذا الحساب مفتوح حالياً في موقع أو تطبيق آخر. يجب تسجيل الخروج من الجلسة الحالية أولاً قبل تسجيل الدخول هنا.');
+            return;
           }
           sessionData.sessionToken = customerSessionToken;
           loggedCustomer=sessionData; loggedDelegate=null; isAdmin=false;
