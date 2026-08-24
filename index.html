@@ -1387,6 +1387,224 @@
     const auth = firebase.auth();
 
     // ============================================================
+    // هوية Firebase للحسابات القديمة (نفس اسم المستخدم وكلمة المرور)
+    // ============================================================
+    function legacyAuthEmail(username, role) {
+      const raw = String(role || 'user') + ':' + String(username || '');
+      let h1 = 2166136261 >>> 0;
+      let h2 = 2246822519 >>> 0;
+      for (let i = 0; i < raw.length; i++) {
+        const c = raw.charCodeAt(i);
+        h1 ^= c; h1 = Math.imul(h1, 16777619) >>> 0;
+        h2 ^= c + i; h2 = Math.imul(h2, 2246822519) >>> 0;
+      }
+      const key = h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+      return 'legacy.' + String(role || 'user') + '.' + key + '@al-mustaqbal-stor.firebaseapp.com';
+    }
+
+    async function legacyAuthPassword(password) {
+      const data = new TextEncoder().encode('al-mustaqbal-auth-v1:' + String(password || ''));
+      const hash = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    let legacyMigrationRunning = false;
+
+    async function migrateLegacyAccountToAuth(username, password, role, sourceData) {
+      const email = legacyAuthEmail(username, role);
+      const authPassword = await legacyAuthPassword(password);
+      const secondaryName = 'legacyAuth_' + role + '_' + String(username).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
+      let secondaryApp;
+      try { secondaryApp = firebase.app(secondaryName); }
+      catch (_) { secondaryApp = firebase.initializeApp(firebaseConfig, secondaryName); }
+      const secondaryAuth = secondaryApp.auth();
+      try {
+        let credential;
+        try { credential = await secondaryAuth.signInWithEmailAndPassword(email, authPassword); }
+        catch (e) {
+          if (e && (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential')) credential = await secondaryAuth.createUserWithEmailAndPassword(email, authPassword);
+          else throw e;
+        }
+        const uid = credential.user.uid;
+        const profile = {
+          username: String(username), role: String(role), active: true,
+          fullname: String((sourceData && (sourceData.fullname || sourceData.name)) || username),
+          permissions: (sourceData && sourceData.permissions && typeof sourceData.permissions === 'object') ? sourceData.permissions : {},
+          authEmail: email, authUid: uid, migratedAt: Date.now()
+        };
+        await db.collection('userProfiles').doc(uid).set(profile, {merge:true});
+        const col = role === 'customer' ? 'customers' : role === 'delegate' ? 'delegates' : 'adminAccounts';
+        await db.collection(col).doc(String(username)).set({authUid: uid, authEmail: email}, {merge:true});
+        return uid;
+      } finally {
+        try { await secondaryAuth.signOut(); } catch (_) {}
+        try { await secondaryApp.delete(); } catch (_) {}
+      }
+    }
+
+    async function syncLegacyAuthPassword(username, oldPassword, newPassword, role) {
+      const email = legacyAuthEmail(username, role);
+      const oldAuthPassword = await legacyAuthPassword(oldPassword);
+      const newAuthPassword = await legacyAuthPassword(newPassword);
+      const secondaryName = 'legacyPwd_' + role + '_' + String(username).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
+      let secondaryApp;
+      try { secondaryApp = firebase.app(secondaryName); }
+      catch (_) { secondaryApp = firebase.initializeApp(firebaseConfig, secondaryName); }
+      const secondaryAuth = secondaryApp.auth();
+      try {
+        const credential = await secondaryAuth.signInWithEmailAndPassword(email, oldAuthPassword);
+        await credential.user.updatePassword(newAuthPassword);
+      } finally {
+        try { await secondaryAuth.signOut(); } catch (_) {}
+        try { await secondaryApp.delete(); } catch (_) {}
+      }
+    }
+
+    async function migrateAllLegacyAccountsToAuth() {
+      if (legacyMigrationRunning) return;
+
+      // الترحيل مسموح فقط للمدير الرئيسي
+      if (!isAdmin || !loggedAdmin || String(loggedAdmin.username) !== 'admin') {
+        console.warn('لم يتم تشغيل ترحيل الحسابات: المدير الرئيسي غير مسجل.');
+        return;
+      }
+
+      if (!auth.currentUser) {
+        console.warn('لم يتم تشغيل الترحيل: لا توجد جلسة Firebase Authentication.');
+        return;
+      }
+
+      legacyMigrationRunning = true;
+
+      try {
+        console.log('بدء ترحيل الحسابات القديمة إلى Firebase Authentication...');
+
+        const [custSnap, delSnap, adminSnap] = await Promise.all([
+          db.collection('customers').get(),
+          db.collection('delegates').get(),
+          db.collection('adminAccounts').get()
+        ]);
+
+        const jobs = [];
+
+        // العملاء
+        custSnap.forEach(doc => {
+          const d = doc.data() || {};
+          const username = String(d.username || doc.id || '').trim();
+          const password = String(d.password || '');
+
+          // تجاهل المستندات التالفة مثل undefined
+          if (
+            username &&
+            username !== 'undefined' &&
+            username !== 'null' &&
+            password &&
+            !d.authUid
+          ) {
+            jobs.push({
+              role: 'customer',
+              username: username,
+              password: password,
+              data: d
+            });
+          }
+        });
+
+        // المندوبون
+        delSnap.forEach(doc => {
+          const d = doc.data() || {};
+          const username = String(d.username || doc.id || '').trim();
+          const password = String(d.password || '');
+
+          if (
+            username &&
+            username !== 'undefined' &&
+            username !== 'null' &&
+            password &&
+            !d.authUid
+          ) {
+            jobs.push({
+              role: 'delegate',
+              username: username,
+              password: password,
+              data: d
+            });
+          }
+        });
+
+        // المدراء الفرعيون فقط
+        adminSnap.forEach(doc => {
+          const d = doc.data() || {};
+          const username = String(d.username || doc.id || '').trim();
+          const password = String(d.password || '');
+
+          if (
+            doc.id !== 'admin' &&
+            username &&
+            username !== 'undefined' &&
+            username !== 'null' &&
+            password &&
+            !d.authUid
+          ) {
+            jobs.push({
+              role: 'admin',
+              username: username,
+              password: password,
+              data: d
+            });
+          }
+        });
+
+        console.log('عدد الحسابات المطلوب ترحيلها:', jobs.length);
+
+        let successCount = 0;
+        let failedCount = 0;
+
+        // ترحيل الحسابات واحداً تلو الآخر
+        for (const job of jobs) {
+          try {
+            console.log('جارٍ ترحيل:', job.role, job.username);
+
+            const uid = await migrateLegacyAccountToAuth(
+              job.username,
+              job.password,
+              job.role,
+              job.data
+            );
+
+            console.log('تم ترحيل الحساب بنجاح:', job.username, 'UID:', uid);
+            successCount++;
+          } catch (error) {
+            failedCount++;
+            console.error('فشل ترحيل الحساب:', job.role, job.username, error);
+          }
+        }
+
+        console.log(
+          'انتهى الترحيل.',
+          'نجح:',
+          successCount,
+          'فشل:',
+          failedCount
+        );
+
+        if (successCount > 0) {
+          alert(
+            'تمت مزامنة ' +
+            successCount +
+            ' حساب/حسابات مع Firebase Authentication بنجاح.'
+          );
+        }
+
+      } catch (error) {
+        console.error('تعذر تنفيذ ترحيل الحسابات القديمة:', error);
+
+      } finally {
+        legacyMigrationRunning = false;
+      }
+    }
+
+    // ============================================================
     // Firebase Cloud Messaging (Web Push)
     // ------------------------------------------------------------
     // مفتاح Web Push / VAPID العام الذي تم إنشاؤه من Firebase Console.
@@ -2175,6 +2393,13 @@
           localStorage.setItem('isAdmin', 'true');
           finishLoginProcess();
           startAdminSessionMonitor();
+          setTimeout(async () => {
+            try {
+              await migrateAllLegacyAccountsToAuth();
+            } catch (error) {
+              console.error('خطأ أثناء الترحيل التلقائي:', error);
+            }
+          }, 1500);
           return;
         } catch (authErr) {
           console.error('Firebase Authentication login error:', authErr);
@@ -2190,6 +2415,76 @@
 
       if (u === 'admin') {
         alert('المدير الرئيسي يسجل الدخول الآن بالبريد الإلكتروني المسجل في Firebase Authentication.');
+        return;
+      }
+
+      // الحسابات القديمة: نفس اسم المستخدم وكلمة المرور، لكن المصادقة تتم الآن عبر Firebase Authentication.
+      // لا نقرأ customers/delegates/adminAccounts قبل تسجيل الدخول، حتى تبقى قواعد Firestore آمنة.
+      try {
+        const roleCandidates = ['admin', 'delegate', 'customer'];
+        let signedInRole = null;
+        let firebaseUser = null;
+        let profileData = null;
+
+        for (const role of roleCandidates) {
+          try {
+            const email = legacyAuthEmail(u, role);
+            const authPassword = await legacyAuthPassword(p);
+            const credential = await auth.signInWithEmailAndPassword(email, authPassword);
+            firebaseUser = credential.user;
+            const profileSnap = await db.collection('userProfiles').doc(firebaseUser.uid).get();
+            if (!profileSnap.exists) { await auth.signOut(); continue; }
+            profileData = profileSnap.data() || {};
+            if (profileData.active !== true || String(profileData.username || '') !== String(u)) { await auth.signOut(); continue; }
+            signedInRole = String(profileData.role || '');
+            if (!roleCandidates.includes(signedInRole)) { await auth.signOut(); signedInRole=null; continue; }
+            break;
+          } catch (e) {
+            try { await auth.signOut(); } catch (_) {}
+          }
+        }
+
+        if (!firebaseUser || !profileData || !signedInRole) {
+          alert('اسم المستخدم أو كلمة المرور غير صحيحة، أو أن الحساب لم تتم مزامنته بعد.');
+          return;
+        }
+
+        let sessionData;
+        if (signedInRole === 'admin') {
+          const adminDoc = await db.collection('adminAccounts').doc(u).get();
+          if (!adminDoc.exists) { await auth.signOut(); alert('تعذر العثور على حساب المدير.'); return; }
+          sessionData = Object.assign({}, adminDoc.data() || {}, {authUid:firebaseUser.uid, authEmail:firebaseUser.email || legacyAuthEmail(u,'admin'), deviceId});
+          if (sessionData.deviceId && sessionData.deviceId !== deviceId) { await auth.signOut(); alert('هذا الحساب مفتوح حالياً في جهاز أو متصفح آخر! يرجى تسجيل الخروج منه أولاً.'); return; }
+          adminSessionToken='adm_'+Math.random().toString(36).slice(2)+Date.now();
+          sessionData.sessionToken=adminSessionToken;
+          await db.collection('adminAccounts').doc(u).set({deviceId,sessionToken:adminSessionToken},{merge:true});
+          loggedAdmin=normalizeAdminAccount(sessionData); isAdmin=false; loggedCustomer=null; loggedDelegate=null;
+          localStorage.setItem('loggedAdmin',JSON.stringify(loggedAdmin)); localStorage.setItem('mustaqbal_admin_session_token',adminSessionToken); localStorage.removeItem('loggedCustomer'); localStorage.removeItem('loggedDelegate'); localStorage.setItem('isAdmin','false');
+          finishLoginProcess(); startAdminSessionMonitor();
+        } else if (signedInRole === 'delegate') {
+          const delDoc = await db.collection('delegates').doc(u).get();
+          if (!delDoc.exists) { await auth.signOut(); alert('تعذر العثور على حساب المندوب.'); return; }
+          sessionData=Object.assign({},delDoc.data()||{},{authUid:firebaseUser.uid,authEmail:firebaseUser.email || legacyAuthEmail(u,'delegate'),deviceId});
+          if (sessionData.deviceId && sessionData.deviceId !== deviceId) { await auth.signOut(); alert('هذا الحساب مفتوح حالياً في جهاز أو متصفح آخر! يرجى تسجيل الخروج منه أولاً.'); return; }
+          await db.collection('delegates').doc(u).set({deviceId},{merge:true});
+          loggedDelegate=sessionData; loggedCustomer=null; isAdmin=false;
+          localStorage.setItem('loggedDelegate',JSON.stringify(loggedDelegate)); localStorage.removeItem('loggedCustomer'); localStorage.setItem('isAdmin','false');
+          finishLoginProcess(); startDelegateForceLogoutMonitor();
+        } else if (signedInRole === 'customer') {
+          const custDoc = await db.collection('customers').doc(u).get();
+          if (!custDoc.exists) { await auth.signOut(); alert('تعذر العثور على حساب الزبون.'); return; }
+          sessionData=Object.assign({},custDoc.data()||{},{authUid:firebaseUser.uid,authEmail:firebaseUser.email || legacyAuthEmail(u,'customer'),deviceId});
+          if (sessionData.deviceId && sessionData.deviceId !== deviceId) { await auth.signOut(); alert('هذا الحساب مفتوح حالياً في جهاز أو متصفح آخر! يرجى تسجيل الخروج منه أولاً.'); return; }
+          await db.collection('customers').doc(u).set({deviceId},{merge:true});
+          loggedCustomer=sessionData; loggedDelegate=null; isAdmin=false;
+          localStorage.setItem('loggedCustomer',JSON.stringify(loggedCustomer)); localStorage.removeItem('loggedDelegate'); localStorage.setItem('isAdmin','false');
+          finishLoginProcess();
+        }
+        return;
+      } catch (authLegacyErr) {
+        console.error('Firebase Authentication login error for legacy account:', authLegacyErr);
+        try { await auth.signOut(); } catch (_) {}
+        alert('تعذر تسجيل الدخول. تحقق من اسم المستخدم وكلمة المرور ثم حاول مرة أخرى.');
         return;
       }
 
@@ -3021,6 +3316,15 @@
       try {
         if (editFlag && editFlag !== username) await db.collection('adminAccounts').doc(editFlag).delete();
         await db.collection('adminAccounts').doc(username).set(account, { merge: true });
+        try {
+          if (old && old.authUid && passwordChanged && !usernameChanged) {
+            await syncLegacyAuthPassword(username, old.password, password, 'admin');
+          } else if (!account.authUid) {
+            await migrateLegacyAccountToAuth(username, password, 'admin', account);
+          }
+        } catch (authSyncErr) {
+          console.warn('تعذر مزامنة حساب المدير مع Firebase Authentication:', authSyncErr);
+        }
 
         // نحدّث القائمة محلياً فور نجاح الحفظ، حتى يظهر الحساب مباشرةً
         // ولا تعتمد الواجهة على تأخر onSnapshot أو إعادة القراءة.
@@ -3116,6 +3420,14 @@
 
       try {
         await db.collection('delegates').doc(String(username)).set(delData, { merge: true });
+        try {
+          const previousDelegate = (typeof oldDel !== 'undefined') ? oldDel : null;
+          if (previousDelegate && previousDelegate.authUid && previousDelegate.password && previousDelegate.password !== password && editFlag === username) {
+            await syncLegacyAuthPassword(username, previousDelegate.password, password, 'delegate');
+          } else if (!delData.authUid) {
+            await migrateLegacyAccountToAuth(username, password, 'delegate', delData);
+          }
+        } catch (authSyncErr) { console.warn('تعذر مزامنة حساب المندوب مع Firebase Authentication:', authSyncErr); }
         alert(wasEditingDelegate
           ? 'تم تعديل حساب المندوب وسيتم تسجيل خروجه فوراً من جهازه.'
           : 'تم حفظ حساب المندوب بنجاح.');
@@ -3381,6 +3693,14 @@
 
       try {
         await db.collection('customers').doc(String(username)).set(custData, { merge: true });
+        try {
+          const previousCustomer = (typeof oldCust !== 'undefined') ? oldCust : null;
+          if (previousCustomer && previousCustomer.authUid && previousCustomer.password && previousCustomer.password !== password && editFlag === username) {
+            await syncLegacyAuthPassword(username, previousCustomer.password, password, 'customer');
+          } else if (!custData.authUid) {
+            await migrateLegacyAccountToAuth(username, password, 'customer', custData);
+          }
+        } catch (authSyncErr) { console.warn('تعذر مزامنة حساب الزبون مع Firebase Authentication:', authSyncErr); }
         alert('تم حفظ حساب الزبون بنجاح.');
       } catch(err) {}
     }
@@ -4001,8 +4321,18 @@
       const dd = String(now.getDate()).padStart(2, '0');
       const isoDateString = `${yyyy}-${mm}-${dd}`;
 
+      // الهوية الفعلية لحساب Firebase Authentication هي المرجع الأمني للفاتورة.
+      // لا نعتمد على localStorage أو اسم المستخدم وحده عند الحفظ.
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser || !firebaseUser.uid) {
+        alert('انتهت جلسة Firebase Authentication. سجّل الخروج ثم ادخل إلى الحساب مرة أخرى قبل إنشاء الفاتورة.');
+        return;
+      }
+
       const newInvoice = {
         id: 'INV-' + Date.now(),
+        ownerUid: firebaseUser.uid,
+        ownerRole: loggedCustomer ? 'customer' : 'delegate',
         date: now.toLocaleString('ar-IQ'),
         rawDate: isoDateString,
         createdAt: now.getTime(),
