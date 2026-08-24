@@ -3488,59 +3488,53 @@
       const password = document.getElementById('new-admin-password').value.trim();
       const fullname = document.getElementById('new-admin-fullname').value.trim();
       const editFlag = document.getElementById('edit-admin-username-flag').value.trim();
-      if (!username || !password || !fullname) return;
+      if (!username || !password || !fullname) return alert('أكمل جميع بيانات الحساب.');
       if (username === 'admin') return alert('لا يمكن استخدام اسم المستخدم admin لهذا الحساب.');
-      if (!editFlag && adminAccounts.some(a => a.username === username)) return alert('اسم المستخدم مستخدم مسبقاً.');
-      let old = editFlag ? adminAccounts.find(a => a.username === editFlag) : null;
+
+      const old = editFlag ? adminAccounts.find(a => String(a.username) === String(editFlag)) : null;
+      if (editFlag && !old) return alert('تعذر العثور على بيانات حساب المدير المراد تعديله. حدّث القائمة ثم حاول مرة أخرى.');
+      if (!editFlag && adminAccounts.some(a => String(a.username) === String(username))) return alert('اسم المستخدم مستخدم مسبقاً.');
+      if (editFlag && editFlag !== username && adminAccounts.some(a => String(a.username) === String(username))) return alert('اسم المستخدم الجديد مستخدم مسبقاً.');
+
       const usernameChanged = !!editFlag && editFlag !== username;
       const passwordChanged = !!old && old.password !== password;
-      // أي تعديل على حساب المدير الفرعي (الاسم، كلمة السر، الصلاحيات أو اسم المستخدم)
-      // يلغي جلسته الحالية فوراً. المدير الرئيسي admin مستثنى من هذا النظام.
-      const wasEditingAdmin = !!editFlag;
-      const forceLogoutAt = wasEditingAdmin ? Date.now() : 0;
+      const now = Date.now();
       const account = normalizeAdminAccount({
+        ...(old || {}),
         username, password, fullname,
-        permissions:getSelectedAdminPermissions(),
-        // عند تعديل حساب المدير الفرعي يتم إبطال الجلسة القديمة بالكامل،
-        // حتى لا يبقى قفل الجلسة مانعاً من تسجيل الدخول بالمعلومات الجديدة.
-        deviceId: wasEditingAdmin ? '' : (old ? old.deviceId : ''),
-        sessionToken: wasEditingAdmin ? '' : (old ? old.sessionToken : ''),
-        sessionDeviceId: wasEditingAdmin ? '' : (old ? old.sessionDeviceId : ''),
-        sessionStartedAt: wasEditingAdmin ? null : (old ? old.sessionStartedAt : null),
-        forceLogoutAt,
-        accountUpdatedAt: Date.now()
+        permissions: getSelectedAdminPermissions(),
+        deviceId: editFlag ? '' : ((old && old.deviceId) || ''),
+        sessionToken: editFlag ? '' : ((old && old.sessionToken) || ''),
+        sessionDeviceId: editFlag ? '' : ((old && old.sessionDeviceId) || ''),
+        sessionStartedAt: editFlag ? null : ((old && old.sessionStartedAt) || null),
+        forceLogoutAt: editFlag ? now : ((old && old.forceLogoutAt) || 0),
+        accountUpdatedAt: now
       });
-      try {
-        if (editFlag && editFlag !== username) await db.collection('adminAccounts').doc(editFlag).delete();
-        await db.collection('adminAccounts').doc(username).set(account, { merge: true });
-        try {
-          if (old && old.authUid && passwordChanged && !usernameChanged) {
-            await syncLegacyAuthPassword(username, old.password, password, 'admin');
-          } else if (!account.authUid) {
-            await migrateLegacyAccountToAuth(username, password, 'admin', account);
-          }
-        } catch (authSyncErr) {
-          console.warn('تعذر مزامنة حساب المدير مع Firebase Authentication:', authSyncErr);
-        }
+      delete account.__docId;
 
-        // نحدّث القائمة محلياً فور نجاح الحفظ، حتى يظهر الحساب مباشرةً
-        // ولا تعتمد الواجهة على تأخر onSnapshot أو إعادة القراءة.
-        adminAccounts = adminAccounts.filter(a => a.username !== editFlag && a.username !== username);
+      try {
+        const batch = db.batch();
+        const newRef = db.collection('adminAccounts').doc(String(username));
+        batch.set(newRef, account, { merge: true });
+        if (usernameChanged) batch.delete(db.collection('adminAccounts').doc(String(editFlag)));
+        await batch.commit();
+
+        try {
+          if (old && old.authUid && passwordChanged && !usernameChanged) await syncLegacyAuthPassword(username, old.password, password, 'admin');
+          else if (!account.authUid) await migrateLegacyAccountToAuth(username, password, 'admin', account);
+        } catch (authSyncErr) { console.warn('تعذر مزامنة حساب المدير مع Firebase Authentication:', authSyncErr); }
+
+        adminAccounts = adminAccounts.filter(a => String(a.username) !== String(editFlag) && String(a.username) !== String(username));
         adminAccounts.push(account);
-        adminAccounts.sort((a,b) => String(a.fullname).localeCompare(String(b.fullname), 'ar'));
+        adminAccounts.sort((a,b) => String(a.fullname || '').localeCompare(String(b.fullname || ''), 'ar'));
         localStorage.setItem('mustaqbal_admin_accounts', JSON.stringify(adminAccounts));
         renderAdminAccountsList();
-
-        // محاولة مزامنة نهائية من Firestore. إذا فشلت القراءة تبقى القائمة المحلية
-        // ظاهرة ولا تختفي الحسابات التي تم حفظها بنجاح.
-        await loadAdminAccountsFromFirestore();
         resetAdminAccountForm();
-        alert(wasEditingAdmin
-          ? 'تم تعديل حساب المدير الفرعي بنجاح، وسيتم تسجيل خروجه تلقائياً من جلسته الحالية. يجب عليه تسجيل الدخول مرة أخرى بالمعلومات الجديدة.'
-          : 'تم إنشاء حساب المدير وحفظ صلاحياته بنجاح.');
+        alert(editFlag ? 'تم تعديل حساب المدير الفرعي وحفظ التعديلات بنجاح.' : 'تم إنشاء حساب المدير وحفظه بنجاح.');
+        loadAdminAccountsFromFirestore().catch(err => console.warn('تعذر إعادة تحميل حسابات المدراء:', err));
       } catch(err) {
-        console.error(err);
-        alert('تعذر حفظ حساب المدير. تحقق من اتصال Firestore وقواعد الصلاحيات.');
+        console.error('خطأ أثناء حفظ حساب المدير:', err);
+        alert('تعذر حفظ حساب المدير: ' + (err && err.message ? err.message : 'تحقق من قواعد Firestore والاتصال.'));
       }
     }
     async function deleteAdminAccount(username) {
@@ -3571,72 +3565,57 @@
     }
 
     async function handleDelegateMgmtSubmit(e) {
-      if (!requireAdminPermission('createDelegates')) return;
       e.preventDefault();
+      if (!requireAdminPermission('createDelegates')) return;
       const username = document.getElementById('new-del-username').value.trim();
       const password = document.getElementById('new-del-password').value.trim();
       const fullname = document.getElementById('new-del-fullname').value.trim();
-      const editFlag = document.getElementById('edit-del-username-flag').value;
+      const editFlag = document.getElementById('edit-del-username-flag').value.trim();
+      if (!username || !password || !fullname) return alert('أكمل جميع بيانات حساب المندوب.');
 
-      if (!username) return;
-      
-      let existingClients = [];
-      let existingDeviceId = "";
-      if (editFlag) {
-        const oldDel = delegates.find(d => d.username === editFlag);
-        if (oldDel) {
-          if (oldDel.clients) existingClients = oldDel.clients;
-          if (oldDel.deviceId) existingDeviceId = oldDel.deviceId;
-        }
-        delegates = delegates.filter(d => d.username !== editFlag);
-        if (editFlag !== username) {
-          try { await db.collection('delegates').doc(String(editFlag)).delete(); } catch(err){}
-        }
-      }
-      
-      // إذا كان هذا تعديلًا لحساب مندوب موجود، نرسل أمر تسجيل خروج فوري
-      // للجهاز الذي ما زال مسجلاً على الحساب.
+      const oldDel = editFlag ? delegates.find(d => String(d.username) === String(editFlag)) : null;
+      if (editFlag && !oldDel) return alert('تعذر العثور على حساب المندوب المراد تعديله. حدّث القائمة ثم حاول مرة أخرى.');
+      if (!editFlag && delegates.some(d => String(d.username) === String(username))) return alert('اسم المستخدم مستخدم مسبقاً.');
+      if (editFlag && editFlag !== username && delegates.some(d => String(d.username) === String(username))) return alert('اسم المستخدم الجديد مستخدم مسبقاً.');
+
       const wasEditingDelegate = !!editFlag;
-      const editedDelegateUsername = username;
-      const forceLogoutAt = wasEditingDelegate ? Date.now() : 0;
-
+      const usernameChanged = wasEditingDelegate && editFlag !== username;
+      const passwordChanged = !!oldDel && oldDel.password !== password;
+      const now = Date.now();
       const delData = {
-        username,
-        password,
-        fullname,
-        clients: existingClients,
-        // تعديل الحساب يبطل الجلسة القديمة بالكامل، ويجبر المندوب
-        // على تسجيل الدخول من جديد بالمعلومات الجديدة.
-        deviceId: wasEditingDelegate ? '' : existingDeviceId,
-        sessionToken: wasEditingDelegate ? '' : (oldDel && oldDel.sessionToken ? oldDel.sessionToken : ''),
-        sessionDeviceId: wasEditingDelegate ? '' : (oldDel && oldDel.sessionDeviceId ? oldDel.sessionDeviceId : ''),
-        sessionStartedAt: wasEditingDelegate ? null : (oldDel && oldDel.sessionStartedAt ? oldDel.sessionStartedAt : null),
-        ...(wasEditingDelegate ? {
-          forceLogoutAt,
-          accountUpdatedAt: forceLogoutAt
-        } : {})
+        ...(oldDel || {}),
+        username, password, fullname,
+        clients: oldDel && Array.isArray(oldDel.clients) ? oldDel.clients : [],
+        deviceId: wasEditingDelegate ? '' : ((oldDel && oldDel.deviceId) || ''),
+        sessionToken: wasEditingDelegate ? '' : ((oldDel && oldDel.sessionToken) || ''),
+        sessionDeviceId: wasEditingDelegate ? '' : ((oldDel && oldDel.sessionDeviceId) || ''),
+        sessionStartedAt: wasEditingDelegate ? null : ((oldDel && oldDel.sessionStartedAt) || null),
+        forceLogoutAt: wasEditingDelegate ? now : ((oldDel && oldDel.forceLogoutAt) || 0),
+        accountUpdatedAt: now
       };
-
-      delegates.push(delData);
-      saveData();
-      renderAdminDelegatesList();
-      resetDelegateMgmtForm();
+      delete delData.__docId;
 
       try {
-        await db.collection('delegates').doc(String(username)).set(delData, { merge: true });
+        const batch = db.batch();
+        batch.set(db.collection('delegates').doc(String(username)), delData, { merge: true });
+        if (usernameChanged) batch.delete(db.collection('delegates').doc(String(editFlag)));
+        await batch.commit();
+
         try {
-          const previousDelegate = (typeof oldDel !== 'undefined') ? oldDel : null;
-          if (previousDelegate && previousDelegate.authUid && previousDelegate.password && previousDelegate.password !== password && editFlag === username) {
-            await syncLegacyAuthPassword(username, previousDelegate.password, password, 'delegate');
-          } else if (!delData.authUid) {
-            await migrateLegacyAccountToAuth(username, password, 'delegate', delData);
-          }
+          if (oldDel && oldDel.authUid && passwordChanged && !usernameChanged) await syncLegacyAuthPassword(username, oldDel.password, password, 'delegate');
+          else if (!delData.authUid) await migrateLegacyAccountToAuth(username, password, 'delegate', delData);
         } catch (authSyncErr) { console.warn('تعذر مزامنة حساب المندوب مع Firebase Authentication:', authSyncErr); }
-        alert(wasEditingDelegate
-          ? 'تم تعديل حساب المندوب وسيتم تسجيل خروجه فوراً من جهازه.'
-          : 'تم حفظ حساب المندوب بنجاح.');
+
+        delegates = delegates.filter(d => String(d.username) !== String(editFlag) && String(d.username) !== String(username));
+        delegates.push(delData);
+        saveData();
+        renderAdminDelegatesList();
+        resetDelegateMgmtForm();
+        alert(wasEditingDelegate ? 'تم تعديل حساب المندوب وحفظ جميع التعديلات بنجاح.' : 'تم حفظ حساب المندوب بنجاح.');
+        if (typeof loadDelegatesFromFirestore === 'function') loadDelegatesFromFirestore().catch(err => console.warn('تعذر إعادة تحميل المناديب:', err));
       } catch(err) {
         console.error('خطأ أثناء تحديث حساب المندوب:', err);
+        alert('تعذر حفظ تعديلات حساب المندوب: ' + (err && err.message ? err.message : 'تحقق من قواعد Firestore والاتصال.'));
       }
     }
 
