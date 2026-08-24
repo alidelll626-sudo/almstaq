@@ -3483,12 +3483,8 @@
       const account = normalizeAdminAccount({
         username, password, fullname,
         permissions:getSelectedAdminPermissions(),
-        // عند تعديل حساب المدير الفرعي يتم إبطال الجلسة القديمة بالكامل،
-        // حتى لا يبقى قفل الجلسة مانعاً من تسجيل الدخول بالمعلومات الجديدة.
-        deviceId: wasEditingAdmin ? '' : (old ? old.deviceId : ''),
-        sessionToken: wasEditingAdmin ? '' : (old ? old.sessionToken : ''),
-        sessionDeviceId: wasEditingAdmin ? '' : (old ? old.sessionDeviceId : ''),
-        sessionStartedAt: wasEditingAdmin ? null : (old ? old.sessionStartedAt : null),
+        deviceId: old ? old.deviceId : '',
+        sessionToken: old ? old.sessionToken : '',
         forceLogoutAt,
         accountUpdatedAt: Date.now()
       });
@@ -3587,12 +3583,7 @@
         password,
         fullname,
         clients: existingClients,
-        // تعديل الحساب يبطل الجلسة القديمة بالكامل، ويجبر المندوب
-        // على تسجيل الدخول من جديد بالمعلومات الجديدة.
-        deviceId: wasEditingDelegate ? '' : existingDeviceId,
-        sessionToken: wasEditingDelegate ? '' : (oldDel && oldDel.sessionToken ? oldDel.sessionToken : ''),
-        sessionDeviceId: wasEditingDelegate ? '' : (oldDel && oldDel.sessionDeviceId ? oldDel.sessionDeviceId : ''),
-        sessionStartedAt: wasEditingDelegate ? null : (oldDel && oldDel.sessionStartedAt ? oldDel.sessionStartedAt : null),
+        deviceId: existingDeviceId,
         ...(wasEditingDelegate ? {
           forceLogoutAt,
           accountUpdatedAt: forceLogoutAt
@@ -3880,12 +3871,7 @@
         password,
         fullname,
         discount,
-        // تعديل الحساب يبطل الجلسة القديمة بالكامل، ويجبر الزبون
-        // على تسجيل الدخول من جديد بالمعلومات الجديدة.
-        deviceId: wasEditingCustomer ? '' : existingDeviceId,
-        sessionToken: wasEditingCustomer ? '' : (oldCust && oldCust.sessionToken ? oldCust.sessionToken : ''),
-        sessionDeviceId: wasEditingCustomer ? '' : (oldCust && oldCust.sessionDeviceId ? oldCust.sessionDeviceId : ''),
-        sessionStartedAt: wasEditingCustomer ? null : (oldCust && oldCust.sessionStartedAt ? oldCust.sessionStartedAt : null),
+        deviceId: existingDeviceId,
         ...(wasEditingCustomer ? {
           forceLogoutAt: customerForceLogoutAt,
           accountUpdatedAt: customerForceLogoutAt
