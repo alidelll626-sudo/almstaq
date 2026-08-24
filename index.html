@@ -1468,10 +1468,30 @@
       const secondaryAuth = secondaryApp.auth();
       try {
         let credential;
-        try { credential = await secondaryAuth.signInWithEmailAndPassword(email, authPassword); }
-        catch (e) {
-          if (e && (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential')) credential = await secondaryAuth.createUserWithEmailAndPassword(email, authPassword);
-          else throw e;
+        try {
+          credential = await secondaryAuth.signInWithEmailAndPassword(email, authPassword);
+        } catch (e) {
+          if (e && (e.code === 'auth/user-not-found' || e.code === 'auth/invalid-credential')) {
+            try {
+              credential = await secondaryAuth.createUserWithEmailAndPassword(email, authPassword);
+            } catch (createErr) {
+              if (createErr && createErr.code === 'auth/email-already-in-use') {
+                // الحساب موجود مسبقاً في Firebase Authentication. نحاول إعادة استخدامه
+                // إذا كانت كلمة المرور الحالية هي نفسها، بدلاً من إظهار خطأ غير مفهوم.
+                try {
+                  credential = await secondaryAuth.signInWithEmailAndPassword(email, authPassword);
+                } catch (_) {
+                  const collision = new Error('اسم المستخدم هذا لديه حساب Firebase قديم بكلمة مرور مختلفة. لا يمكن من المتصفح استبدال كلمة مرور مستخدم آخر في Firebase Authentication. احذف الحساب القديم من Firebase Authentication أو استخدم اسم مستخدم جديد.');
+                  collision.code = 'auth/legacy-account-collision';
+                  throw collision;
+                }
+              } else {
+                throw createErr;
+              }
+            }
+          } else {
+            throw e;
+          }
         }
         const uid = credential.user.uid;
         const profile = {
@@ -3649,11 +3669,8 @@
       delete delData.__docId;
 
       try {
-        const batch = db.batch();
-        batch.set(db.collection('delegates').doc(String(username)), delData, { merge: true });
-        if (usernameChanged) batch.delete(db.collection('delegates').doc(String(editFlag)));
-        await batch.commit();
-
+        // أولاً نزامن Firebase Authentication، ثم نحفظ Firestore.
+        // بهذا لا تظهر بيانات حساب جديد في Firestore إذا فشل إنشاء/تحديث تسجيل الدخول.
         try {
           if (oldDel && oldDel.authUid && (passwordChanged || usernameChanged)) {
             const synced = await syncLegacyAuthCredentials(editFlag, oldDel.password, username, password, 'delegate');
@@ -3666,9 +3683,14 @@
           }
         } catch (authSyncErr) {
           console.error('تعذر مزامنة حساب المندوب مع Firebase Authentication:', authSyncErr);
-          alert('تم حفظ بيانات المندوب في Firestore لكن تعذر تحديث بيانات تسجيل الدخول في Firebase. لم يتم اعتماد رسالة نجاح كاملة. الخطأ: ' + (authSyncErr.message || authSyncErr.code || 'غير معروف'));
+          alert('تعذر إنشاء أو تحديث بيانات تسجيل دخول المندوب، لذلك لم يتم حفظ العملية نهائياً. السبب: ' + (authSyncErr.message || authSyncErr.code || 'غير معروف'));
           return;
         }
+
+        const batch = db.batch();
+        batch.set(db.collection('delegates').doc(String(username)), delData, { merge: true });
+        if (usernameChanged) batch.delete(db.collection('delegates').doc(String(editFlag)));
+        await batch.commit();
 
         await db.collection('delegates').doc(String(username)).set({ authUid: delData.authUid || null, authEmail: delData.authEmail || null }, { merge: true });
         delegates = delegates.filter(d => String(d.username) !== String(editFlag) && String(d.username) !== String(username));
