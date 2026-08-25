@@ -1120,6 +1120,104 @@
     .notification-openable:active { transform:scale(.99); }
     .notification-openable:focus { outline:3px solid rgba(59,130,246,.25); outline-offset:2px; }
 
+
+    /* ===== تقرير إحصائيات المنتجات والمخزون - تصميم عصري ===== */
+    .product-stats-receipt {
+      background: linear-gradient(180deg,#f8fbff 0%,#ffffff 38%,#f8fafc 100%);
+      border: 0 !important;
+      border-radius: 24px !important;
+      padding: 0 !important;
+      overflow: hidden;
+      box-shadow: 0 16px 40px rgba(15,23,42,.10);
+    }
+    .product-stats-hero {
+      padding: 22px 18px 18px;
+      color:#fff;
+      background: linear-gradient(135deg,#0284c7 0%,#0369a1 58%,#0f172a 140%);
+      position:relative;
+      overflow:hidden;
+    }
+    .product-stats-hero::after {
+      content:"";
+      position:absolute;
+      width:170px;height:170px;
+      left:-70px;top:-85px;
+      border-radius:50%;
+      background:rgba(255,255,255,.10);
+    }
+    .product-stats-brand { font-size:.72rem; font-weight:800; opacity:.88; }
+    .product-stats-title { font-size:1.22rem; font-weight:950; margin-top:5px; letter-spacing:-.4px; }
+    .product-stats-period { font-size:.72rem; margin-top:5px; opacity:.88; }
+    .product-stats-meta {
+      margin-top:15px;
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:7px;
+    }
+    .product-stats-summary-card {
+      background:rgba(255,255,255,.14);
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:14px;
+      padding:9px 7px;
+      text-align:center;
+      backdrop-filter:blur(8px);
+    }
+    .product-stats-summary-label { font-size:.58rem; opacity:.88; font-weight:800; }
+    .product-stats-summary-value { font-size:.92rem; font-weight:950; margin-top:3px; font-variant-numeric:tabular-nums; }
+    .product-stats-body { padding:14px; }
+    .product-stats-info {
+      display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;
+      padding:10px 12px; margin-bottom:11px;
+      background:#f8fafc; border:1px solid #e2e8f0; border-radius:15px;
+      font-size:.7rem; color:#475569; font-weight:750;
+    }
+    .product-stats-table-wrap { overflow-x:auto; border:1px solid #e2e8f0; border-radius:17px; }
+    .product-stats-table {
+      width:100%; min-width:650px; border-collapse:separate; border-spacing:0;
+      font-size:.74rem; background:#fff;
+    }
+    .product-stats-table th {
+      padding:11px 8px; text-align:center; color:#475569;
+      background:#f1f5f9; border-bottom:1px solid #e2e8f0; font-weight:900;
+      white-space:nowrap;
+    }
+    .product-stats-table th:first-child { border-top-right-radius:16px; }
+    .product-stats-table th:last-child { border-top-left-radius:16px; }
+    .product-stats-table td {
+      padding:11px 8px; text-align:center; border-bottom:1px solid #eef2f7;
+      vertical-align:middle; font-variant-numeric:tabular-nums;
+    }
+    .product-stats-table tr:last-child td { border-bottom:0; }
+    .product-stats-product { text-align:right !important; min-width:190px; }
+    .product-stats-product-name { font-weight:900; color:#0f172a; line-height:1.4; }
+    .product-stats-product-note { margin-top:4px; color:#b45309; font-size:.62rem; line-height:1.55; }
+    .stats-number { font-weight:950; font-size:.88rem; }
+    .stats-requested { color:#0369a1; }
+    .stats-stock { color:#166534; }
+    .stats-shortage { color:#b91c1c; }
+    .stats-shortage.ok { color:#166534; }
+    .stats-status {
+      display:inline-flex; align-items:center; justify-content:center;
+      padding:5px 8px; border-radius:999px; font-size:.61rem; font-weight:900; white-space:nowrap;
+    }
+    .stats-status.ready { background:#dcfce7; color:#166534; }
+    .stats-status.short { background:#fee2e2; color:#991b1b; }
+    .product-stats-footer {
+      margin-top:12px; display:flex; justify-content:space-between; align-items:center;
+      gap:10px; padding:12px 13px; border-radius:16px;
+      background:linear-gradient(135deg,#e0f2fe,#f0f9ff);
+      border:1px solid #bae6fd;
+    }
+    .product-stats-footer-label { font-size:.7rem; color:#475569; font-weight:850; }
+    .product-stats-footer-value { font-size:1rem; color:#0369a1; font-weight:950; }
+    @media (max-width:520px) {
+      .product-stats-meta { grid-template-columns:1fr 1fr 1fr; }
+      .product-stats-summary-card { padding:8px 4px; }
+      .product-stats-summary-label { font-size:.52rem; }
+      .product-stats-summary-value { font-size:.78rem; }
+      .product-stats-body { padding:10px; }
+    }
+
   </style>
 </head>
 <body>
@@ -1541,11 +1639,11 @@
       </div>
     </div>
 
-    <!-- نافذة إحصائيات المنتجات للمدير (فاتورة إجمالي الطلبات والملاحظات) -->
+    <!-- نافذة إحصائيات المنتجات للمدير (تقرير الطلبات والمخزون والتجهيز) -->
     <div id="product-stats-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
-          <h3>فاتورة إحصائيات المنتجات والملاحظات</h3>
+          <h3>تقرير إحصائيات المنتجات والمخزون</h3>
           <button class="close-modal" onclick="closeProductStatsModal()">✕</button>
         </div>
         <div class="modal-body">
@@ -6752,157 +6850,181 @@
       const area = document.getElementById('product-stats-receipt-area');
       if (!area) return;
 
-      const fromVal = document.getElementById('stats-date-from') ? document.getElementById('stats-date-from').value : '';
-      const toVal = document.getElementById('stats-date-to') ? document.getElementById('stats-date-to').value : '';
+      const fromVal = document.getElementById('stats-date-from')?.value || '';
+      const toVal = document.getElementById('stats-date-to')?.value || '';
 
-      let fromDate = null;
-      let toDate = null;
-
+      let fromDate = null, toDate = null;
       if (fromVal) {
         const fp = fromVal.split('-');
-        fromDate = new Date(
-          parseInt(fp[0], 10),
-          parseInt(fp[1], 10) - 1,
-          parseInt(fp[2], 10),
-          0, 0, 0, 0
-        );
+        fromDate = new Date(+fp[0], +fp[1] - 1, +fp[2], 0, 0, 0, 0);
       }
-
       if (toVal) {
         const tp = toVal.split('-');
-        toDate = new Date(
-          parseInt(tp[0], 10),
-          parseInt(tp[1], 10) - 1,
-          parseInt(tp[2], 10),
-          23, 59, 59, 999
-        );
+        toDate = new Date(+tp[0], +tp[1] - 1, +tp[2], 23, 59, 59, 999);
       }
 
-      // منع اختيار فترة غير صحيحة
       if (fromDate && toDate && fromDate.getTime() > toDate.getTime()) {
         area.innerHTML = `
-          <div style="text-align:center; padding:24px; color:var(--danger); background:#fef2f2; border-radius:var(--radius-sm);">
+          <div style="text-align:center;padding:28px;color:var(--danger);background:#fef2f2;border-radius:18px;">
             <strong>الفترة الزمنية غير صحيحة</strong>
-            <div style="margin-top:6px; font-size:0.8rem;">
-              يجب أن يكون تاريخ "من" قبل أو مساوياً لتاريخ "إلى".
-            </div>
+            <div style="margin-top:6px;font-size:.8rem;">يجب أن يكون تاريخ "من" قبل أو مساوياً لتاريخ "إلى".</div>
           </div>`;
         return;
       }
 
-      // تصفية دقيقة للفواتير بحسب التاريخ.
-      // عند تفعيل أي فلتر، يتم استبعاد الفواتير التي لا يمكن تحديد تاريخها.
-      let filteredInvoices = invoices.filter(inv => {
-        let invDate = null;
-
-        if (inv.createdAt) {
-          invDate = new Date(inv.createdAt);
-        }
-
-        if (!invDate || isNaN(invDate.getTime())) {
-          invDate = parseInvoiceDateString(inv.date, inv.rawDate);
-        }
-
-        if (!invDate || isNaN(invDate.getTime())) {
-          return !fromDate && !toDate;
-        }
-
+      const filteredInvoices = invoices.filter(inv => {
+        let invDate = inv.createdAt ? new Date(inv.createdAt) : null;
+        if (!invDate || isNaN(invDate.getTime())) invDate = parseInvoiceDateString(inv.date, inv.rawDate);
+        if (!invDate || isNaN(invDate.getTime())) return !fromDate && !toDate;
         if (fromDate && invDate.getTime() < fromDate.getTime()) return false;
         if (toDate && invDate.getTime() > toDate.getTime()) return false;
-
         return true;
       });
 
+      // نجمع الطلبات حسب رقم المنتج أولاً، ثم الاسم كحل احتياطي للفواتير القديمة.
       const productTotalsMap = {};
       const productNotesMap = {};
       let overallQuantity = 0;
 
       filteredInvoices.forEach(inv => {
-        if (inv.items && Array.isArray(inv.items)) {
-          inv.items.forEach(item => {
-            const pName = item.name ? item.name.trim() : 'منتج غير معروف';
-            const qty = Number(item.qty) || 0;
-            
-            if (!productTotalsMap[pName]) {
-              productTotalsMap[pName] = 0;
-              productNotesMap[pName] = [];
-            }
-            productTotalsMap[pName] += qty;
-            overallQuantity += qty;
+        if (!Array.isArray(inv.items)) return;
+        inv.items.forEach(item => {
+          const pName = String(item.name || 'منتج غير معروف').trim();
+          const qty = Math.max(0, Number(item.qty) || 0);
+          const key = item.id != null ? `id:${item.id}` : `name:${pName.toLowerCase()}`;
 
-            if (item.note && item.note.trim() !== '') {
-              productNotesMap[pName].push(item.note.trim());
-            }
-          });
-        }
+          if (!productTotalsMap[key]) {
+            productTotalsMap[key] = { id: item.id ?? null, name: pName, totalQty: 0 };
+            productNotesMap[key] = [];
+          }
+          productTotalsMap[key].totalQty += qty;
+          overallQuantity += qty;
+          if (item.note && String(item.note).trim()) productNotesMap[key].push(String(item.note).trim());
+        });
       });
 
-      const itemsList = Object.keys(productTotalsMap).map(pName => ({
-        name: pName,
-        totalQty: productTotalsMap[pName],
-        notes: productNotesMap[pName] || []
-      }));
+      // المخزون الحالي مأخوذ من قائمة المنتجات الحالية في النظام.
+      const productById = {};
+      const productByName = {};
+      (Array.isArray(products) ? products : []).forEach(p => {
+        if (p?.id != null) productById[String(p.id)] = p;
+        const nameKey = String(p?.name || '').trim().toLowerCase();
+        if (nameKey) productByName[nameKey] = p;
+      });
 
-      itemsList.sort((a, b) => b.totalQty - a.totalQty);
-
-      if (itemsList.length === 0) {
-        area.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد أي طلبات مطابقة للفترة المحددة.</p>';
-        return;
-      }
-
-      let rowsHTML = itemsList.map((item, index) => {
-        let notesHTML = '';
-        if (item.notes && item.notes.length > 0) {
-          notesHTML = `<div style="margin-top:4px; font-size:0.75rem; color:#b45309;">
-            <strong>الملاحظات المطلوبة:</strong>
-            <ul style="margin-right:15px; margin-top:2px;">
-              ${item.notes.map(n => `<li style="background:#fef3c7; padding:2px 6px; border-radius:4px; margin-bottom:2px; list-style-type:disc;">${n}</li>`).join('')}
-            </ul>
-          </div>`;
-        }
-
-        return `
-          <tr>
-            <td style="text-align:center; width: 40px;">${index + 1}</td>
-            <td>
-              <strong>${item.name}</strong>
-              ${notesHTML}
-            </td>
-            <td style="text-align:center; font-weight: bold; color: var(--primary-dark); font-size: 0.9rem;">${formatPrice(item.totalQty)}</td>
-          </tr>
-        `;
-      }).join('');
+      const itemsList = Object.values(productTotalsMap).map(item => {
+        const product = item.id != null ? productById[String(item.id)] : productByName[item.name.toLowerCase()];
+        const stock = Math.max(0, Number(product?.stock ?? 0));
+        const shortage = Math.max(0, item.totalQty - stock);
+        const fulfillable = Math.min(item.totalQty, stock);
+        return {
+          ...item,
+          stock,
+          fulfillable,
+          shortage,
+          notes: productNotesMap[item.id != null ? `id:${item.id}` : `name:${item.name.toLowerCase()}`] || []
+        };
+      }).sort((a,b) => b.totalQty - a.totalQty);
 
       let dateRangeText = 'جميع التواريخ المسجلة';
       if (fromVal && toVal) dateRangeText = `من ${fromVal} إلى ${toVal}`;
       else if (fromVal) dateRangeText = `من تاريخ ${fromVal}`;
       else if (toVal) dateRangeText = `حتى تاريخ ${toVal}`;
 
+      const totalStock = itemsList.reduce((sum, x) => sum + x.stock, 0);
+      const totalShortage = itemsList.reduce((sum, x) => sum + x.shortage, 0);
+      const totalProducts = itemsList.length;
+
+      if (!itemsList.length) {
+        area.innerHTML = `
+          <div class="product-stats-receipt">
+            <div class="product-stats-hero">
+              <div class="product-stats-brand">متجر المستقبل للجملة</div>
+              <div class="product-stats-title">تقرير إحصائيات المنتجات والمخزون</div>
+              <div class="product-stats-period">الفترة: ${dateRangeText}</div>
+            </div>
+            <div class="product-stats-body">
+              <div style="text-align:center;padding:28px 12px;color:var(--text-muted);">لا توجد أي طلبات مطابقة للفترة المحددة.</div>
+            </div>
+          </div>`;
+        return;
+      }
+
+      const rowsHTML = itemsList.map((item, index) => {
+        const notesHTML = item.notes.length
+          ? `<div class="product-stats-product-note">📝 ${item.notes.slice(0,3).map(n => escapeHtml(n)).join(' • ')}</div>`
+          : '';
+        const statusHTML = item.shortage > 0
+          ? `<span class="stats-status short">ناقص ${formatPrice(item.shortage)}</span>`
+          : `<span class="stats-status ready">✓ متوفر بالكامل</span>`;
+
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td class="product-stats-product">
+              <div class="product-stats-product-name">${escapeHtml(item.name)}</div>
+              ${notesHTML}
+            </td>
+            <td><span class="stats-number stats-requested">${formatPrice(item.totalQty)}</span></td>
+            <td><span class="stats-number stats-stock">${formatPrice(item.stock)}</span></td>
+            <td><span class="stats-number ${item.shortage ? 'stats-shortage' : 'stats-shortage ok'}">${formatPrice(item.shortage)}</span></td>
+            <td>${statusHTML}</td>
+          </tr>`;
+      }).join('');
+
       area.innerHTML = `
-        <div class="receipt-header">
-          <h2 style="font-size:1.1rem; color:var(--primary-dark);">متجر المستقبل للجملة</h2>
-          <h3 style="font-size:0.9rem; color:var(--text-main); margin-top:4px;">فاتورة الإحصائيات الشاملة للمنتجات والملاحظات</h3>
-          <p style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">الفترة المحددة: ${dateRangeText}</p>
-        </div>
-        <div style="font-size:0.8rem; margin-bottom:12px; line-height:1.6; background: var(--primary-light); padding: 8px; border-radius: var(--radius-sm);">
-          <strong>جهة التقرير:</strong> إدارة المتجر<br>
-          <strong>عدد الفواتير المحللة:</strong> ${filteredInvoices.length} فاتورة
-        </div>
-        <table class="receipt-table">
-          <thead>
-            <tr>
-              <th style="text-align:center; width: 40px;">#</th>
-              <th>اسم المنتج والملاحظات</th>
-              <th style="text-align:center;">العدد الكلي المطلوب</th>
-            </tr>
-          </thead>
-          <tbody>${rowsHTML}</tbody>
-        </table>
-        <div class="receipt-total-box" style="display: flex; justify-content: space-between; align-items: center;">
-          <span>إجمالي القطع والكميات المطلوبة:</span>
-          <span>${formatPrice(overallQuantity)} قطعة</span>
-        </div>
-      `;
+        <div class="product-stats-receipt">
+          <div class="product-stats-hero">
+            <div class="product-stats-brand">🛍️ متجر المستقبل للجملة</div>
+            <div class="product-stats-title">تقرير إحصائيات المنتجات والمخزون</div>
+            <div class="product-stats-period">الفترة: ${dateRangeText} • ${filteredInvoices.length} فاتورة</div>
+            <div class="product-stats-meta">
+              <div class="product-stats-summary-card">
+                <div class="product-stats-summary-label">عدد المنتجات</div>
+                <div class="product-stats-summary-value">${formatPrice(totalProducts)}</div>
+              </div>
+              <div class="product-stats-summary-card">
+                <div class="product-stats-summary-label">إجمالي المطلوب</div>
+                <div class="product-stats-summary-value">${formatPrice(overallQuantity)}</div>
+              </div>
+              <div class="product-stats-summary-card">
+                <div class="product-stats-summary-label">إجمالي النقص</div>
+                <div class="product-stats-summary-value">${formatPrice(totalShortage)}</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="product-stats-body">
+            <div class="product-stats-info">
+              <span>📦 إجمالي المخزون الحالي للمنتجات المطلوبة: <strong>${formatPrice(totalStock)}</strong></span>
+              <span>🧾 التقرير: حسب كل منتج</span>
+            </div>
+
+            <div class="product-stats-table-wrap">
+              <table class="product-stats-table">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th class="product-stats-product">اسم المنتج</th>
+                    <th>إجمالي المطلوب</th>
+                    <th>المخزون الحالي</th>
+                    <th>الكمية المطلوبة للتجهيز</th>
+                    <th>حالة التجهيز</th>
+                  </tr>
+                </thead>
+                <tbody>${rowsHTML}</tbody>
+              </table>
+            </div>
+
+            <div class="product-stats-footer">
+              <div>
+                <div class="product-stats-footer-label">إجمالي الكمية المطلوبة للتجهيز من خارج المخزون</div>
+                <div style="font-size:.62rem;color:#64748b;margin-top:2px;">الكميات الناقصة بعد احتساب المخزون الحالي لكل منتج</div>
+              </div>
+              <div class="product-stats-footer-value">${formatPrice(totalShortage)} قطعة</div>
+            </div>
+          </div>
+        </div>`;
     }
   </script>
 </body>
