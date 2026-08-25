@@ -1479,11 +1479,14 @@
 
             <div class="payment-box">
               <div id="delegate-payment-section">
-                <div style="font-size:.76rem;font-weight:900;color:var(--primary-dark);">طريقة الدفع للمندوب</div>
+                <div style="font-size:.76rem;font-weight:900;color:var(--primary-dark);">طريقة الدفع</div>
                 <select id="invoice-payment-method" class="compact-input">
                   <option value="cash">💵 نقدي</option>
                   <option value="credit">📒 آجل</option>
                 </select>
+                <div id="discount-cash-fixed" class="compact-input" style="display:none;background:var(--input-bg,#f8fafc);font-weight:800;">
+                  💵 نقدي
+                </div>
               </div>
               <div id="invoice-type-wrap">
                 <label id="invoice-type-label" style="font-size:.76rem;font-weight:900;color:var(--primary-dark);display:block;margin-bottom:2px;">نوع الفاتورة</label>
@@ -5216,6 +5219,8 @@
     function openCartModal() {
       if (isAdmin) return;
       applyInvoiceTypeUIByRole();
+      // تطبيق حالة طريقة الدفع فور فتح نافذة الفاتورة.
+      applyPaymentUIByRole();
       const selectWrap = document.getElementById('delegate-client-select-wrap');
       if (loggedDelegate) {
         if (selectWrap) selectWrap.classList.remove('hidden');
@@ -5237,6 +5242,8 @@
     }
 
     function renderCartModal() {
+      // ضمان تطبيق حالة طريقة الدفع كلما أعيد رسم نافذة السلة.
+      applyPaymentUIByRole();
       const cartItemsContainer = document.getElementById('cart-items');
       const clearBtn = document.getElementById('clear-cart-btn');
       if (!cartItemsContainer) return;
@@ -5298,10 +5305,26 @@
     function applyPaymentUIByRole() {
       const section = document.getElementById('delegate-payment-section');
       if (!section) return;
-      // طريقة الدفع تظهر للمندوب فقط. المدير يرى بيانات الفاتورة لاحقاً في الإدارة.
-      section.style.display = loggedDelegate ? '' : 'none';
+      // طريقة الدفع تظهر للزبون والمندوب معاً.
+      // إذا كان حساب الزبون لديه خصم، تصبح "نقدي" ثابتة ولا يمكن تغييرها.
+      section.style.display = '';
       const method = document.getElementById('invoice-payment-method');
-      if (method && !loggedDelegate) method.value = 'cash';
+      const fixedCash = document.getElementById('discount-cash-fixed');
+      const customerHasDiscount = !!(loggedCustomer && Number(loggedCustomer.discount) > 0);
+
+      if (method && fixedCash) {
+        if (customerHasDiscount) {
+          // الزبون الذي لديه خصم لا يرى قائمة منسدلة إطلاقاً؛ يظهر له "نقدي" فقط.
+          method.style.display = 'none';
+          method.value = 'cash';
+          fixedCash.style.display = '';
+        } else {
+          // بدون خصم تبقى القائمة المنسدلة نقدي / آجل.
+          method.style.display = '';
+          fixedCash.style.display = 'none';
+          method.disabled = false;
+        }
+      }
     }
 
     async function handleCheckout(e) {
@@ -5313,12 +5336,14 @@
       const custPhone = document.getElementById('cust-phone').value.trim();
       const custAddress = document.getElementById('cust-address').value.trim();
       const generalNote = document.getElementById('general-invoice-note').value.trim();
-      // طريقة الدفع تخص المندوب فقط: نقدي أو آجل.
-      // الزبون لا يختار طريقة دفع داخل النظام.
+      // طريقة الدفع للزبون والمندوب: نقدي أو آجل.
+      // إذا كان حساب الزبون لديه خصم أكبر من 0% تصبح "نقدي" ثابتة.
       const isDelegateOrder = !!loggedDelegate;
-      const paymentMethod = isDelegateOrder
-        ? (document.getElementById('invoice-payment-method')?.value || 'cash')
-        : 'cash';
+      const customerDiscount = loggedCustomer ? (Number(loggedCustomer.discount) || 0) : 0;
+      const hasCustomerDiscount = customerDiscount > 0;
+      const paymentMethod = hasCustomerDiscount
+        ? 'cash'
+        : (document.getElementById('invoice-payment-method')?.value || 'cash');
       // طريقة الدفع معلومة فقط على الفاتورة: نقدي أو آجل.
       // لا يتم تسجيل مدفوع/متبقي أو أي حركة مالية إضافية.
       const paymentStatus = null;
@@ -5383,7 +5408,8 @@
         createdAt: now.getTime(),
         customer: {
           name: custName, phone: custPhone, address: custAddress,
-          username: loggedCustomer ? 'زبون: ' + loggedCustomer.username : 'مندوب: ' + loggedDelegate.username
+          username: loggedCustomer ? 'زبون: ' + loggedCustomer.username : 'مندوب: ' + loggedDelegate.username,
+          discount: customerDiscount
         },
         delegateUsername: loggedDelegate ? loggedDelegate.username : null,
         items: currentCart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, note: i.note || '' })),
@@ -5530,6 +5556,7 @@
         setCurrentCart([]);
         updateCartUI();
         document.getElementById('checkout-form').reset();
+        applyPaymentUIByRole();
         const searchCustomerInput = document.getElementById('searchCustomerInput');
         if (searchCustomerInput) searchCustomerInput.value = '';
         closeCartModal();
@@ -5968,6 +5995,14 @@
 
       const customer = invoice.customer || {};
       const items = Array.isArray(invoice.items) ? invoice.items : [];
+      // عند وجود خصم على حساب الزبون، تظهر طريقة الدفع في فاتورته "نقدي" فقط.
+      const invoiceCustomerDiscount = Number(customer.discount ?? invoice.customerDiscount ?? 0) || 0;
+      const displayedPaymentMethod = invoiceCustomerDiscount > 0 ? 'cash' : (invoice.paymentMethod || 'cash');
+      const customerTypeLabel = invoice.customerType === 'old_customer'
+        ? '👤 زبون قديم'
+        : invoice.customerType === 'new_customer'
+          ? '🆕 زبون جديد'
+          : 'غير محدد';
 
       let itemsRows = items.map(item => {
         item = item || {};
@@ -6020,7 +6055,8 @@
           ${(isAdmin || loggedAdmin)
             ? `<div><strong>حالة الطلب:</strong> <span class="order-status-chip">${getOrderStatusLabel(invoice.orderStatus)}</span></div>`
             : `<div style="background:#ecfdf5;border:1px solid #bbf7d0;color:#166534;padding:9px 10px;border-radius:10px;text-align:center;font-weight:700;">📩 تم إرسال طلبك بنجاح</div>`}
-          <div><strong>طريقة الدفع:</strong> ${getPaymentMethodLabel(invoice.paymentMethod)}</div>
+          <div><strong>نوع الزبون:</strong> ${customerTypeLabel}</div>
+          <div><strong>طريقة الدفع:</strong> ${getPaymentMethodLabel(displayedPaymentMethod)}</div>
         </div>
         <div class="receipt-total-box">المجموع الكلي: ${formatPrice(Number(invoice.total) || 0)} د.ع</div>
       `;
