@@ -4,11 +4,17 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- BUILD: whatsapp-link-pdf-fixed-v9-invoice-front-invoices-list-stays-open-20260825 -->
+  <!-- BUILD: business-v13-firestore-invoice-security-transaction-fix-20260825 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>متجر المستقبل للجملة</title>
+  <title>متجر المستقبل للجملة - النظام التجاري</title>
   
+
+  <!-- ملاحظة أمان v7:
+       يجب تطبيق Firestore Security Rules بحيث يكون Firebase Authentication هو مصدر الهوية،
+       ويُمنع العميل/المندوب من تعديل المخزون أو الفواتير الخاصة بغيره،
+       ويُسمح للمديرين حسب permissions. هذه الحماية لا يمكن ضمانها من HTML/JavaScript وحده. -->
+
   <!-- مكتبات Firebase الأساسية وقاعدة البيانات -->
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
@@ -1030,6 +1036,73 @@
     .admin-account-actions { display:flex; gap:6px; }
     .admin-account-actions button { flex:1; }
     @media (max-width:520px) { .admin-permissions-grid { grid-template-columns:1fr; } }
+
+    /* ===== تطوير النظام التجاري v7 ===== */
+    .business-dashboard {
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      gap:10px;
+      margin-bottom:12px;
+    }
+    .business-stat {
+      background:#fff;
+      border:1px solid var(--border-color);
+      border-radius:16px;
+      padding:12px;
+      box-shadow:0 5px 16px rgba(15,23,42,.05);
+    }
+    .business-stat-label { font-size:.68rem; color:var(--text-muted); font-weight:800; }
+    .business-stat-value { font-size:1.05rem; font-weight:900; margin-top:4px; color:var(--primary-dark); }
+    .business-stat-sub { font-size:.62rem; color:var(--text-muted); margin-top:3px; }
+    .inventory-badge {
+      display:inline-flex; align-items:center; justify-content:center;
+      padding:4px 7px; border-radius:999px; font-size:.62rem; font-weight:900;
+      margin-top:4px;
+    }
+    .inventory-ok { background:#dcfce7; color:#166534; }
+    .inventory-low { background:#fef3c7; color:#92400e; }
+    .inventory-out { background:#fee2e2; color:#991b1b; }
+
+    .inventory-backorder-note {
+      display:block; margin-top:4px; font-size:.62rem; font-weight:800;
+      color:#6d28d9;
+    }
+
+    .order-status-chip {
+      display:inline-flex; align-items:center; gap:4px;
+      padding:4px 8px; border-radius:999px; font-size:.64rem; font-weight:900;
+      background:#e0f2fe; color:#0369a1;
+    }
+    .payment-box {
+      background:#f8fafc; border:1px solid var(--border-color);
+      border-radius:14px; padding:10px; display:grid; gap:8px;
+    }
+    .admin-tools-grid {
+      display:grid; grid-template-columns:repeat(2,1fr); gap:8px;
+      margin-top:8px;
+    }
+    .admin-tool-btn {
+      border:1px solid var(--border-color); background:#fff; border-radius:13px;
+      padding:10px; cursor:pointer; font-weight:800; color:var(--text-main);
+    }
+    .admin-tool-btn:active { transform:scale(.97); }
+
+    .order-tracking-card {
+      background:#fff; border:1px solid var(--border-color); border-radius:18px;
+      padding:13px; box-shadow:0 5px 16px rgba(15,23,42,.05);
+    }
+    .order-tracking-top { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+    .order-tracking-id { font-weight:900; color:var(--primary-dark); font-size:.84rem; }
+    .order-tracking-customer { font-size:.72rem; color:var(--text-muted); margin-top:4px; line-height:1.6; }
+    .order-tracking-actions { display:grid; grid-template-columns:1fr auto; gap:7px; margin-top:10px; }
+    .order-status-select { width:100%; border:1px solid var(--border-color); border-radius:12px; padding:9px 10px; background:#fff; font-weight:800; color:var(--text-main); }
+    .tracking-timeline { display:flex; gap:5px; margin-top:10px; }
+    .tracking-step { flex:1; height:6px; border-radius:999px; background:#e2e8f0; }
+    .tracking-step.active { background:var(--primary); }
+    @media (max-width:520px) {
+      .business-dashboard { grid-template-columns:repeat(2,1fr); }
+    }
+
     .hidden { display: none !important; }
   
     /* نافذة عرض تفاصيل الإشعار */
@@ -1118,6 +1191,35 @@
 
       <!-- واجهة المدير الرئيسية بالأيقونات الاربع -->
       <div id="admin-panel" class="admin-panel hidden">
+
+        <div id="business-dashboard" class="business-dashboard">
+          <div class="business-stat">
+            <div class="business-stat-label">مبيعات اليوم</div>
+            <div id="dash-sales-today" class="business-stat-value">0 د.ع</div>
+            <div class="business-stat-sub">إجمالي الفواتير اليوم</div>
+          </div>
+          <div class="business-stat">
+            <div class="business-stat-label">طلبات اليوم</div>
+            <div id="dash-orders-today" class="business-stat-value">0</div>
+            <div class="business-stat-sub">عدد الفواتير الجديدة</div>
+          </div>
+          <div class="business-stat">
+            <div class="business-stat-label">طلبات المندوبين</div>
+            <div id="dash-delegate-orders" class="business-stat-value">0</div>
+            <div class="business-stat-sub">الفواتير المسجلة للمندوبين</div>
+          </div>
+          <div class="business-stat">
+            <div class="business-stat-label">مخزون منخفض</div>
+            <div id="dash-low-stock" class="business-stat-value">0</div>
+            <div class="business-stat-sub">منتجات تحتاج متابعة</div>
+          </div>
+        </div>
+        <div class="admin-tools-grid">
+          <button type="button" class="admin-tool-btn" onclick="renderBusinessDashboard()">📊 تحديث لوحة المؤشرات</button>
+          <button type="button" class="admin-tool-btn" onclick="openLowStockReport()">📦 المنتجات قليلة المخزون</button>
+
+          <button type="button" class="admin-tool-btn" onclick="openAuditLogModal()">🧾 سجل عمليات الإدارة</button>
+        </div>
         <h2>لوحة تحكم المدير</h2>
         
         <div class="admin-dashboard-cards">
@@ -1142,6 +1244,10 @@
             <span>🔔</span>
             <span>إرسال الإشعارات</span>
           </div>
+          <div class="admin-card-btn" onclick="openOrderTrackingModal()">
+            <span>🚚</span>
+            <span>تتبع الطلبات</span>
+          </div>
           <div class="admin-card-btn whatsapp-admin-card" id="admin-whatsapp-card" onclick="openAdminWhatsAppModal()">
             <span>💬</span>
             <span>إدارة واتساب</span>
@@ -1161,6 +1267,13 @@
           <select id="product-tab" class="compact-input" required></select>
           <input type="number" id="product-price" placeholder="السعر بالدينار" required class="compact-input" min="0">
           <input type="text" id="product-desc" placeholder="وصف المنتج" class="compact-input">
+
+          <input type="text" id="product-sku" placeholder="كود المنتج / SKU (اختياري)" class="compact-input">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <input type="number" id="product-stock" placeholder="المخزون الحالي" class="compact-input" min="0" step="1" value="0">
+            <input type="number" id="product-min-stock" placeholder="حد التنبيه" class="compact-input" min="0" step="1" value="5">
+          </div>
+
           <div style="display: flex; align-items: center; gap: 5px;">
             <label style="font-size:0.75rem; color:var(--text-muted);">صورة:</label>
             <input type="file" id="product-img-file" accept="image/*" class="compact-input" style="padding: 5px;">
@@ -1363,6 +1476,24 @@
             <input type="text" id="cust-phone" placeholder="رقم الهاتف" required class="compact-input">
             <input type="text" id="cust-address" placeholder="العنوان" required class="compact-input">
             <textarea id="general-invoice-note" placeholder="ملاحظات عامة حول الفاتورة (اختياري)..." class="compact-input" style="resize: vertical; min-height: 50px;"></textarea>
+
+            <div class="payment-box">
+              <div id="delegate-payment-section">
+                <div style="font-size:.76rem;font-weight:900;color:var(--primary-dark);">طريقة الدفع للمندوب</div>
+                <select id="invoice-payment-method" class="compact-input">
+                  <option value="cash">💵 نقدي</option>
+                  <option value="credit">📒 آجل</option>
+                </select>
+              </div>
+              <div id="invoice-type-wrap">
+                <label id="invoice-type-label" style="font-size:.76rem;font-weight:900;color:var(--primary-dark);display:block;margin-bottom:2px;">نوع الفاتورة</label>
+                <select id="invoice-order-status" class="compact-input">
+                  <option value="new_customer">🆕 زبون جديد</option>
+                  <option value="old_customer">👤 زبون قديم</option>
+                </select>
+              </div>
+            </div>
+
             <button type="submit" class="btn" style="background: var(--success); width: 100%; padding: 12px; margin-top: 4px;">تأكيد وإصدار الفاتورة 🧾</button>
           </form>
         </div>
@@ -1589,6 +1720,43 @@
 
           <button type="button" class="btn btn-secondary" style="width:100%;" onclick="testWhatsAppContact()">🔗 اختبار فتح واتساب</button>
         </div>
+      </div>
+    </div>
+
+
+    <div id="low-stock-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>📦 المنتجات قليلة المخزون</h3>
+          <button class="close-modal" onclick="closeLowStockReport()">✕</button>
+        </div>
+        <div class="modal-body" id="low-stock-list"></div>
+      </div>
+    </div>
+
+    <div id="order-tracking-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🚚 تتبع الطلبات</h3>
+          <button class="close-modal" onclick="closeOrderTrackingModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div style="display:flex;gap:7px;margin-bottom:10px;">
+            <input id="order-tracking-search" class="compact-input" placeholder="ابحث برقم الطلب أو اسم الزبون..." oninput="renderOrderTrackingList()">
+            <button type="button" class="btn btn-secondary" onclick="openOrderTrackingModal()">↻</button>
+          </div>
+          <div id="order-tracking-list" style="display:flex;flex-direction:column;gap:9px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="audit-log-modal" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>🧾 سجل عمليات الإدارة</h3>
+          <button class="close-modal" onclick="closeAuditLogModal()">✕</button>
+        </div>
+        <div class="modal-body" id="audit-log-list"></div>
       </div>
     </div>
 
@@ -2307,16 +2475,16 @@
     async function loadInvoicesFromFirestore() {
       try {
         let snapshots = [];
-        if (loggedCustomer) {
+        const firebaseUser = auth.currentUser;
+        if ((loggedCustomer || loggedDelegate) && (!firebaseUser || !firebaseUser.uid)) {
+          throw new Error('AUTH_SESSION_MISSING');
+        }
+
+        if (loggedCustomer || loggedDelegate) {
+          // نحمّل فقط الفواتير التي يملكها المستخدم الحالي فعلياً.
+          // هذا يتطابق مع ownerUid في Rules ويمنع استعلام مستخدم عن فواتير الآخرين.
           snapshots = [await db.collection('invoices')
-            .where('customer.username', '==', 'زبون: ' + String(loggedCustomer.username)).get()];
-        } else if (loggedDelegate) {
-          const username = String(loggedDelegate.username);
-          const [delegateSnap, customerSnap] = await Promise.all([
-            db.collection('invoices').where('delegateUsername', '==', username).get(),
-            db.collection('invoices').where('customer.username', '==', 'مندوب: ' + username).get()
-          ]);
-          snapshots = [delegateSnap, customerSnap];
+            .where('ownerUid', '==', firebaseUser.uid).get()];
         } else if (isAdmin || loggedAdmin) {
           snapshots = [await db.collection('invoices').get()];
         } else {
@@ -2669,6 +2837,7 @@
         renderAdminCustomersList();
         renderAdminDelegatesList();
         renderDelegateClientsList();
+        renderBusinessDashboard();
 
         if (btn) {
           btn.innerText = "🔄 تم التحديث";
@@ -2689,6 +2858,8 @@
       localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
       localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
       localStorage.setItem('mustaqbal_notifications_cache', JSON.stringify(notifications || []));
+      localStorage.setItem('mustaqbal_audit_logs', JSON.stringify(auditLogs || []));
+
     }
 
     function ensureDefaultCategories() {
@@ -2709,6 +2880,9 @@
     function formatPrice(amount) {
       return Number(amount).toLocaleString('en-US');
     }
+
+
+    let auditLogs = JSON.parse(localStorage.getItem('mustaqbal_audit_logs') || '[]');
 
     let categories = JSON.parse(localStorage.getItem('mustaqbal_categories')) || [
       { id: 'all', name: 'جميع المنتجات', order: 0 },
@@ -3430,6 +3604,8 @@
       monitorActiveSession();
       if (loggedAdmin) startAdminSessionMonitor();
       applyAdminPermissionsUI();
+      renderBusinessDashboard();
+      applyManagerOnlyInventoryUI();
     }
 
     async function handleLogout() {
@@ -4650,50 +4826,55 @@
       e.preventDefault();
       const editingExistingProduct = !!document.getElementById('product-id').value;
       if (editingExistingProduct ? !requireAdminPermission('editProducts') : !requireAdminPermission('addProducts')) return;
+
       const id = document.getElementById('product-id').value;
       const name = document.getElementById('product-name').value.trim();
       const category = document.getElementById('product-tab').value;
       const price = parseFloat(document.getElementById('product-price').value);
       const desc = document.getElementById('product-desc').value.trim();
+      const sku = document.getElementById('product-sku')?.value.trim() || '';
+      const stock = Math.max(0, Number(document.getElementById('product-stock')?.value || 0));
+      const minStock = Math.max(0, Number(document.getElementById('product-min-stock')?.value || 5));
 
-      if (!name) return;
-      let isNew = true;
-      if (id) {
-        const existing = products.find(p => p.id == id);
-        if (existing && existing.isNew !== undefined) isNew = existing.isNew;
-      }
+      if (!name || !Number.isFinite(price)) return;
 
       const existingProduct = id ? products.find(p => p.id == id) : null;
-      const productCreatedAt = existingProduct
-        ? getProductCreatedTime(existingProduct)
-        : Date.now();
-
+      const productCreatedAt = existingProduct ? getProductCreatedTime(existingProduct) : Date.now();
       const productData = {
         id: id ? Number(id) : Date.now(),
-        name, category, price, desc,
+        name, category, price, desc, sku,
+        stock, minStock,
+        soldQty: Number(existingProduct?.soldQty || 0),
         image: currentImageData || '',
-        isNew: isNew,
-        createdAt: productCreatedAt
+        isNew: existingProduct?.isNew !== undefined ? existingProduct.isNew : true,
+        createdAt: productCreatedAt,
+        updatedAt: Date.now()
       };
 
       if (id) {
         const index = products.findIndex(p => p.id == id);
         if (index !== -1) {
-          if (!currentImageData) productData.image = products[index].image;
-          products[index] = productData;
+          if (!currentImageData) productData.image = products[index].image || '';
+          products[index] = { ...products[index], ...productData };
         }
       } else {
         products.push(productData);
       }
 
-      saveData();
-      resetProductForm();
-      renderProducts();
-
       try {
-        await db.collection('products').doc(String(productData.id)).set(productData);
+        await db.collection('products').doc(String(productData.id)).set(productData, {merge:true});
+        await writeAuditLog('updateProduct', `تم ${id ? 'تحديث' : 'إضافة'} المنتج "${name}"`, {
+          productId: productData.id, stock, minStock
+        });
+        saveData();
+        resetProductForm();
+        renderProducts();
+        renderBusinessDashboard();
         alert('تم حفظ المنتج بنجاح!');
-      } catch (err) {}
+      } catch (err) {
+        console.error('فشل حفظ المنتج:', err);
+        alert('تعذر حفظ المنتج في قاعدة البيانات. لم يتم اعتماد التعديل محلياً.');
+      }
     }
 
     function editProduct(id) {
@@ -4705,6 +4886,9 @@
       document.getElementById('product-tab').value = product.category || '';
       document.getElementById('product-price').value = product.price || 0;
       document.getElementById('product-desc').value = product.desc || '';
+      const skuEl = document.getElementById('product-sku'); if (skuEl) skuEl.value = product.sku || '';
+      const stockEl = document.getElementById('product-stock'); if (stockEl) stockEl.value = Number(product.stock || 0);
+      const minStockEl = document.getElementById('product-min-stock'); if (minStockEl) minStockEl.value = Number(product.minStock ?? 5);
       currentImageData = product.image || '';
       document.getElementById('save-product-btn').innerText = 'تحديث المنتج';
     }
@@ -4724,8 +4908,12 @@
     async function deleteProduct(id) {
       if (!requireAdminPermission('deleteProducts')) return;
       if (confirm('تأكيد حذف المنتج بالكامل من البرنامج؟')) {
+        const deletedProduct = products.find(p => p.id === id);
         products = products.filter(p => p.id !== id);
-        try { await db.collection('products').doc(String(id)).delete(); } catch(err){}
+        try {
+          await db.collection('products').doc(String(id)).delete();
+          await writeAuditLog('deleteProduct', `تم حذف المنتج "${deletedProduct?.name || id}"`, {productId:id});
+        } catch(err){}
         saveData();
         renderProducts();
       }
@@ -4735,6 +4923,9 @@
       document.getElementById('product-form').reset();
       document.getElementById('product-id').value = '';
       currentImageData = "";
+      const skuEl = document.getElementById('product-sku'); if (skuEl) skuEl.value = '';
+      const stockEl = document.getElementById('product-stock'); if (stockEl) stockEl.value = 0;
+      const minStockEl = document.getElementById('product-min-stock'); if (minStockEl) minStockEl.value = 5;
       document.getElementById('save-product-btn').innerText = 'حفظ المنتج';
     }
 
@@ -4772,6 +4963,8 @@
       });
 
       updateProductsSortUI();
+      if (isAdmin || loggedAdmin) renderBusinessDashboard();
+      applyManagerOnlyInventoryUI();
 
       if (!list || list.length === 0) {
         grid.innerHTML = '<p style="padding:15px; color:var(--text-muted); grid-column: 1 / -1; font-size:0.85rem; text-align:center;">لا توجد منتجات متاحة.</p>';
@@ -4998,8 +5191,36 @@
       if (cartCountElem) cartCountElem.innerText = totalItems;
     }
 
+    function applyInvoiceTypeUIByRole() {
+      const select = document.getElementById('invoice-order-status');
+      const label = document.getElementById('invoice-type-label');
+      if (!select) return;
+
+      if (loggedDelegate) {
+        // في فاتورة المندوب: هذا الحقل يحدد نوع الزبون فقط.
+        if (label) label.textContent = 'نوع الفاتورة';
+        select.innerHTML = `
+          <option value="new_customer">🆕 زبون جديد</option>
+          <option value="old_customer">👤 زبون قديم</option>
+        `;
+        select.value = select.value === 'old_customer' ? 'old_customer' : 'new_customer';
+      } else {
+        // في فاتورة الزبون يبقى الحقل خاصاً بحالة الطلب.
+        if (label) label.textContent = 'حالة الطلب';
+        select.innerHTML = `
+          <option value="new">🟡 جديد</option>
+          <option value="preparing">🔵 قيد التجهيز</option>
+          <option value="ready">🟠 جاهز للتسليم</option>
+          <option value="with_delegate">🛵 مع المندوب</option>
+          <option value="delivered">🟢 تم التسليم</option>
+        `;
+        select.value = 'new';
+      }
+    }
+
     function openCartModal() {
       if (isAdmin) return;
+      applyInvoiceTypeUIByRole();
       const selectWrap = document.getElementById('delegate-client-select-wrap');
       if (loggedDelegate) {
         if (selectWrap) selectWrap.classList.remove('hidden');
@@ -5073,34 +5294,61 @@
       document.getElementById('cart-total-price').innerText = formatPrice(total);
     }
 
+
+    document.addEventListener('change', (e) => {
+      if (e.target?.id === 'invoice-payment-method') applyPaymentUIByRole();
+    });
+
+
+    function applyPaymentUIByRole() {
+      const section = document.getElementById('delegate-payment-section');
+      if (!section) return;
+      // طريقة الدفع تظهر للمندوب فقط. المدير يرى بيانات الفاتورة لاحقاً في الإدارة.
+      section.style.display = loggedDelegate ? '' : 'none';
+      const method = document.getElementById('invoice-payment-method');
+      if (method && !loggedDelegate) method.value = 'cash';
+    }
+
     async function handleCheckout(e) {
       e.preventDefault();
-      let currentCart = getCurrentCart();
+      const currentCart = getCurrentCart();
       if (currentCart.length === 0) return;
 
       const custName = document.getElementById('cust-name').value.trim();
       const custPhone = document.getElementById('cust-phone').value.trim();
       const custAddress = document.getElementById('cust-address').value.trim();
       const generalNote = document.getElementById('general-invoice-note').value.trim();
+      // طريقة الدفع تخص المندوب فقط: نقدي أو آجل.
+      // الزبون لا يختار طريقة دفع داخل النظام.
+      const isDelegateOrder = !!loggedDelegate;
+      const paymentMethod = isDelegateOrder
+        ? (document.getElementById('invoice-payment-method')?.value || 'cash')
+        : 'cash';
+      // طريقة الدفع معلومة فقط على الفاتورة: نقدي أو آجل.
+      // لا يتم تسجيل مدفوع/متبقي أو أي حركة مالية إضافية.
+      const paymentStatus = null;
+      const selectedInvoiceType = document.getElementById('invoice-order-status')?.value || 'new_customer';
+      // المندوب يختار نوع الزبون (جديد/قديم)، بينما حالة الطلب تبدأ دائماً بالقيمة الآمنة "new".
+      const customerType = isDelegateOrder
+        ? selectedInvoiceType
+        : null;
+      const orderStatus = 'new';
 
-      let accountSource = loggedCustomer ? 'زبون: ' + loggedCustomer.username : 'مندوب: ' + loggedDelegate.username;
-      const totalAmount = currentCart.reduce((acc, item) => acc + ((item.price || 0) * (item.qty || 0)), 0);
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser || !firebaseUser.uid) {
+        alert('انتهت جلسة Firebase Authentication. سجّل الخروج ثم ادخل مرة أخرى.');
+        return;
+      }
+
+      const totalAmount = currentCart.reduce((acc, item) => acc + ((Number(item.price) || 0) * (Number(item.qty) || 0)), 0);
+      const paidAmount = null;
+      const remainingAmount = null;
 
       const now = new Date();
-      // حفظ تاريخ ISO دقيق للفلترة
       const yyyy = now.getFullYear();
       const mm = String(now.getMonth() + 1).padStart(2, '0');
       const dd = String(now.getDate()).padStart(2, '0');
       const isoDateString = `${yyyy}-${mm}-${dd}`;
-
-      // الهوية الفعلية لحساب Firebase Authentication هي المرجع الأمني للفاتورة.
-      // لا نعتمد على localStorage أو اسم المستخدم وحده عند الحفظ.
-      const firebaseUser = auth.currentUser;
-      if (!firebaseUser || !firebaseUser.uid) {
-        alert('انتهت جلسة Firebase Authentication. سجّل الخروج ثم ادخل إلى الحساب مرة أخرى قبل إنشاء الفاتورة.');
-        return;
-      }
-
       const newInvoice = {
         id: 'INV-' + Date.now(),
         ownerUid: firebaseUser.uid,
@@ -5108,46 +5356,373 @@
         date: now.toLocaleString('en-US'),
         rawDate: isoDateString,
         createdAt: now.getTime(),
-        customer: { name: custName, phone: custPhone, address: custAddress, username: accountSource },
+        customer: {
+          name: custName, phone: custPhone, address: custAddress,
+          username: loggedCustomer ? 'زبون: ' + loggedCustomer.username : 'مندوب: ' + loggedDelegate.username
+        },
         delegateUsername: loggedDelegate ? loggedDelegate.username : null,
         items: currentCart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, note: i.note || '' })),
-        generalNote: generalNote,
+        generalNote,
         total: totalAmount,
-        // الفاتورة الجديدة تكون غير مفتوحة لكل مدير حتى يقوم بفتحها بنفسه.
+        paymentMethod,
+        paymentStatus,
+        paidAmount,
+        remainingAmount,
+        orderStatus,
+        customerType,
         viewedByAdmins: {}
       };
 
-      // حفظ الفاتورة في Firestore أولاً. لا نعرض نجاح الفاتورة ولا نضيفها
-      // إلى القائمة المحلية إذا فشل الحفظ، حتى لا تظهر للمستخدم وكأنها محفوظة وهي ليست كذلك.
+      const invoiceRef = db.collection('invoices').doc(String(newInvoice.id));
+
       try {
-        await db.collection('invoices').doc(String(newInvoice.id)).set(newInvoice);
+        let backorderedItems = [];
+        await db.runTransaction(async tx => {
+          const invoiceSnap = await tx.get(invoiceRef);
+          if (invoiceSnap.exists) throw new Error('DUPLICATE_INVOICE');
+
+          const productRefs = currentCart.map(item => db.collection('products').doc(String(item.id)));
+          const productSnaps = [];
+          for (const ref of productRefs) productSnaps.push(await tx.get(ref));
+
+          const updatedProducts = [];
+          for (let i = 0; i < currentCart.length; i++) {
+            const item = currentCart[i];
+            const snap = productSnaps[i];
+            const data = snap.exists ? (snap.data() || {}) : null;
+            if (!data) throw new Error(`PRODUCT_NOT_FOUND:${item.name}`);
+            const stock = Number(data.stock ?? 0);
+            const qty = Number(item.qty || 0);
+            const availableQty = Math.max(0, stock);
+            const fulfilledQty = Math.min(availableQty, qty);
+            const backorderQty = Math.max(0, qty - fulfilledQty);
+            updatedProducts.push({
+              ref: productRefs[i],
+              data,
+              stock: stock - fulfilledQty,
+              soldQty: Number(data.soldQty || 0) + fulfilledQty,
+              backorderQty
+            });
+          }
+
+          backorderedItems = updatedProducts.filter(x => x.backorderQty > 0).map(x => ({
+            productId: x.data.id,
+            name: x.data.name || '',
+            requestedQty: Number(currentCart.find(i => String(i.id) === String(x.data.id))?.qty || 0),
+            fulfilledQty: Number((currentCart.find(i => String(i.id) === String(x.data.id))?.qty || 0) - x.backorderQty),
+            backorderQty: Number(x.backorderQty)
+          }));
+
+          if (backorderedItems.length) {
+            newInvoice.orderStatus = 'backorder';
+            newInvoice.stockNote = 'يوجد صنف/أصناف مطلوبة غير متوفرة حالياً بالكامل، وتم تسجيل الكمية المتبقية كطلب مؤجل.';
+            newInvoice.backorderedItems = backorderedItems;
+          }
+
+          updatedProducts.forEach(p => {
+            tx.set(p.ref, {
+              stock: p.stock,
+              soldQty: p.soldQty,
+              updatedAt: Date.now(),
+              lastStockUpdateUid: firebaseUser.uid,
+              lastStockUpdateInvoiceId: newInvoice.id
+            }, {merge:true});
+          });
+
+          // حفظ الفاتورة داخل نفس المعاملة الذرية مع تحديث المخزون،
+          // حتى لا يتم خصم المخزون بدون إنشاء الفاتورة.
+          tx.set(invoiceRef, newInvoice);
+        });
+
+        // لا ينشئ المندوب/الزبون إشعاراً باسم الإدارة؛ إشعارات حالة الطلب
+        // ينشئها المدير عند تغيير الحالة من لوحة تتبع الطلبات.
+        invoices.unshift(newInvoice);
+        await writeAuditLog('createInvoice'
+, `تم إصدار الفاتورة ${newInvoice.id} للزبون "${custName}"`, {
+          invoiceId: newInvoice.id, total: totalAmount, paymentStatus, orderStatus
+        });
+
+        saveData();
+        renderProducts();
+        renderBusinessDashboard();
+        renderReceiptHTML(newInvoice);
+        setCurrentCart([]);
+        updateCartUI();
+        document.getElementById('checkout-form').reset();
+        const searchCustomerInput = document.getElementById('searchCustomerInput');
+        if (searchCustomerInput) searchCustomerInput.value = '';
+        closeCartModal();
+        document.getElementById('receipt-modal').classList.remove('hidden');
       } catch (err) {
-        console.error('فشل حفظ الفاتورة في Firestore:', err);
-        const code = err && err.code ? String(err.code) : '';
-        let msg = 'تعذر حفظ الفاتورة في قاعدة البيانات.';
-        if (code === 'permission-denied') {
-          msg += '\n\nالسبب: قواعد Firestore تمنع إنشاء الفاتورة في مجموعة invoices.';
-        } else if (code === 'unavailable') {
-          msg += '\n\nالسبب: تعذر الاتصال بخدمة Firestore. تحقق من الإنترنت.';
-        } else if (code) {
-          msg += '\n\nرمز الخطأ: ' + code;
+        console.error('فشل إصدار الفاتورة:', err);
+        const message = String(err?.message || '');
+        if (message === 'DUPLICATE_INVOICE') {
+          alert('تعذر إصدار الفاتورة بسبب تكرار رقم الفاتورة. حاول مرة أخرى.');
+        } else if (message.startsWith('INSUFFICIENT_STOCK:')) {
+          const parts = message.split(':');
+          alert(`الكمية المطلوبة من "${parts[1]}" غير متوفرة. المخزون الحالي: ${parts[2]}.`);
+        } else if (message.startsWith('PRODUCT_NOT_FOUND:')) {
+          alert(`المنتج "${message.split(':')[1]}" لم يعد موجوداً في قاعدة البيانات. حدّث الصفحة وحاول مرة أخرى.`);
+        } else if (err?.code === 'permission-denied') {
+          // لا نعرض اسم قاعدة البيانات أو تفاصيل Firebase الحساسة للمستخدم.
+          alert('تعذر اعتماد الطلب بسبب عدم تطابق صلاحيات الحساب. تأكد من أن حسابك مسجل دخولاً بشكل صحيح، ثم حدّث التطبيق وحاول مرة أخرى.');
+        } else {
+          alert('تعذر إصدار الفاتورة. لم يتم اعتماد الطلب.');
         }
-        alert(msg);
+      }
+    }
+
+
+
+    function getProductStockStatus(product) {
+      const stock = Number(product?.stock ?? 0);
+      const minStock = Number(product?.minStock ?? 5);
+      return {
+        stock,
+        minStock,
+        out: stock <= 0,
+        low: stock > 0 && stock <= minStock
+      };
+    }
+
+    function canAddProductToCart(product, requestedQty = 1) {
+      const status = getProductStockStatus(product);
+      // نفاذ المخزون لا يمنع الطلب: يسمح بالطلب حتى عندما stock = 0.
+      // المنع الحقيقي للكمية يتم عند إصدار الفاتورة حسب إعداد الطلب من المخزون.
+      return Number(requestedQty || 0) > 0;
+    }
+
+    function getStockBadgeHTML(product) {
+      // معلومات المخزون داخلية للمدير فقط.
+      // الزبون والمندوب يرون المنتج بصورة طبيعية دون أي إشارة إلى الكمية أو النفاد.
+      if (!(isAdmin || loggedAdmin)) return '';
+      const s = getProductStockStatus(product);
+      if (s.out) {
+        return `<span class="inventory-badge inventory-out">📦 نفاد المخزون — الطلبات المؤجلة: مفعلة</span>`;
+      }
+      if (s.low) {
+        return `<span class="inventory-badge inventory-low">📦 المخزون: ${s.stock} | حد التنبيه: ${s.minStock}</span>`;
+      }
+      return `<span class="inventory-badge inventory-ok">📦 المخزون: ${s.stock}</span>`;
+    }
+
+    function getOrderStatusLabel(status) {
+      return ({
+        new:'📥 تم استلام الطلب', preparing:'🔵 الطلب قيد التجهيز', ready:'📦 الطلب جاهز', backorder:'🟣 طلب مؤجل — بانتظار توفر الكمية',
+        with_delegate:'🚚 الطلب مع السائق', delivered:'✅ تم تسليم الطلب', cancelled:'🔴 ملغي'
+      })[status] || '🟡 جديد';
+    }
+    function getPaymentMethodLabel(method) {
+      return ({cash:'نقدي', transfer:'تحويل', credit:'آجل'})[method] || 'نقدي';
+    }
+
+    async function writeAuditLog(action, details, meta = {}) {
+      const actor = loggedAdmin?.username || (isAdmin ? 'admin' : loggedDelegate?.username || loggedCustomer?.username || 'unknown');
+      const entry = {
+        id: 'AUD-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+        action: String(action || ''),
+        details: String(details || ''),
+        actor: String(actor),
+        actorRole: isAdmin || loggedAdmin ? 'admin' : loggedDelegate ? 'delegate' : loggedCustomer ? 'customer' : 'unknown',
+        createdAt: Date.now(),
+        meta: meta || {}
+      };
+      auditLogs = [entry, ...(auditLogs || [])].slice(0, 500);
+      localStorage.setItem('mustaqbal_audit_logs', JSON.stringify(auditLogs));
+      try { await db.collection('auditLogs').doc(entry.id).set(entry); } catch (_) {}
+      return entry;
+    }
+
+
+    function applyManagerOnlyInventoryUI() {
+      const manager = !!(isAdmin || loggedAdmin);
+      ['product-stock','product-min-stock','product-sku'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const wrapper = el.closest('.compact-input')?.parentElement || el.parentElement;
+        // SKU is also an internal product code; keep it manager-only.
+        if (wrapper) wrapper.style.display = manager ? '' : 'none';
+        el.style.display = manager ? '' : 'none';
+      });
+      const dashboard = document.getElementById('business-dashboard');
+      if (dashboard) dashboard.style.display = manager ? '' : 'none';
+      document.querySelectorAll('.admin-tools-grid').forEach(el => {
+        el.style.display = manager ? '' : 'none';
+      });
+    }
+
+    function renderBusinessDashboard() {
+      if (!(isAdmin || loggedAdmin)) return;
+      const today = new Date();
+      const y = today.getFullYear(), m = String(today.getMonth()+1).padStart(2,'0'), d = String(today.getDate()).padStart(2,'0');
+      const todayKey = `${y}-${m}-${d}`;
+      const todayInvoices = (invoices || []).filter(inv => String(inv.rawDate || '') === todayKey);
+      const sales = todayInvoices.reduce((s, inv) => s + Number(inv.total || 0), 0);
+      const low = (products || []).filter(p => Number(p.stock ?? 0) <= Number(p.minStock ?? 5)).length;
+      const set = (id, value) => { const el=document.getElementById(id); if(el) el.textContent=value; };
+      set('dash-sales-today', formatPrice(sales) + ' د.ع');
+      set('dash-orders-today', String(todayInvoices.length));
+      set('dash-delegate-orders', String((invoices || []).filter(inv => inv.ownerRole === 'delegate').length));
+      set('dash-low-stock', String(low));
+    }
+
+    function openLowStockReport() {
+      if (!requireAdminPermission('editProducts')) return;
+      const box = document.getElementById('low-stock-list');
+      if (!box) return;
+      const list = (products || []).filter(p => Number(p.stock ?? 0) <= Number(p.minStock ?? 5))
+        .sort((a,b) => Number(a.stock||0)-Number(b.stock||0));
+      box.innerHTML = list.length ? list.map(p => {
+        const stock = Number(p.stock || 0), min = Number(p.minStock ?? 5);
+        return `<div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:14px;padding:11px;">
+          <strong>${escapeHtml(p.name)}</strong>
+          <div style="font-size:.74rem;color:var(--text-muted);margin-top:4px;">المخزون: ${stock} | حد التنبيه: ${min} | المباع: ${Number(p.soldQty||0)}</div>
+        </div>`;
+      }).join('') : '<div class="notification-empty">لا توجد منتجات منخفضة المخزون حالياً.</div>';
+      document.getElementById('low-stock-modal').classList.remove('hidden');
+    }
+    function closeLowStockReport() { document.getElementById('low-stock-modal')?.classList.add('hidden'); }
+
+    async function openAuditLogModal() {
+      if (!(isAdmin || loggedAdmin)) {
+        alert('هذه الصفحة متاحة للمدير فقط.');
         return;
       }
 
-      // بعد نجاح Firestore فقط نحفظها محلياً ونفتح الإيصال.
-      invoices.unshift(newInvoice);
-      saveData();
-      renderReceiptHTML(newInvoice);
-      setCurrentCart([]);
-      updateCartUI();
-      document.getElementById('checkout-form').reset();
-      const searchCustomerInput = document.getElementById('searchCustomerInput');
-      if (searchCustomerInput) searchCustomerInput.value = '';
-      closeCartModal();
-      document.getElementById('receipt-modal').classList.remove('hidden');
+      const modal = document.getElementById('audit-log-modal');
+      const list = document.getElementById('audit-log-list');
+      if (!modal || !list) return;
+
+      modal.classList.remove('hidden');
+      list.innerHTML = '<div class="notification-empty">⏳ جارٍ تحميل سجل عمليات الإدارة...</div>';
+
+      let logs = [];
+      try {
+        const snap = await db.collection('auditLogs')
+          .orderBy('createdAt', 'desc')
+          .limit(200)
+          .get();
+        logs = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+      } catch (err) {
+        console.warn('تعذر تحميل سجل الإدارة من Firestore، سيتم استخدام النسخة المحلية:', err);
+        logs = Array.isArray(auditLogs) ? [...auditLogs] : [];
+      }
+
+      logs.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+
+      if (!logs.length) {
+        list.innerHTML = '<div class="notification-empty">📋 لا توجد عمليات إدارية مسجلة حتى الآن.</div>';
+        return;
+      }
+
+      const formatAuditDate = (value) => {
+        const d = new Date(Number(value) || value);
+        if (Number.isNaN(d.getTime())) return 'تاريخ غير معروف';
+        return d.toLocaleString('ar-IQ', {
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit'
+        });
+      };
+
+      const roleLabel = (role) => ({
+        admin: 'مدير', delegate: 'مندوب', customer: 'زبون'
+      })[role] || 'غير معروف';
+
+      list.innerHTML = logs.map(log => {
+        const action = escapeHtml(log.action || 'عملية إدارية');
+        const details = escapeHtml(log.details || 'بدون تفاصيل');
+        const actor = escapeHtml(log.actor || 'غير معروف');
+        const role = escapeHtml(roleLabel(log.actorRole));
+        const date = escapeHtml(formatAuditDate(log.createdAt));
+
+        return `
+          <div style="background:#fff;border:1px solid var(--border-color);border-radius:16px;padding:12px;box-shadow:0 4px 12px rgba(15,23,42,.04);">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+              <div style="min-width:0;flex:1;">
+                <div style="font-weight:900;color:var(--primary-dark);font-size:.86rem;">${action}</div>
+                <div style="margin-top:5px;color:#475569;font-size:.78rem;line-height:1.7;white-space:pre-wrap;word-break:break-word;">${details}</div>
+              </div>
+              <span class="notification-chip" style="white-space:nowrap;">${role}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:9px;padding-top:8px;border-top:1px solid #f1f5f9;color:var(--text-muted);font-size:.68rem;">
+              <span>👤 ${actor}</span>
+              <span>🕒 ${date}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
+
+    const ORDER_TRACKING_STEPS = [
+      { value:'new', label:'تم استلام الطلب', icon:'📥' },
+      { value:'preparing', label:'الطلب قيد التجهيز', icon:'🔵' },
+      { value:'ready', label:'الطلب جاهز', icon:'📦' },
+      { value:'with_delegate', label:'الطلب مع السائق', icon:'🚚' },
+      { value:'delivered', label:'تم تسليم الطلب', icon:'✅' }
+    ];
+
+    function getTrackingStatusLabel(status) {
+      const found = ORDER_TRACKING_STEPS.find(x => x.value === String(status || 'new'));
+      return found ? `${found.icon} ${found.label}` : getOrderStatusLabel(status);
+    }
+    function getTrackingStatusOptions(current) {
+      const value = String(current || 'new');
+      return ORDER_TRACKING_STEPS.map(x => `<option value="${x.value}" ${x.value === value ? 'selected' : ''}>${x.icon} ${x.label}</option>`).join('');
+    }
+    function getTrackingTimelineHTML(status) {
+      const current = String(status || 'new');
+      const index = Math.max(0, ORDER_TRACKING_STEPS.findIndex(x => x.value === current));
+      return `<div class="tracking-timeline">${ORDER_TRACKING_STEPS.map((x,i) => `<span class="tracking-step ${i <= index ? 'active' : ''}" title="${escapeHtml(x.label)}"></span>`).join('')}</div>`;
+    }
+    async function openOrderTrackingModal() {
+      if (!(isAdmin || loggedAdmin)) return alert('تتبع الطلبات متاح للمدير فقط.');
+      const modal=document.getElementById('order-tracking-modal'); if(!modal)return;
+      modal.classList.remove('hidden');
+      const box=document.getElementById('order-tracking-list'); if(box) box.innerHTML='<div class="notification-empty">⏳ جارٍ تحميل الطلبات...</div>';
+      await loadInvoicesFromFirestore(); renderOrderTrackingList();
+    }
+    function closeOrderTrackingModal(){ document.getElementById('order-tracking-modal')?.classList.add('hidden'); }
+    function renderOrderTrackingList(){
+      const box=document.getElementById('order-tracking-list'); if(!box)return;
+      const q=String(document.getElementById('order-tracking-search')?.value||'').trim().toLowerCase();
+      let list=Array.isArray(invoices)?[...invoices]:[];
+      list.sort((a,b)=>Number(b.createdAt||0)-Number(a.createdAt||0));
+      if(q) list=list.filter(inv=>[inv.id,inv.customer?.name,inv.customer?.phone,inv.customer?.username,inv.delegateUsername,getTrackingStatusLabel(inv.orderStatus)].join(' ').toLowerCase().includes(q));
+      if(!list.length){box.innerHTML='<div class="notification-empty">لا توجد طلبات مطابقة.</div>';return;}
+      box.innerHTML=list.map(inv=>{
+        const current=String(inv.orderStatus||'new'), customerName=inv.customer?.name||'غير محدد';
+        const recipient=inv.ownerRole==='delegate'?`مندوب: ${inv.delegateUsername||'غير محدد'}`:`زبون: ${inv.customer?.username||'غير محدد'}`;
+        const id=escapeNotificationHtml(inv.id);
+        return `<div class="order-tracking-card"><div class="order-tracking-top"><div><div class="order-tracking-id">🧾 ${id}</div><div class="order-tracking-customer">الزبون: ${escapeNotificationHtml(customerName)}<br>الإشعار إلى: ${escapeNotificationHtml(recipient)}<br>التاريخ: ${escapeNotificationHtml(inv.date||inv.rawDate||'')}</div></div><span class="order-status-chip">${escapeNotificationHtml(getTrackingStatusLabel(current))}</span></div>${getTrackingTimelineHTML(current)}<div class="order-tracking-actions"><select class="order-status-select" onchange="updateOrderTrackingStatus('${id}',this.value)">${getTrackingStatusOptions(current)}</select><button type="button" class="btn btn-secondary" onclick="viewSavedInvoice('${id}')">عرض</button></div></div>`;
+      }).join('');
+    }
+    async function updateOrderTrackingStatus(invoiceId,newStatus){
+      if(!(isAdmin||loggedAdmin))return alert('تعديل حالة الطلب متاح للمدير فقط.');
+      const id=String(invoiceId||''), status=String(newStatus||'new'), inv=(invoices||[]).find(x=>String(x.id)===id); if(!inv)return;
+      const oldStatus=String(inv.orderStatus||'new'); if(oldStatus===status)return;
+      try{
+        const now=Date.now();
+        await db.collection('invoices').doc(id).set({orderStatus:status,orderStatusUpdatedAt:now,orderStatusUpdatedBy:loggedAdmin?.username||(isAdmin?'admin':'manager')},{merge:true});
+        inv.orderStatus=status; inv.orderStatusUpdatedAt=now; inv.orderStatusUpdatedBy=loggedAdmin?.username||(isAdmin?'admin':'manager');
+        saveData(); renderOrderTrackingList(); if(typeof renderInvoicesList==='function')renderInvoicesList();
+        await sendOrderStatusNotification(inv,status);
+        await writeAuditLog('updateOrderStatus',`تم تغيير حالة الطلب ${id} من "${getTrackingStatusLabel(oldStatus)}" إلى "${getTrackingStatusLabel(status)}"`,{invoiceId:id,oldStatus,newStatus:status});
+      }catch(err){console.error('خطأ تحديث حالة الطلب:',err);alert('تعذر تحديث حالة الطلب. تأكد من صلاحيات Firestore.');renderOrderTrackingList();}
+    }
+    async function sendOrderStatusNotification(invoice,status){
+      const id=String(invoice?.id||''), entry=ORDER_TRACKING_STEPS.find(x=>x.value===String(status||'new')); if(!id||!entry)return;
+      let recipientType,recipientUsername;
+      if(invoice.ownerRole==='delegate'||invoice.delegateUsername){recipientType='delegate';recipientUsername=String(invoice.delegateUsername||'').trim();}
+      else{recipientType='customer';recipientUsername=String(invoice.customer?.username||'').replace(/^زبون:\s*/i,'').trim();}
+      if(!recipientUsername)return;
+      const now=Date.now();
+      const data={id:`order_status_${id}_${status}_${now}`,sender:'admin',senderName:'إدارة المتجر',recipientType,recipientUsername,audience:'direct',subject:`تحديث حالة الطلب ${id}`,details:`${entry.icon} ${entry.label}\nرقم الطلب: ${id}\nالزبون: ${invoice.customer?.name||'غير محدد'}`,createdAt:now,notificationType:'order_status',invoiceId:id,orderStatus:String(status),pushStatus:'pending',pushRequestedAt:now};
+      await db.collection('notifications').doc(data.id).set(data);
+      notifications=[data,...(notifications||[]).filter(n=>String(n.id)!==String(data.id))];
+      localStorage.setItem('mustaqbal_notifications_cache',JSON.stringify(notifications));
+    }
+
+    function closeAuditLogModal() { document.getElementById('audit-log-modal')?.classList.add('hidden'); }
 
     function renderReceiptHTML(invoice) {
       const area = document.getElementById('receipt-area');
@@ -5203,6 +5778,11 @@
           </thead>
           <tbody>${itemsRows}</tbody>
         </table>
+        <div style="display:grid;gap:6px;margin-top:10px;font-size:.78rem;">
+          <div><strong>حالة الطلب:</strong> <span class="order-status-chip">${getOrderStatusLabel(invoice.orderStatus)}</span></div>
+          <div><strong>طريقة الدفع:</strong> ${getPaymentMethodLabel(invoice.paymentMethod)}</div>
+          ${invoice.ownerRole === 'delegate' && invoice.paymentMethod ? `<div><strong>طريقة الدفع:</strong> ${getPaymentMethodLabel(invoice.paymentMethod)}</div>` : ''}
+        </div>
         <div class="receipt-total-box">المجموع الكلي: ${formatPrice(Number(invoice.total) || 0)} د.ع</div>
       `;
     }
