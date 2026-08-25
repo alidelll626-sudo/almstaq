@@ -5422,17 +5422,26 @@
             const snap = productSnaps[i];
             const data = snap.exists ? (snap.data() || {}) : null;
             if (!data) throw new Error(`PRODUCT_NOT_FOUND:${item.name}`);
-            const stock = Number(data.stock ?? 0);
-            const qty = Number(item.qty || 0);
+            // أي قيمة stock غير رقمية تُعامل كمخزون صفر ولا تمنع إصدار الفاتورة.
+            // هذا يسمح بالطلبات القديمة التي تحتوي stock كنص أو قيمة فارغة.
+            const rawStock = Number(data.stock);
+            const stock = Number.isFinite(rawStock) ? rawStock : 0;
+            const rawQty = Number(item.qty);
+            const qty = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 0;
             const availableQty = Math.max(0, stock);
             const fulfilledQty = Math.min(availableQty, qty);
             const backorderQty = Math.max(0, qty - fulfilledQty);
+
+            const rawSoldQty = Number(data.soldQty);
+            const baseSoldQty = Number.isFinite(rawSoldQty) ? rawSoldQty : 0;
+
             updatedProducts.push({
               ref: productRefs[i],
               data,
               stock: availableQty - fulfilledQty,
-              soldQty: Number(data.soldQty || 0) + fulfilledQty,
-              backorderQty
+              soldQty: baseSoldQty + fulfilledQty,
+              backorderQty,
+              originalStockIsNumeric: Number.isFinite(rawStock)
             });
           }
 
@@ -5454,10 +5463,15 @@
           // إذا كان المخزون صفراً أو أقل، لا نحدّث المنتج إطلاقاً ولا نمنع إنشاء الفاتورة.
           // تبقى الكمية المطلوبة مسجلة في backorderedItems وتُحفظ الفاتورة بحالة backorder.
           updatedProducts.forEach(p => {
-            const originalStock = Math.max(0, Number(p.data.stock ?? 0));
-            const stockWasFulfilled = Number(p.soldQty || 0) > Number(p.data.soldQty || 0);
+            const originalStockRaw = Number(p.data.stock);
+            const originalStock = Number.isFinite(originalStockRaw) ? Math.max(0, originalStockRaw) : 0;
+            const originalSoldQtyRaw = Number(p.data.soldQty);
+            const originalSoldQty = Number.isFinite(originalSoldQtyRaw) ? originalSoldQtyRaw : 0;
+            const stockWasFulfilled = Number(p.soldQty || 0) > originalSoldQty;
 
-            if (!stockWasFulfilled || originalStock <= 0) {
+            // إذا كان stock غير رقمي أو صفراً أو أقل، لا نحدّث هذا المنتج.
+            // تُصدر الفاتورة مع تسجيل الكمية كطلب مؤجل بدلاً من رفض الطلب.
+            if (!p.originalStockIsNumeric || !stockWasFulfilled || originalStock <= 0) {
               return;
             }
 
@@ -5555,14 +5569,21 @@
                   const deltaSold = nextSold - soldQty;
 
                   // Rules الحالية تتطلب أن تكون القيمة الحالية غير سالبة، وأن يتساوى فرق المخزون مع زيادة المباع.
+                  // stock غير الرقمي أو المخزون صفر لا يمنع الفاتورة.
+                  // يُعامل كمخزون صفر/طلب مؤجل، ولا يدخل في تشخيص الرفض.
+                  const stockUsable = Number.isFinite(stock) ? Math.max(0, stock) : 0;
+                  const soldUsable = Number.isFinite(soldQty) ? soldQty : 0;
+                  const isStockNumeric = stockType === 'number' && Number.isFinite(rawStock);
+                  const noStockUpdateNeeded = !isStockNumeric || stockUsable <= 0;
+
                   const checks = {
-                    stockIsNumber: stockType === 'number' && Number.isFinite(rawStock),
-                    soldQtyIsNumber: rawSoldQty == null || (soldQtyType === 'number' && Number.isFinite(rawSoldQty)),
-                    stockCurrentNonNegative: Number.isFinite(stock) && stock >= 0,
-                    stockNextNonNegative: Number.isFinite(nextStock) && nextStock >= 0,
-                    stockNotIncreased: Number.isFinite(stock) && nextStock <= stock,
-                    soldNotDecreased: Number.isFinite(soldQty) && nextSold >= soldQty,
-                    deltaMatches: Number.isFinite(deltaStock) && Number.isFinite(deltaSold) && deltaStock === deltaSold
+                    stockIsNumber: true,
+                    soldQtyIsNumber: true,
+                    stockCurrentNonNegative: true,
+                    stockNextNonNegative: noStockUpdateNeeded || (Number.isFinite(nextStock) && nextStock >= 0),
+                    stockNotIncreased: noStockUpdateNeeded || (Number.isFinite(nextStock) && nextStock <= stockUsable),
+                    soldNotDecreased: noStockUpdateNeeded || (Number.isFinite(nextSold) && nextSold >= soldUsable),
+                    deltaMatches: noStockUpdateNeeded || (Number.isFinite(deltaStock) && Number.isFinite(deltaSold) && deltaStock === deltaSold)
                   };
 
                   const failed = Object.keys(checks).filter(key => !checks[key]);
