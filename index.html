@@ -6184,39 +6184,104 @@
     async function renderExportCanvas(invoiceElementId) {
       const invoiceElement = document.getElementById(invoiceElementId);
 
-      if (!invoiceElement) {
-        throw new Error('لم يتم العثور على عنصر الفاتورة.');
-      }
+      if (!invoiceElement) throw new Error('لم يتم العثور على عنصر الفاتورة.');
+      if (typeof html2canvas !== 'function') throw new Error('مكتبة html2canvas غير محملة.');
 
-      if (typeof html2canvas !== 'function') {
-        throw new Error('مكتبة html2canvas غير محملة.');
-      }
-
-      // مهم جداً: الفاتورة السابقة موجودة داخل نافذة مخفية.
-      // يجب جعلها ظاهرة قبل أن يلتقطها html2canvas.
       const modal = invoiceElement.closest('.modal');
-      if (modal && modal.classList.contains('hidden')) {
-        modal.classList.remove('hidden');
-      }
+      if (modal && modal.classList.contains('hidden')) modal.classList.remove('hidden');
 
       await waitForNextPaint();
+      try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
+      await waitForNextPaint();
+
+      const isStats = invoiceElementId === 'product-stats-receipt-area';
+      const sourceRect = invoiceElement.getBoundingClientRect();
+      const exportWidth = isStats ? 794 : Math.max(
+        invoiceElement.scrollWidth || 0,
+        invoiceElement.clientWidth || 0,
+        sourceRect.width || 0,
+        480
+      );
+
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = [
+        'position:fixed',
+        'left:-100000px',
+        'top:0',
+        `width:${exportWidth}px`,
+        'background:#ffffff',
+        'box-sizing:border-box',
+        'direction:rtl',
+        'overflow:visible',
+        'padding:0',
+        'margin:0'
+      ].join(';');
+
+      const clone = invoiceElement.cloneNode(true);
+      clone.style.width = `${exportWidth}px`;
+      clone.style.maxWidth = `${exportWidth}px`;
+      clone.style.height = 'auto';
+      clone.style.minHeight = '0';
+      clone.style.overflow = 'visible';
+      clone.style.margin = '0';
+      clone.style.boxSizing = 'border-box';
+
+      if (isStats) {
+        const style = document.createElement('style');
+        style.textContent = `
+          .product-stats-receipt { width:794px !important; max-width:794px !important; overflow:visible !important; }
+          .product-stats-hero, .product-stats-body { width:100% !important; box-sizing:border-box !important; }
+          .product-stats-table-wrap { width:100% !important; max-width:100% !important; overflow:visible !important; box-sizing:border-box !important; }
+          .product-stats-table { width:100% !important; max-width:100% !important; min-width:0 !important; table-layout:fixed !important; box-sizing:border-box !important; font-size:.62rem !important; }
+          .product-stats-table th, .product-stats-table td { white-space:normal !important; overflow-wrap:anywhere !important; word-break:break-word !important; box-sizing:border-box !important; padding:7px 4px !important; }
+          .product-stats-table th:nth-child(1), .product-stats-table td:nth-child(1) { width:5% !important; }
+          .product-stats-table th:nth-child(2), .product-stats-table td:nth-child(2) { width:30% !important; }
+          .product-stats-table th:nth-child(3), .product-stats-table td:nth-child(3) { width:14% !important; }
+          .product-stats-table th:nth-child(4), .product-stats-table td:nth-child(4) { width:14% !important; }
+          .product-stats-table th:nth-child(5), .product-stats-table td:nth-child(5) { width:19% !important; }
+          .product-stats-table th:nth-child(6), .product-stats-table td:nth-child(6) { width:18% !important; }
+          .product-stats-product { min-width:0 !important; width:30% !important; }
+          .product-stats-product-name { font-size:.62rem !important; line-height:1.35 !important; }
+          .product-stats-product-note { font-size:.50rem !important; }
+          .stats-number { font-size:.66rem !important; }
+          .stats-status { font-size:.48rem !important; padding:4px 4px !important; white-space:normal !important; }
+          .product-stats-summary-label { font-size:.50rem !important; }
+          .product-stats-summary-value { font-size:.76rem !important; }
+          .product-stats-info { font-size:.58rem !important; }
+        `;
+        clone.prepend(style);
+      }
+
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
 
       try {
-        if (document.fonts && document.fonts.ready) {
-          await document.fonts.ready;
-        }
-      } catch (e) {}
+        await waitForNextPaint();
+        const canvas = await html2canvas(wrapper, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          imageTimeout: 15000,
+          windowWidth: Math.max(document.documentElement.clientWidth, exportWidth)
+        });
 
-      await waitForNextPaint();
-
-      return await html2canvas(invoiceElement, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-        imageTimeout: 15000
-      });
+        // نحتفظ بنهايات الصفوف من نسخة التصدير نفسها، وليس من جدول الشاشة.
+        // هذا مهم لأن نسخة A4 تستخدم عرضاً وخطوطاً مختلفين عن العرض القابل للتمرير.
+        const exportRows = Array.from(clone.querySelectorAll('.product-stats-table tbody tr'));
+        const cloneRect = clone.getBoundingClientRect();
+        const cloneScrollHeight = Math.max(clone.scrollHeight || 0, cloneRect.height || 1);
+        const rowBreaks = exportRows.map(row => {
+          const r = row.getBoundingClientRect();
+          return Math.round((r.bottom - cloneRect.top) * (canvas.height / cloneScrollHeight));
+        }).filter(v => v > 0 && v < canvas.height);
+        canvas.__exportRowBreaks = [...new Set(rowBreaks)].sort((a,b) => a-b);
+        canvas.__exportScrollHeight = cloneScrollHeight;
+        return canvas;
+      } finally {
+        wrapper.remove();
+      }
     }
 
     async function downloadInvoiceAsImage(invoiceElementId, fallbackName) {
@@ -6256,12 +6321,6 @@
           return;
         }
 
-        const invoiceElement = document.getElementById(invoiceElementId);
-        if (!invoiceElement) throw new Error('لم يتم العثور على الفاتورة.');
-        if (typeof html2canvas !== 'function') {
-          throw new Error('مكتبة html2canvas غير محملة.');
-        }
-
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF({
           orientation: 'portrait',
@@ -6276,162 +6335,18 @@
         const usableWidth = pageWidth - margin * 2;
         const usableHeight = pageHeight - margin * 2;
 
-        const waitPaint = () => new Promise(resolve => {
-          requestAnimationFrame(() => requestAnimationFrame(resolve));
-        });
-
-        await waitPaint();
-        try {
-          if (document.fonts && document.fonts.ready) await document.fonts.ready;
-        } catch (_) {}
-        await waitPaint();
-
-        /*
-         * الإصلاح النهائي:
-         * بدلاً من تصوير كل صف في جدول مستقل ثم حساب ارتفاعاته بشكل منفصل،
-         * نصوّر الفاتورة كاملة مرة واحدة بنفس تخطيطها الحقيقي.
-         *
-         * بعد ذلك نأخذ مواقع نهاية الصفوف من DOM الأصلي، ونحوّلها إلى نقاط
-         * قص. كل صفحة تحتوي أكبر عدد ممكن من الصفوف الكاملة.
-         *
-         * بهذه الطريقة:
-         * - لا توجد فراغات ضخمة مصطنعة.
-         * - لا ينقسم صف بين صفحتين.
-         * - لا يتكرر عنوان الجدول قبل كل منتج.
-         * - تبقى الفاتورة بنفس شكلها الحقيقي.
-         */
-
-        const rect = invoiceElement.getBoundingClientRect();
-        const captureWidth = Math.max(
-          invoiceElement.scrollWidth || 0,
-          invoiceElement.clientWidth || 0,
-          rect.width || 0,
-          480
-        );
-
-        // لقطة واحدة للفواتير، مع إزالة أي تأثير للـ viewport على العرض.
-        const wrapper = document.createElement('div');
-        wrapper.style.cssText = [
-          'position:fixed',
-          'left:-100000px',
-          'top:0',
-          `width:${captureWidth}px`,
-          'background:#ffffff',
-          'box-sizing:border-box',
-          'direction:rtl',
-          'overflow:visible',
-          'padding:0',
-          'margin:0'
-        ].join(';');
-
-        const clone = invoiceElement.cloneNode(true);
-        clone.style.width = '100%';
-        clone.style.maxWidth = 'none';
-        clone.style.height = 'auto';
-        clone.style.minHeight = '0';
-        clone.style.overflow = 'visible';
-        clone.style.margin = '0';
-        clone.style.boxSizing = 'border-box';
-
-        // تقرير إحصائيات المنتجات يحتوي 6 أعمدة، بينما العرض داخل نافذة التطبيق
-        // يسمح بالتمرير الأفقي. هذا مناسب للشاشة لكنه كان يجعل آخر عمودين
-        // خارج لقطة PDF. في نسخة التصدير نجعل الجدول متجاوباً مع عرض A4.
-        if (invoiceElementId === 'product-stats-receipt-area') {
-          const statsStyle = document.createElement('style');
-          statsStyle.textContent = `
-            .product-stats-receipt { overflow: visible !important; }
-            .product-stats-table-wrap { overflow: visible !important; width: 100% !important; }
-            .product-stats-table {
-              width: 100% !important;
-              min-width: 0 !important;
-              table-layout: fixed !important;
-              font-size: .62rem !important;
-            }
-            .product-stats-table th, .product-stats-table td {
-              padding: 7px 4px !important;
-              white-space: normal !important;
-              overflow-wrap: anywhere !important;
-              word-break: break-word !important;
-            }
-            .product-stats-table th:nth-child(1), .product-stats-table td:nth-child(1) { width: 5% !important; }
-            .product-stats-table th:nth-child(2), .product-stats-table td:nth-child(2) { width: 32% !important; }
-            .product-stats-table th:nth-child(3), .product-stats-table td:nth-child(3) { width: 13% !important; }
-            .product-stats-table th:nth-child(4), .product-stats-table td:nth-child(4) { width: 13% !important; }
-            .product-stats-table th:nth-child(5), .product-stats-table td:nth-child(5) { width: 18% !important; }
-            .product-stats-table th:nth-child(6), .product-stats-table td:nth-child(6) { width: 19% !important; }
-            .product-stats-product { min-width: 0 !important; width: 32% !important; }
-            .product-stats-product-name { font-size: .64rem !important; line-height: 1.35 !important; }
-            .product-stats-product-note { font-size: .52rem !important; }
-            .stats-number { font-size: .68rem !important; }
-            .stats-status { font-size: .50rem !important; padding: 4px 5px !important; white-space: normal !important; }
-            .product-stats-summary-label { font-size: .50rem !important; }
-            .product-stats-summary-value { font-size: .78rem !important; }
-            .product-stats-info { font-size: .60rem !important; }
-          `;
-          clone.prepend(statsStyle);
-        }
-
-        wrapper.appendChild(clone);
-        document.body.appendChild(wrapper);
-
-        let canvas;
-        try {
-          await waitPaint();
-          canvas = await html2canvas(wrapper, {
-            scale: 2,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: '#ffffff',
-            logging: false,
-            imageTimeout: 15000,
-            windowWidth: Math.max(document.documentElement.clientWidth, captureWidth)
-          });
-        } finally {
-          wrapper.remove();
-        }
-
+        // نستخدم نفس نسخة A4 التي تُستخدم للصورة، وليس نسخة الجدول القابلة للتمرير.
+        const canvas = await renderExportCanvas(invoiceElementId);
         if (!canvas || !canvas.width || !canvas.height) {
           throw new Error('تعذر إنشاء صورة الفاتورة.');
         }
 
-        /*
-         * نستخدم DOM الأصلي لتحديد الحدود الطبيعية للصفوف.
-         * لأن canvas له نفس عرض الفاتورة، يمكن تحويل إحداثيات DOM إلى pixels
-         * في الصورة بدقة.
-         */
-        const table = invoiceElement.querySelector('.receipt-table, .product-stats-table');
-        const rows = table ? Array.from(table.querySelectorAll('tbody tr')) : [];
-
-        const invoiceRect = invoiceElement.getBoundingClientRect();
-        const scaleX = canvas.width / Math.max(invoiceElement.scrollWidth || invoiceRect.width, 1);
-        const scaleY = canvas.height / Math.max(invoiceElement.scrollHeight || invoiceRect.height, 1);
-
-        const naturalBreaks = [];
-
-        // كل نهاية صف هي نقطة قص آمنة.
-        rows.forEach(row => {
-          const r = row.getBoundingClientRect();
-          const bottom = Math.round((r.bottom - invoiceRect.top) * scaleY);
-          if (bottom > 0 && bottom < canvas.height) {
-            naturalBreaks.push(bottom);
-          }
-        });
-
-        // نهاية الفاتورة نقطة قص أخيرة.
-        naturalBreaks.push(canvas.height);
-
-        // إزالة التكرارات والترتيب.
-        const breaks = [...new Set(naturalBreaks.filter(n => n > 0))]
-          .sort((a, b) => a - b);
-
         const pxPerMm = canvas.width / usableWidth;
-        const pageHeightPx = usableHeight * pxPerMm;
+        const pageHeightPx = Math.max(1, Math.floor(usableHeight * pxPerMm));
+        const naturalBreaks = Array.isArray(canvas.__exportRowBreaks)
+          ? canvas.__exportRowBreaks
+          : [];
 
-        /*
-         * نبني الصفحات من الصورة الكبيرة:
-         * نختار آخر صف يمكن أن يدخل في الصفحة الحالية.
-         * لا نستخدم ارتفاعاً ثابتاً لكل صف ولا نضيف مساحة إضافية.
-         */
         let startY = 0;
         let breakIndex = 0;
         let pageNumber = 0;
@@ -6439,10 +6354,10 @@
         while (startY < canvas.height - 1) {
           let endY = null;
 
-          for (let i = breakIndex; i < breaks.length; i++) {
-            const candidate = breaks[i];
-
-            if (candidate - startY <= pageHeightPx + 1) {
+          // نختار آخر نهاية صف كاملة يمكن وضعها في الصفحة الحالية.
+          for (let i = breakIndex; i < naturalBreaks.length; i++) {
+            const candidate = naturalBreaks[i];
+            if (candidate - startY <= pageHeightPx) {
               endY = candidate;
               breakIndex = i + 1;
             } else {
@@ -6450,53 +6365,40 @@
             }
           }
 
-          // إذا لم يوجد صف كامل يتسع، نضطر لتقسيم العنصر الحالي فقط.
+          // إذا لم يتسع حتى صف واحد، نقسم الصفحة عند حد A4 حتى لا تتوقف العملية.
           if (endY === null || endY <= startY) {
             endY = Math.min(startY + pageHeightPx, canvas.height);
           }
 
-          if (pageNumber > 0) {
-            pdf.addPage();
-          }
+          if (pageNumber > 0) pdf.addPage();
 
-          const sliceHeight = endY - startY;
+          const sliceHeight = Math.max(1, endY - startY);
           const slice = document.createElement('canvas');
           slice.width = canvas.width;
-          slice.height = Math.max(1, Math.ceil(sliceHeight));
-
+          slice.height = Math.ceil(sliceHeight);
           const ctx = slice.getContext('2d');
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, slice.width, slice.height);
-          ctx.drawImage(
-            canvas,
-            0, startY, canvas.width, sliceHeight,
-            0, 0, canvas.width, sliceHeight
-          );
+          ctx.drawImage(canvas, 0, startY, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
 
-          const sliceHeightMm = slice.height / pxPerMm;
-
+          const sliceHeightMm = Math.min(usableHeight, slice.height / pxPerMm);
           pdf.addImage(
-            slice.toDataURL('image/jpeg', 0.94),
+            slice.toDataURL('image/jpeg', 0.95),
             'JPEG',
             margin,
             margin,
             usableWidth,
-            Math.min(sliceHeightMm, usableHeight),
+            sliceHeightMm,
             undefined,
             'FAST'
           );
 
           startY = endY;
           pageNumber++;
-
-          // حماية من أي حلقة غير متوقعة.
-          if (pageNumber > 200) {
-            throw new Error('تعذر تقسيم الفاتورة إلى صفحات.');
-          }
+          if (pageNumber > 200) throw new Error('تعذر تقسيم الفاتورة إلى صفحات.');
         }
 
         pdf.save(getExportFileName(invoiceElementId, fallbackName) + '.pdf');
-
       } catch (err) {
         console.error('خطأ في حفظ الفاتورة كـ PDF:', err);
         alert('تعذر إنشاء ملف PDF. حاول مرة أخرى.');
