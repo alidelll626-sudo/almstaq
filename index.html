@@ -3855,7 +3855,7 @@
       monitorActiveSession();
       if (loggedAdmin) startAdminSessionMonitor();
       applyAdminPermissionsUI();
-      renderBusinessDashboard();
+      if (isAdmin || loggedAdmin) renderBusinessDashboard();
       applyManagerOnlyInventoryUI();
     }
 
@@ -6074,7 +6074,9 @@
     }
 
     function renderBusinessDashboard() {
-      if (!requireAdminPermission('viewDashboard')) return;
+      // لوحة المؤشرات خاصة بالمديرين فقط، لذلك لا نعرض رسالة صلاحية
+      // للزبون أو المندوب عند تسجيل الدخول.
+      if (!(isAdmin || loggedAdmin) || !hasAdminPermission('viewDashboard')) return;
       const today = new Date();
       const y = today.getFullYear(), m = String(today.getMonth()+1).padStart(2,'0'), d = String(today.getDate()).padStart(2,'0');
       const todayKey = `${y}-${m}-${d}`;
@@ -6650,7 +6652,10 @@
     }
 
     async function openInvoicesModal() {
-      if (!hasAdminPermission('viewInvoices') && !hasAdminPermission('editInvoices') && !hasAdminPermission('deleteInvoices')) {
+      // الزبون والمندوب يستطيعان فتح الفواتير السابقة الخاصة بهما.
+      // صلاحيات المديرين الفرعيين تطبق فقط على دخولهم كمديرين.
+      const isCustomerOrDelegate = !!(loggedCustomer || loggedDelegate);
+      if (!isCustomerOrDelegate && !hasAdminPermission('viewInvoices') && !hasAdminPermission('editInvoices') && !hasAdminPermission('deleteInvoices')) {
         return requireAdminPermission('viewInvoices');
       }
       document.getElementById('invoices-modal').classList.remove('hidden');
@@ -6923,7 +6928,9 @@
     }
 
     async function exportSavedInvoicePDF(invoiceId) {
-      if (!requireAdminPermission('exportReports')) return;
+      // تصدير الفاتورة الشخصية متاح للزبون والمندوب، بينما تقارير PDF
+      // الإدارية تبقى محكومة بصلاحية المدير.
+      if (!(loggedCustomer || loggedDelegate) && !requireAdminPermission('exportReports')) return;
       const inv = invoices.find(i => String(i.id) === String(invoiceId));
 
       if (!inv) {
