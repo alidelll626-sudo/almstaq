@@ -5408,86 +5408,113 @@
 
       try {
         let backorderedItems = [];
+
+        // نجمع حالة المنتجات أولاً، لكن أي مشكلة في المخزون لا تمنع الفاتورة.
+        const productRefs = currentCart.map(item => db.collection('products').doc(String(item.id)));
+        const productSnaps = await Promise.all(productRefs.map(ref => ref.get()));
+        const stockPlans = [];
+
+        for (let i = 0; i < currentCart.length; i++) {
+          const item = currentCart[i];
+          const snap = productSnaps[i];
+          const data = snap.exists ? (snap.data() || {}) : null;
+          const requestedQtyRaw = Number(item.qty);
+          const requestedQty = Number.isFinite(requestedQtyRaw) && requestedQtyRaw > 0 ? requestedQtyRaw : 0;
+
+          if (!data) {
+            stockPlans.push({
+              ref: productRefs[i],
+              productId: item.id,
+              name: item.name || String(item.id),
+              productExists: false,
+              requestedQty,
+              backorderQty: requestedQty,
+              originalStockIsNumeric: false
+            });
+            continue;
+          }
+
+          const rawStock = Number(data.stock);
+          const stockIsNumeric = Number.isFinite(rawStock);
+          const availableQty = stockIsNumeric ? Math.max(0, rawStock) : 0;
+          const fulfilledQty = Math.min(availableQty, requestedQty);
+          const backorderQty = Math.max(0, requestedQty - fulfilledQty);
+
+          stockPlans.push({
+            ref: productRefs[i],
+            productId: data.id || item.id,
+            name: data.name || item.name || String(item.id),
+            productExists: true,
+            requestedQty,
+            fulfilledQty,
+            backorderQty,
+            originalStockIsNumeric: stockIsNumeric
+          });
+        }
+
+        backorderedItems = stockPlans
+          .filter(p => p.backorderQty > 0)
+          .map(p => ({
+            productId: p.productId,
+            name: p.name,
+            requestedQty: p.requestedQty,
+            fulfilledQty: Number(p.fulfilledQty || 0),
+            backorderQty: Number(p.backorderQty || 0)
+          }));
+
+        if (backorderedItems.length) {
+          newInvoice.orderStatus = 'backorder';
+          newInvoice.stockNote = 'تم قبول الطلب وإصدار الفاتورة حتى مع عدم توفر بعض المنتجات أو كون مخزونها صفراً أو غير صالح. الكميات غير المتوفرة سُجلت كطلب مؤجل دون منع الفاتورة.';
+          newInvoice.backorderedItems = backorderedItems;
+        }
+
+        // أولاً: إنشاء الفاتورة وحدها. لا يدخل تحديث المخزون في نفس Transaction.
+        // لذلك فشل stock أو getAfter لا يمكنه إلغاء الفاتورة.
         await db.runTransaction(async tx => {
           const invoiceSnap = await tx.get(invoiceRef);
           if (invoiceSnap.exists) throw new Error('DUPLICATE_INVOICE');
-
-          const productRefs = currentCart.map(item => db.collection('products').doc(String(item.id)));
-          const productSnaps = [];
-          for (const ref of productRefs) productSnaps.push(await tx.get(ref));
-
-          const updatedProducts = [];
-          for (let i = 0; i < currentCart.length; i++) {
-            const item = currentCart[i];
-            const snap = productSnaps[i];
-            const data = snap.exists ? (snap.data() || {}) : null;
-            if (!data) throw new Error(`PRODUCT_NOT_FOUND:${item.name}`);
-            // أي قيمة stock غير رقمية تُعامل كمخزون صفر ولا تمنع إصدار الفاتورة.
-            // هذا يسمح بالطلبات القديمة التي تحتوي stock كنص أو قيمة فارغة.
-            const rawStock = Number(data.stock);
-            const stock = Number.isFinite(rawStock) ? rawStock : 0;
-            const rawQty = Number(item.qty);
-            const qty = Number.isFinite(rawQty) && rawQty > 0 ? rawQty : 0;
-            const availableQty = Math.max(0, stock);
-            const fulfilledQty = Math.min(availableQty, qty);
-            const backorderQty = Math.max(0, qty - fulfilledQty);
-
-            const rawSoldQty = Number(data.soldQty);
-            const baseSoldQty = Number.isFinite(rawSoldQty) ? rawSoldQty : 0;
-
-            updatedProducts.push({
-              ref: productRefs[i],
-              data,
-              stock: availableQty - fulfilledQty,
-              soldQty: baseSoldQty + fulfilledQty,
-              backorderQty,
-              originalStockIsNumeric: Number.isFinite(rawStock)
-            });
-          }
-
-          backorderedItems = updatedProducts.filter(x => x.backorderQty > 0).map(x => ({
-            productId: x.data.id,
-            name: x.data.name || '',
-            requestedQty: Number(currentCart.find(i => String(i.id) === String(x.data.id))?.qty || 0),
-            fulfilledQty: Number((currentCart.find(i => String(i.id) === String(x.data.id))?.qty || 0) - x.backorderQty),
-            backorderQty: Number(x.backorderQty)
-          }));
-
-          if (backorderedItems.length) {
-            newInvoice.orderStatus = 'backorder';
-            newInvoice.stockNote = 'تم قبول الطلب وإصدار الفاتورة حتى مع عدم توفر بعض المنتجات أو كون مخزونها صفراً. الكميات غير المتوفرة سُجلت كطلب مؤجل دون منع الفاتورة.';
-            newInvoice.backorderedItems = backorderedItems;
-          }
-
-          // تحديث المنتجات التي يوجد منها مخزون فعلي فقط.
-          // إذا كان المخزون صفراً أو أقل، لا نحدّث المنتج إطلاقاً ولا نمنع إنشاء الفاتورة.
-          // تبقى الكمية المطلوبة مسجلة في backorderedItems وتُحفظ الفاتورة بحالة backorder.
-          updatedProducts.forEach(p => {
-            const originalStockRaw = Number(p.data.stock);
-            const originalStock = Number.isFinite(originalStockRaw) ? Math.max(0, originalStockRaw) : 0;
-            const originalSoldQtyRaw = Number(p.data.soldQty);
-            const originalSoldQty = Number.isFinite(originalSoldQtyRaw) ? originalSoldQtyRaw : 0;
-            const stockWasFulfilled = Number(p.soldQty || 0) > originalSoldQty;
-
-            // إذا كان stock غير رقمي أو صفراً أو أقل، لا نحدّث هذا المنتج.
-            // تُصدر الفاتورة مع تسجيل الكمية كطلب مؤجل بدلاً من رفض الطلب.
-            if (!p.originalStockIsNumeric || !stockWasFulfilled || originalStock <= 0) {
-              return;
-            }
-
-            tx.set(p.ref, {
-              stock: p.stock,
-              soldQty: p.soldQty,
-              updatedAt: Date.now(),
-              lastStockUpdateUid: firebaseUser.uid,
-              lastStockUpdateInvoiceId: newInvoice.id
-            }, {merge:true});
-          });
-
-          // حفظ الفاتورة داخل نفس المعاملة الذرية مع تحديث المخزون،
-          // حتى لا يتم خصم المخزون بدون إنشاء الفاتورة.
           tx.set(invoiceRef, newInvoice);
         });
+
+        // ثانياً: محاولة مزامنة المخزون بعد نجاح الفاتورة.
+        // أي فشل هنا يُسجل في Console فقط ولا يلغي الفاتورة.
+        const stockCandidates = stockPlans.filter(p =>
+          p.productExists &&
+          p.originalStockIsNumeric &&
+          Number(p.fulfilledQty || 0) > 0
+        );
+
+        if (stockCandidates.length) {
+          try {
+            await db.runTransaction(async tx => {
+              for (const p of stockCandidates) {
+                const freshSnap = await tx.get(p.ref);
+                if (!freshSnap.exists) continue;
+
+                const fresh = freshSnap.data() || {};
+                const freshStock = Number(fresh.stock);
+                const freshSoldQtyRaw = Number(fresh.soldQty);
+
+                // لا نحدّث منتجاً مخزونه غير رقمي أو صفراً.
+                if (!Number.isFinite(freshStock) || freshStock <= 0) continue;
+
+                const freshSoldQty = Number.isFinite(freshSoldQtyRaw) ? freshSoldQtyRaw : 0;
+                const fulfilledQty = Math.min(Math.max(0, freshStock), Number(p.requestedQty || 0));
+                if (!Number.isFinite(fulfilledQty) || fulfilledQty <= 0) continue;
+
+                tx.set(p.ref, {
+                  stock: Math.max(0, freshStock - fulfilledQty),
+                  soldQty: freshSoldQty + fulfilledQty,
+                  updatedAt: Date.now(),
+                  lastStockUpdateUid: firebaseUser.uid,
+                  lastStockUpdateInvoiceId: newInvoice.id
+                }, {merge:true});
+              }
+            });
+          } catch (stockErr) {
+            console.warn('تم إصدار الفاتورة لكن تعذرت مزامنة بعض كميات المخزون:', stockErr);
+          }
+        }
 
         // لا ينشئ المندوب/الزبون إشعاراً باسم الإدارة؛ إشعارات حالة الطلب
         // ينشئها المدير عند تغيير الحالة من لوحة تتبع الطلبات.
