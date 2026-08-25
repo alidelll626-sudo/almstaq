@@ -6333,6 +6333,44 @@
         clone.style.margin = '0';
         clone.style.boxSizing = 'border-box';
 
+        // تقرير إحصائيات المنتجات يحتوي 6 أعمدة، بينما العرض داخل نافذة التطبيق
+        // يسمح بالتمرير الأفقي. هذا مناسب للشاشة لكنه كان يجعل آخر عمودين
+        // خارج لقطة PDF. في نسخة التصدير نجعل الجدول متجاوباً مع عرض A4.
+        if (invoiceElementId === 'product-stats-receipt-area') {
+          const statsStyle = document.createElement('style');
+          statsStyle.textContent = `
+            .product-stats-receipt { overflow: visible !important; }
+            .product-stats-table-wrap { overflow: visible !important; width: 100% !important; }
+            .product-stats-table {
+              width: 100% !important;
+              min-width: 0 !important;
+              table-layout: fixed !important;
+              font-size: .62rem !important;
+            }
+            .product-stats-table th, .product-stats-table td {
+              padding: 7px 4px !important;
+              white-space: normal !important;
+              overflow-wrap: anywhere !important;
+              word-break: break-word !important;
+            }
+            .product-stats-table th:nth-child(1), .product-stats-table td:nth-child(1) { width: 5% !important; }
+            .product-stats-table th:nth-child(2), .product-stats-table td:nth-child(2) { width: 32% !important; }
+            .product-stats-table th:nth-child(3), .product-stats-table td:nth-child(3) { width: 13% !important; }
+            .product-stats-table th:nth-child(4), .product-stats-table td:nth-child(4) { width: 13% !important; }
+            .product-stats-table th:nth-child(5), .product-stats-table td:nth-child(5) { width: 18% !important; }
+            .product-stats-table th:nth-child(6), .product-stats-table td:nth-child(6) { width: 19% !important; }
+            .product-stats-product { min-width: 0 !important; width: 32% !important; }
+            .product-stats-product-name { font-size: .64rem !important; line-height: 1.35 !important; }
+            .product-stats-product-note { font-size: .52rem !important; }
+            .stats-number { font-size: .68rem !important; }
+            .stats-status { font-size: .50rem !important; padding: 4px 5px !important; white-space: normal !important; }
+            .product-stats-summary-label { font-size: .50rem !important; }
+            .product-stats-summary-value { font-size: .78rem !important; }
+            .product-stats-info { font-size: .60rem !important; }
+          `;
+          clone.prepend(statsStyle);
+        }
+
         wrapper.appendChild(clone);
         document.body.appendChild(wrapper);
 
@@ -6361,7 +6399,7 @@
          * لأن canvas له نفس عرض الفاتورة، يمكن تحويل إحداثيات DOM إلى pixels
          * في الصورة بدقة.
          */
-        const table = invoiceElement.querySelector('.receipt-table');
+        const table = invoiceElement.querySelector('.receipt-table, .product-stats-table');
         const rows = table ? Array.from(table.querySelectorAll('tbody tr')) : [];
 
         const invoiceRect = invoiceElement.getBoundingClientRect();
