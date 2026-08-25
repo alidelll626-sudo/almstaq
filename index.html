@@ -5473,7 +5473,7 @@
         // لذلك لا يحدث رفض بسبب محاولة قراءة فاتورة غير موجودة قبل إنشائها،
         // وتبقى حماية تكرار رقم الفاتورة موجودة على مستوى Firestore.
         try {
-          await invoiceRef.create(newInvoice);
+          await invoiceRef.set(newInvoice);
         } catch (createErr) {
           if (createErr?.code === 'already-exists') {
             throw new Error('DUPLICATE_INVOICE');
