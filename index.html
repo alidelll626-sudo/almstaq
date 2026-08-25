@@ -5516,26 +5516,122 @@
               } else if (String(profile.username || '') !== expectedUsername) {
                 diagnosticMessage = 'تم رفض الطلب لأن اسم المستخدم في userProfiles لا يطابق الحساب الحالي.';
               } else {
-                // نتحقق من المنتجات فقط لمعرفة ما إذا كان أحدها يخالف شروط تحديث المخزون.
+                // تشخيص مطابق لشروط Rules قدر الإمكان، مع كشف اسم المنتج والحقل المخالف فقط.
+                // لا نعرض UID أو بيانات Firebase الحساسة للمستخدم.
+                const idCounts = currentCart.reduce((acc, item) => {
+                  const id = String(item.id);
+                  acc[id] = (acc[id] || 0) + 1;
+                  return acc;
+                }, {});
+                const duplicateCartId = Object.keys(idCounts).find(id => idCounts[id] > 1);
+
                 const checks = await Promise.all(currentCart.map(async item => {
                   const snap = await db.collection('products').doc(String(item.id)).get();
-                  if (!snap.exists) return {id: item.id, reason: 'غير موجود'};
+                  if (!snap.exists) return {id: item.id, name: item.name || item.id, reason: 'PRODUCT_NOT_FOUND'};
+
                   const data = snap.data() || {};
-                  const stock = Number(data.stock ?? 0);
-                  const availableQty = Math.max(0, stock);
+                  const rawStock = data.stock;
+                  const rawSoldQty = data.soldQty;
+                  const stockType = typeof rawStock;
+                  const soldQtyType = typeof rawSoldQty;
+                  const stock = Number(rawStock ?? 0);
+                  const soldQty = Number(rawSoldQty ?? 0);
                   const qty = Math.max(0, Number(item.qty || 0));
+                  const availableQty = Math.max(0, stock);
                   const fulfilledQty = Math.min(availableQty, qty);
                   const nextStock = availableQty - fulfilledQty;
-                  const nextSold = Number(data.soldQty || 0) + fulfilledQty;
-                  const validDelta = (stock >= 0) && nextStock >= 0 && ((stock - nextStock) === (nextSold - Number(data.soldQty || 0)));
-                  return {id: item.id, name: data.name || item.name || item.id, validDelta};
+                  const nextSold = soldQty + fulfilledQty;
+                  const deltaStock = stock - nextStock;
+                  const deltaSold = nextSold - soldQty;
+
+                  // Rules الحالية تتطلب أن تكون القيمة الحالية غير سالبة، وأن يتساوى فرق المخزون مع زيادة المباع.
+                  const checks = {
+                    stockIsNumber: stockType === 'number' && Number.isFinite(rawStock),
+                    soldQtyIsNumber: rawSoldQty == null || (soldQtyType === 'number' && Number.isFinite(rawSoldQty)),
+                    stockCurrentNonNegative: Number.isFinite(stock) && stock >= 0,
+                    stockNextNonNegative: Number.isFinite(nextStock) && nextStock >= 0,
+                    stockNotIncreased: Number.isFinite(stock) && nextStock <= stock,
+                    soldNotDecreased: Number.isFinite(soldQty) && nextSold >= soldQty,
+                    deltaMatches: Number.isFinite(deltaStock) && Number.isFinite(deltaSold) && deltaStock === deltaSold
+                  };
+
+                  const failed = Object.keys(checks).filter(key => !checks[key]);
+                  return {
+                    id: item.id,
+                    name: data.name || item.name || item.id,
+                    reason: failed.length ? 'PRODUCT_RULE_MISMATCH' : null,
+                    failed,
+                    rawStock,
+                    rawSoldQty,
+                    stockType,
+                    soldQtyType,
+                    stock,
+                    soldQty,
+                    qty,
+                    nextStock,
+                    nextSold,
+                    deltaStock,
+                    deltaSold
+                  };
                 }));
-                const badProduct = checks.find(x => x.reason || x.validDelta === false);
-                if (badProduct) {
-                  diagnosticMessage = `تم رفض الطلب أثناء تحديث مخزون المنتج: ${badProduct.name || badProduct.id}. راجع بيانات المخزون لهذا المنتج.`;
+
+                const badProduct = checks.find(x => x.reason);
+                if (duplicateCartId) {
+                  const duplicateItem = currentCart.find(i => String(i.id) === duplicateCartId);
+                  diagnosticMessage = `تم رفض الطلب لأن المنتج "${duplicateItem?.name || duplicateCartId}" مكرر في السلة. احذفه وأضفه مرة واحدة ثم جرّب.`;
+                } else if (badProduct) {
+                  const labels = {
+                    PRODUCT_NOT_FOUND: 'المنتج غير موجود في Firestore',
+                    stockIsNumber: 'حقل stock ليس رقماً حقيقياً',
+                    soldQtyIsNumber: 'حقل soldQty ليس رقماً حقيقياً',
+                    stockCurrentNonNegative: 'قيمة stock الحالية سالبة',
+                    stockNextNonNegative: 'قيمة stock الجديدة سالبة',
+                    stockNotIncreased: 'قيمة stock الجديدة أكبر من الحالية',
+                    soldNotDecreased: 'قيمة soldQty الجديدة أقل من الحالية',
+                    deltaMatches: 'فرق stock لا يساوي زيادة soldQty'
+                  };
+                  const details = badProduct.reason === 'PRODUCT_NOT_FOUND'
+                    ? labels.PRODUCT_NOT_FOUND
+                    : badProduct.failed.map(key => labels[key] || key).join('، ');
+                  diagnosticMessage = `تم رفض الطلب أثناء فحص المنتج: ${badProduct.name || badProduct.id}. السبب: ${details}.`;
                 } else {
-                  diagnosticMessage = 'تم رفض الطلب رغم تطابق الحساب والمنتجات محلياً؛ السبب المتبقي على الأرجح هو أن قواعد Firestore المنشورة تختلف عن ملف القواعد الذي تم تعديله. تأكد من الضغط على Publish.';
+                  // إذا مرّت كل شروط الحساب المحلي، فالرفض غالباً في ربط getAfter بالفاتورة
+                  // أو في شرط إنشاء الفاتورة. نعرض ذلك بوضوح بدلاً من اتهام القواعد المنشورة.
+                  diagnosticMessage = 'تم فحص الحساب وكل شروط المخزون محلياً ونجحت. الرفض المتبقي غالباً في ربط تحديث المخزون بالفاتورة داخل Transaction (getAfter) أو في شرط إنشاء الفاتورة. تم تسجيل التفاصيل في Console للفحص الدقيق.';
                 }
+
+                console.warn('Invoice permission diagnostic - detailed', {
+                  invoice: {
+                    id: newInvoice.id,
+                    ownerRole: newInvoice.ownerRole,
+                    orderStatus: newInvoice.orderStatus,
+                    customerUsername: newInvoice.customer?.username,
+                    delegateUsername: newInvoice.delegateUsername,
+                    customerType: newInvoice.customerType
+                  },
+                  products: checks.map(x => ({
+                    id: x.id,
+                    name: x.name,
+                    reason: x.reason,
+                    failed: x.failed,
+                    stockType: x.stockType,
+                    soldQtyType: x.soldQtyType,
+                    rawStock: x.rawStock,
+                    rawSoldQty: x.rawSoldQty,
+                    stock: x.stock,
+                    soldQty: x.soldQty,
+                    nextStock: x.nextStock,
+                    nextSold: x.nextSold,
+                    deltaStock: x.deltaStock,
+                    deltaSold: x.deltaSold
+                  })),
+                  duplicateCartId,
+                  profile: {
+                    active: profile?.active,
+                    role: profile?.role,
+                    username: profile?.username
+                  }
+                });
               }
               console.warn('Invoice permission diagnostic', {
                 authUid: firebaseUserNow.uid,
