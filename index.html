@@ -1114,6 +1114,22 @@
       .business-dashboard { grid-template-columns:repeat(2,1fr); }
     }
 
+    /* ===== نظام أرشفة الفواتير ===== */
+    .archive-admin-tool-btn { background:linear-gradient(135deg,#f8fafc,#eef2f7) !important; border-color:#cbd5e1 !important; color:#334155 !important; }
+    .archive-admin-tool-btn:hover { border-color:#94a3b8 !important; box-shadow:0 7px 18px rgba(71,85,105,.12); }
+    .archive-badge { display:inline-flex; align-items:center; gap:5px; padding:4px 8px; border-radius:999px; background:#e2e8f0; color:#475569; font-size:.62rem; font-weight:900; }
+    .archive-search-wrap { display:flex; gap:8px; align-items:center; padding:10px; background:#f8fafc; border:1px solid var(--border-color); border-radius:15px; }
+    .archive-search-wrap input { flex:1; min-width:0; border:0; outline:0; background:transparent; font-size:.82rem; }
+    .archive-card { background:#fff; border:1px solid #dbe3ec; border-radius:16px; padding:11px; box-shadow:0 4px 13px rgba(15,23,42,.04); }
+    @media print {
+      body * { visibility:hidden !important; }
+      #receipt-modal, #receipt-modal * { visibility:visible !important; }
+      #receipt-modal { position:absolute !important; inset:0 !important; background:#fff !important; }
+      #receipt-modal .modal-content { width:100% !important; max-width:none !important; max-height:none !important; box-shadow:none !important; }
+      #receipt-modal .modal-header, #receipt-modal .invoice-export-actions { display:none !important; }
+      #receipt-modal .modal-body { overflow:visible !important; max-height:none !important; }
+    }
+
     .hidden { display: none !important; }
   
     /* نافذة عرض تفاصيل الإشعار */
@@ -1326,7 +1342,7 @@
         <div class="admin-tools-grid">
           <button type="button" class="admin-tool-btn" onclick="renderBusinessDashboard()">📊 تحديث لوحة المؤشرات</button>
           <button type="button" class="admin-tool-btn" onclick="openLowStockReport()">📦 المنتجات قليلة المخزون</button>
-
+          <button type="button" class="admin-tool-btn archive-admin-tool-btn" onclick="openArchivedInvoicesModal()">🗄️ الفواتير المؤرشفة</button>
           <button type="button" class="admin-tool-btn" onclick="openAuditLogModal()">🧾 سجل عمليات الإدارة</button>
         </div>
         <h2>لوحة تحكم المدير</h2>
@@ -1632,10 +1648,41 @@
     <div id="invoices-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
-          <h3 id="invoices-modal-title">سجل الفواتير السابقة</h3>
+          <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+            <h3 id="invoices-modal-title">سجل الفواتير السابقة</h3>
+            <button
+              id="mark-all-invoices-read-btn"
+              type="button"
+              onclick="markAllInvoicesAsReadByCurrentAdmin()"
+              title="اعتبار جميع الفواتير الحالية كمقروءة"
+              aria-label="اعتبار جميع الفواتير كمقروءة"
+              style="border:1px solid #bae6fd;background:#f0f9ff;color:#0369a1;border-radius:9px;padding:4px 7px;font-size:.64rem;font-weight:900;cursor:pointer;white-space:nowrap;line-height:1.2;">
+              ✓ مشاهدة الكل
+            </button>
+          </div>
           <button class="close-modal" onclick="closeInvoicesModal()">✕</button>
         </div>
         <div class="modal-body" id="invoices-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+      </div>
+    </div>
+
+    <!-- نافذة الفواتير المؤرشفة -->
+    <div id="archived-invoices-modal" class="modal hidden">
+      <div class="modal-content" style="max-width:820px; width:calc(100% - 16px); border-radius:24px;">
+        <div class="modal-header">
+          <h3>🗄️ الفواتير المؤرشفة</h3>
+          <button class="close-modal" type="button" onclick="closeArchivedInvoicesModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div style="background:linear-gradient(135deg,#f8fafc,#eef2f7);border:1px solid #dbe3ec;border-radius:17px;padding:12px;color:#475569;font-size:.74rem;line-height:1.7;">
+            الفواتير المؤرشفة تبقى محفوظة في Firestore ولا تؤثر على المخزون أو المبيعات. الأرشفة مجرد تغيير لحالة الفاتورة.
+          </div>
+          <div class="archive-search-wrap">
+            <span>🔍</span>
+            <input id="archived-invoices-search" type="text" placeholder="ابحث برقم الفاتورة أو اسم الزبون أو الهاتف..." oninput="renderArchivedInvoicesList()">
+          </div>
+          <div id="archived-invoices-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+        </div>
       </div>
     </div>
 
@@ -1832,7 +1879,7 @@
                 <div class="admin-permission-group" data-permission-group="invoices">
                   <div class="admin-permission-group-head"><div><b>🧾 الفواتير والطلبات</b><small>الوصول للفواتير وحالات الطلب والدفع</small></div><button type="button" class="permission-group-toggle" onclick="togglePermissionGroup('invoices')">تحديد القسم</button></div>
                   <div class="admin-permissions-grid">
-                    <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewInvoices"> مشاهدة الفواتير السابقة</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editInvoices"> تعديل الفواتير السابقة</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="deleteInvoices"> حذف الفواتير السابقة</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="createInvoices"> اعتماد وإصدار الفواتير</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editOrderStatus"> تعديل حالة الطلب</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewCustomerOrders"> مشاهدة طلبات الزبائن</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegateOrders"> مشاهدة طلبات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="cancelOrders"> إلغاء الطلبات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewPaymentDetails"> مشاهدة تفاصيل الدفع</label>
+                    <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewInvoices"> مشاهدة الفواتير السابقة</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editInvoices"> تعديل الفواتير السابقة</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="deleteInvoices"> حذف الفواتير السابقة</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewArchivedInvoices"> مشاهدة الفواتير المؤرشفة</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="archiveInvoices"> أرشفة الفواتير</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="unarchiveInvoices"> إلغاء أرشفة الفواتير</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="deleteArchivedInvoices"> حذف الفواتير المؤرشفة</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="createInvoices"> اعتماد وإصدار الفواتير</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editOrderStatus"> تعديل حالة الطلب</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewCustomerOrders"> مشاهدة طلبات الزبائن</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegateOrders"> مشاهدة طلبات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="cancelOrders"> إلغاء الطلبات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewPaymentDetails"> مشاهدة تفاصيل الدفع</label>
                   </div>
                 </div>
                 <div class="admin-permission-group" data-permission-group="customers">
@@ -2694,6 +2741,74 @@
       }
     }
 
+    function getInvoiceCreatedTime(inv) {
+      const created = Number(inv?.createdAt);
+      if (Number.isFinite(created) && created > 0) return created;
+      if (inv?.rawDate) {
+        const d = parseInvoiceDateString(inv.date, inv.rawDate);
+        if (d && !isNaN(d.getTime())) return d.getTime();
+      }
+      if (inv?.date) {
+        const d = parseInvoiceDateString(inv.date, inv.rawDate);
+        if (d && !isNaN(d.getTime())) return d.getTime();
+      }
+      return 0;
+    }
+
+    function isInvoiceArchived(inv) {
+      return !!(inv && (inv.isArchived === true || inv.archiveStatus === 'archived'));
+    }
+
+    function getActiveInvoices() {
+      return (invoices || []).filter(inv => !isInvoiceArchived(inv));
+    }
+
+    async function autoArchiveOldInvoices() {
+      if (!(isAdmin || loggedAdmin)) return 0;
+      const cutoff = Date.now() - (365 * 24 * 60 * 60 * 1000);
+      const candidates = (invoices || []).filter(inv => !isInvoiceArchived(inv) && getInvoiceCreatedTime(inv) > 0 && getInvoiceCreatedTime(inv) <= cutoff);
+      if (!candidates.length) return 0;
+
+      let archivedCount = 0;
+      for (const inv of candidates) {
+        const id = String(inv.id || '');
+        if (!id) continue;
+        const now = Date.now();
+        const archivedBy = 'system-auto';
+        try {
+          const refs = [];
+          const directRef = db.collection('invoices').doc(id);
+          const directSnap = await directRef.get();
+          if (directSnap.exists) refs.push(directRef);
+          const matches = await db.collection('invoices').where('id', '==', id).get();
+          matches.forEach(doc => { if (!refs.some(r => r.path === doc.ref.path)) refs.push(doc.ref); });
+          if (!refs.length) continue;
+          await db.runTransaction(async tx => {
+            refs.forEach(ref => tx.set(ref, {
+              isArchived: true,
+              archiveStatus: 'archived',
+              archivedAt: now,
+              archivedBy,
+              archiveReason: 'auto_after_one_year'
+            }, { merge: true }));
+          });
+          inv.isArchived = true;
+          inv.archiveStatus = 'archived';
+          inv.archivedAt = now;
+          inv.archivedBy = archivedBy;
+          inv.archiveReason = 'auto_after_one_year';
+          archivedCount++;
+        } catch (err) {
+          console.warn('تعذر أرشفة الفاتورة القديمة تلقائياً:', id, err);
+        }
+      }
+      if (archivedCount) {
+        saveData();
+        await writeAuditLog('autoArchiveInvoices', `تمت أرشفة ${archivedCount} فاتورة تجاوزت سنة من تاريخ إصدارها تلقائياً.`, { count: archivedCount, reason: 'auto_after_one_year' });
+      }
+      return archivedCount;
+    }
+
     async function loadInvoicesFromFirestore() {
       try {
         let snapshots = [];
@@ -2720,6 +2835,9 @@
         }));
         invoices = Array.from(byId.values());
         invoices.sort((a, b) => String(b.id).localeCompare(String(a.id)));
+        if (isAdmin || loggedAdmin) {
+          await autoArchiveOldInvoices();
+        }
         localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
         updateUnreadInvoicesBadge();
         return true;
@@ -3126,7 +3244,7 @@
         ['editMinStock','تعديل حد تنبيه المخزون'], ['viewProductStats','مشاهدة إحصائيات المنتجات'], ['viewLowStock','مشاهدة المنتجات قليلة المخزون']
       ]},
       { key:'invoices', icon:'🧾', title:'الفواتير والطلبات', items:[
-        ['viewInvoices','مشاهدة الفواتير السابقة'], ['editInvoices','تعديل الفواتير السابقة'], ['deleteInvoices','حذف الفواتير السابقة'], ['createInvoices','اعتماد وإصدار الفواتير'],
+        ['viewInvoices','مشاهدة الفواتير السابقة'], ['editInvoices','تعديل الفواتير السابقة'], ['deleteInvoices','حذف الفواتير السابقة'], ['viewArchivedInvoices','مشاهدة الفواتير المؤرشفة'], ['archiveInvoices','أرشفة الفواتير'], ['unarchiveInvoices','إلغاء أرشفة الفواتير'], ['deleteArchivedInvoices','حذف الفواتير المؤرشفة'], ['createInvoices','اعتماد وإصدار الفواتير'],
         ['editOrderStatus','تعديل حالة الطلب'], ['viewCustomerOrders','مشاهدة طلبات الزبائن'], ['viewDelegateOrders','مشاهدة طلبات المندوبين'],
         ['cancelOrders','إلغاء الطلبات'], ['viewPaymentDetails','مشاهدة تفاصيل الدفع']
       ]},
@@ -3835,6 +3953,7 @@
         const fn=btn.getAttribute('onclick')||'';
         if(fn.includes('renderBusinessDashboard')) btn.classList.toggle('hidden', !any('viewDashboard'));
         else if(fn.includes('openLowStockReport')) btn.classList.toggle('hidden', !any('viewLowStock'));
+        else if(fn.includes('openArchivedInvoicesModal')) btn.classList.toggle('hidden', !any('viewArchivedInvoices','unarchiveInvoices','deleteArchivedInvoices','archiveInvoices'));
         else if(fn.includes('openAuditLogModal')) btn.classList.toggle('hidden', !any('viewAuditLog'));
       });
       const productForm=document.getElementById('product-form'); if(productForm) productForm.classList.toggle('hidden', !any('addProducts','editProducts'));
@@ -5663,6 +5782,8 @@
         date: now.toLocaleString('en-US'),
         rawDate: isoDateString,
         createdAt: now.getTime(),
+        isArchived: false,
+        archiveStatus: 'active',
         customer: {
           name: custName, phone: custPhone, address: custAddress,
           username: loggedCustomer ? 'زبون: ' + loggedCustomer.username : 'مندوب: ' + loggedDelegate.username,
@@ -5745,6 +5866,17 @@
           newInvoice.backorderedItems = backorderedItems;
         }
 
+        // نحفظ الكمية التي تم خصمها فعلياً من المخزون لكل منتج.
+        // هذا مهم جداً حتى يمكن إعادة الكمية الصحيحة عند حذف الفاتورة،
+        // وحتى لا نعيد كميات الطلب المؤجلة التي لم تُخصم أصلاً.
+        newInvoice.stockAdjustments = stockPlans
+          .filter(p => p.productExists && p.originalStockIsNumeric && Number(p.fulfilledQty || 0) > 0)
+          .map(p => ({
+            productId: p.productId,
+            name: p.name,
+            qty: Number(p.fulfilledQty || 0)
+          }));
+
         // أولاً: إنشاء الفاتورة وحدها. لا يدخل تحديث المخزون في نفس Transaction.
         // create() ينشئ المستند فقط إذا لم يكن موجوداً مسبقاً، من دون tx.get().
         // لذلك لا يحدث رفض بسبب محاولة قراءة فاتورة غير موجودة قبل إنشائها،
@@ -5766,6 +5898,7 @@
           Number(p.fulfilledQty || 0) > 0
         );
 
+        const appliedStockAdjustments = {};
         if (stockCandidates.length) {
           try {
             await db.runTransaction(async tx => {
@@ -5791,11 +5924,32 @@
                   lastStockUpdateUid: firebaseUser.uid,
                   lastStockUpdateInvoiceId: newInvoice.id
                 }, {merge:true});
+
+                appliedStockAdjustments[String(p.productId)] = {
+                  productId: p.productId,
+                  name: p.name,
+                  qty: fulfilledQty
+                };
               }
             });
+
+            // نحفظ الكمية التي خُصمت فعلياً، وليس فقط الكمية المطلوبة،
+            // حتى تكون عملية الحذف أو التعديل لاحقاً دقيقة.
+            newInvoice.stockAdjustments = Object.values(appliedStockAdjustments);
+            await invoiceRef.set({
+              stockAdjustments: newInvoice.stockAdjustments,
+              stockAdjustedAt: Date.now(),
+              stockAdjustedBy: firebaseUser.uid
+            }, {merge:true});
           } catch (stockErr) {
+            // إذا فشلت مزامنة المخزون، لا نترك metadata توحي بأن الكمية خُصمت.
+            newInvoice.stockAdjustments = [];
+            try { await invoiceRef.set({ stockAdjustments: [] }, {merge:true}); } catch (_) {}
             console.warn('تم إصدار الفاتورة لكن تعذرت مزامنة بعض كميات المخزون:', stockErr);
           }
+        } else {
+          newInvoice.stockAdjustments = [];
+          try { await invoiceRef.set({ stockAdjustments: [] }, {merge:true}); } catch (_) {}
         }
 
         // لا ينشئ المندوب/الزبون إشعاراً باسم الإدارة؛ إشعارات حالة الطلب
@@ -6080,13 +6234,13 @@
       const today = new Date();
       const y = today.getFullYear(), m = String(today.getMonth()+1).padStart(2,'0'), d = String(today.getDate()).padStart(2,'0');
       const todayKey = `${y}-${m}-${d}`;
-      const todayInvoices = (invoices || []).filter(inv => String(inv.rawDate || '') === todayKey);
+      const todayInvoices = getActiveInvoices().filter(inv => String(inv.rawDate || '') === todayKey);
       const sales = todayInvoices.reduce((s, inv) => s + Number(inv.total || 0), 0);
       const low = (products || []).filter(p => Number(p.stock ?? 0) <= Number(p.minStock ?? 5)).length;
       const set = (id, value) => { const el=document.getElementById(id); if(el) el.textContent=value; };
       set('dash-sales-today', formatPrice(sales) + ' د.ع');
       set('dash-orders-today', String(todayInvoices.length));
-      set('dash-delegate-orders', String((invoices || []).filter(inv => inv.ownerRole === 'delegate').length));
+      set('dash-delegate-orders', String(getActiveInvoices().filter(inv => inv.ownerRole === 'delegate').length));
       set('dash-low-stock', String(low));
     }
 
@@ -6621,7 +6775,7 @@
       }
 
       const readIds = getReadInvoiceIds();
-      const unreadCount = invoices.filter(inv => !readIds.includes(String(inv.id))).length;
+      const unreadCount = getActiveInvoices().filter(inv => !readIds.includes(String(inv.id))).length;
 
       badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
       badge.classList.toggle('hidden', unreadCount === 0);
@@ -6651,6 +6805,109 @@
       }
     }
 
+    // اعتبار جميع الفواتير الحالية التي يراها المدير كمقروءة بضغطة واحدة.
+    // لا يتم حذف أو تعديل أي فاتورة؛ يتم فقط تصفير عداد الفواتير الجديدة للمدير الحالي.
+    async function markAllInvoicesAsReadByCurrentAdmin() {
+      const adminKey = getCurrentAdminReadKey();
+      if (!adminKey || (!isAdmin && !loggedAdmin)) {
+        return requireAdminPermission('viewInvoices');
+      }
+
+      const activeInvoices = getActiveInvoices();
+      if (!activeInvoices.length) {
+        updateUnreadInvoicesBadge();
+        return;
+      }
+
+      const btn = document.getElementById('mark-all-invoices-read-btn');
+      const originalText = btn ? btn.innerText : '✓ مشاهدة الكل';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = '⏳ جارٍ...';
+        btn.style.opacity = '.7';
+      }
+
+      try {
+        // الحفظ المحلي هو الأساس، لذلك يختفي العداد فوراً.
+        const allIds = activeInvoices.map(inv => String(inv.id));
+        const existingIds = getReadInvoiceIds();
+        const mergedIds = Array.from(new Set(existingIds.concat(allIds))).slice(-5000);
+        const storageKey = getInvoiceReadStorageKey();
+        if (storageKey) {
+          localStorage.setItem(storageKey, JSON.stringify(mergedIds));
+        }
+
+        // تحديث الحالة داخل الذاكرة، ومحاولة مزامنتها مع Firestore.
+        activeInvoices.forEach(inv => {
+          if (!inv.viewedByAdmins || typeof inv.viewedByAdmins !== 'object') {
+            inv.viewedByAdmins = {};
+          }
+          inv.viewedByAdmins[adminKey] = true;
+        });
+
+        updateUnreadInvoicesBadge();
+        renderInvoicesList();
+
+        // نحاول حفظ الحالة في Firestore دون تغيير أي بيانات أخرى في الفاتورة.
+        const chunks = [];
+        for (let i = 0; i < activeInvoices.length; i += 400) {
+          chunks.push(activeInvoices.slice(i, i + 400));
+        }
+
+        for (const chunk of chunks) {
+          const batch = db.batch();
+          let hasWrites = false;
+
+          chunk.forEach(inv => {
+            try {
+              const ref = db.collection('invoices').doc(String(inv.id));
+              batch.set(ref, { viewedByAdmins: inv.viewedByAdmins }, { merge: true });
+              hasWrites = true;
+            } catch (_) {}
+          });
+
+          if (hasWrites) {
+            try {
+              await batch.commit();
+            } catch (err) {
+              console.warn('تعذر مزامنة حالة مشاهدة بعض الفواتير مع Firestore، وتم حفظها محلياً:', err);
+            }
+          }
+        }
+
+        saveData();
+        updateUnreadInvoicesBadge();
+
+        if (btn) {
+          btn.innerText = '✓ تمت مشاهدة الكل';
+          btn.style.background = '#dcfce7';
+          btn.style.borderColor = '#86efac';
+          btn.style.color = '#166534';
+        }
+
+        setTimeout(() => {
+          if (btn) {
+            btn.innerText = originalText;
+            btn.style.background = '#f0f9ff';
+            btn.style.borderColor = '#bae6fd';
+            btn.style.color = '#0369a1';
+            btn.style.opacity = '1';
+            btn.disabled = false;
+          }
+        }, 1400);
+      } catch (err) {
+        console.error('تعذر اعتبار جميع الفواتير كمقروءة:', err);
+        updateUnreadInvoicesBadge();
+
+        if (btn) {
+          btn.innerText = originalText;
+          btn.style.opacity = '1';
+          btn.disabled = false;
+        }
+        alert('تعذر إكمال العملية، لكن لم يتم حذف أو تعديل أي فاتورة.');
+      }
+    }
+
     async function openInvoicesModal() {
       // الزبون والمندوب يستطيعان فتح الفواتير السابقة الخاصة بهما.
       // صلاحيات المديرين الفرعيين تطبق فقط على دخولهم كمديرين.
@@ -6669,24 +6926,24 @@
       const titleContainer = document.getElementById('invoices-modal-title');
       if (!listContainer) return;
       listContainer.innerHTML = '';
-      
+
       let visibleInvoices = [];
+      const activeInvoices = getActiveInvoices();
       if (loggedCustomer) {
-        visibleInvoices = invoices.filter(inv => inv.customer && inv.customer.username === 'زبون: ' + loggedCustomer.username);
+        visibleInvoices = activeInvoices.filter(inv => inv.customer && inv.customer.username === 'زبون: ' + loggedCustomer.username);
         if (titleContainer) titleContainer.innerText = 'سجل فواتيري السابقة';
       } else if (loggedDelegate) {
-        visibleInvoices = invoices.filter(inv => 
-          inv.delegateUsername === loggedDelegate.username || 
+        visibleInvoices = activeInvoices.filter(inv =>
+          inv.delegateUsername === loggedDelegate.username ||
           (inv.customer && inv.customer.username === 'مندوب: ' + loggedDelegate.username)
         );
         if (titleContainer) titleContainer.innerText = 'سجل فواتير الزبائن الخاصة بي';
       } else if (isAdmin || loggedAdmin) {
-        visibleInvoices = invoices;
+        visibleInvoices = activeInvoices;
         if (titleContainer) titleContainer.innerText = 'سجل جميع الفواتير السابقة للزبائن والمندوبين';
       }
 
       updateUnreadInvoicesBadge();
-
       if (visibleInvoices.length === 0) {
         listContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد فواتير مسجلة.</p>';
         return;
@@ -6697,24 +6954,90 @@
         const adminKey = getCurrentAdminReadKey();
         const readIds = getReadInvoiceIds();
         const isUnreadForAdmin = !!adminKey && (isAdmin || loggedAdmin) && !readIds.includes(String(inv.id));
-        div.style.cssText = 'background:' + (isUnreadForAdmin ? '#eff6ff' : 'var(--bg-surface)') + '; border:1px solid ' + (isUnreadForAdmin ? '#93c5fd' : 'var(--border-color)') + '; border-radius:var(--radius-sm); padding:10px; display:flex; justify-content:space-between; align-items:center; font-size:0.8rem;';
+        div.style.cssText = 'background:' + (isUnreadForAdmin ? '#eff6ff' : 'var(--bg-surface)') + '; border:1px solid ' + (isUnreadForAdmin ? '#93c5fd' : 'var(--border-color)') + '; border-radius:var(--radius-sm); padding:10px; display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:0.8rem;';
+        const customer = inv.customer || {};
         div.innerHTML = `
-          <div>
-            <div style="font-weight:700; color:var(--primary-dark);">فاتورة: ${inv.id} ${isUnreadForAdmin ? '<span style="display:inline-flex;align-items:center;justify-content:center;background:#ef4444;color:#fff;border-radius:999px;padding:2px 7px;font-size:.62rem;margin-right:5px;">جديدة</span>' : ''}</div>
-            <div style="color:var(--text-muted); font-size:0.75rem;">الزبون: ${inv.customer.name} | التاريخ: ${inv.date}</div>
+          <div style="min-width:0;">
+            <div style="font-weight:700; color:var(--primary-dark);">فاتورة: ${escapeHtml(inv.id)} ${isUnreadForAdmin ? '<span style="display:inline-flex;align-items:center;justify-content:center;background:#ef4444;color:#fff;border-radius:999px;padding:2px 7px;font-size:.62rem;margin-right:5px;">جديدة</span>' : ''}</div>
+            <div style="color:var(--text-muted); font-size:0.75rem;">الزبون: ${escapeHtml(customer.name || 'غير محدد')} | التاريخ: ${escapeHtml(inv.date || '')}</div>
             <div style="font-weight:bold; margin-top:2px;">المجموع: ${formatPrice(inv.total)} د.ع</div>
           </div>
           <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
-            <button class="btn" style="padding:6px 10px; font-size:0.75rem;" onclick="viewSavedInvoice('${inv.id}')">عرض 👁️</button>
-            ${hasAdminPermission('editInvoices') ? `<button class="btn" style="padding:6px 10px; font-size:0.75rem; background:#f59e0b;color:#fff;" onclick="openEditInvoiceModal('${inv.id}')">تعديل ✏️</button>` : ''}
-            <button class="btn" style="padding:6px 10px; font-size:0.75rem; background:var(--success);" onclick="exportSavedInvoiceImage('${inv.id}')">🖼️ صورة</button>
-            <button class="btn" style="padding:6px 10px; font-size:0.75rem; background:#dc2626;" onclick="exportSavedInvoicePDF('${inv.id}')">📄 PDF</button>
-            ${hasAdminPermission('deleteInvoices') ? `<button class="btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteInvoice('${inv.id}')">حذف 🗑️</button>` : ''}
-          </div>
-        `;
+            <button class="btn" style="padding:6px 10px; font-size:0.75rem;" onclick="viewSavedInvoice('${String(inv.id).replace(/'/g, "\\'")}')">عرض 👁️</button>
+            ${hasAdminPermission('editInvoices') ? `<button class="btn" style="padding:6px 10px; font-size:0.75rem; background:#f59e0b;color:#fff;" onclick="openEditInvoiceModal('${String(inv.id).replace(/'/g, "\\'")}')">تعديل ✏️</button>` : ''}
+            <button class="btn" style="padding:6px 10px; font-size:0.75rem; background:var(--success);" onclick="exportSavedInvoiceImage('${String(inv.id).replace(/'/g, "\\'")}')">🖼️ صورة</button>
+            <button class="btn" style="padding:6px 10px; font-size:0.75rem; background:#dc2626;" onclick="exportSavedInvoicePDF('${String(inv.id).replace(/'/g, "\\'")}')">📄 PDF</button>
+            ${hasAdminPermission('archiveInvoices') ? `<button class="btn" style="padding:6px 10px; font-size:0.75rem; background:#64748b;color:#fff;" onclick="archiveInvoice('${String(inv.id).replace(/'/g, "\\'")}')">📦 أرشفة</button>` : ''}
+            ${hasAdminPermission('deleteInvoices') ? `<button class="btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteInvoice('${String(inv.id).replace(/'/g, "\\'")}')">حذف 🗑️</button>` : ''}
+          </div>`;
         listContainer.appendChild(div);
       });
     }
+
+    async function openArchivedInvoicesModal() {
+      if (!requireAdminPermission('viewArchivedInvoices')) return;
+      const modal = document.getElementById('archived-invoices-modal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      const search = document.getElementById('archived-invoices-search');
+      if (search) search.value = '';
+      await loadInvoicesFromFirestore();
+      renderArchivedInvoicesList();
+    }
+
+    function closeArchivedInvoicesModal() {
+      document.getElementById('archived-invoices-modal')?.classList.add('hidden');
+    }
+
+    function renderArchivedInvoicesList() {
+      const box = document.getElementById('archived-invoices-list');
+      if (!box) return;
+      const q = String(document.getElementById('archived-invoices-search')?.value || '').trim().toLowerCase();
+      const archived = (invoices || []).filter(isInvoiceArchived).filter(inv => {
+        if (!q) return true;
+        const customer = inv.customer || {};
+        return [inv.id, customer.name, customer.phone, inv.date].some(v => String(v || '').toLowerCase().includes(q));
+      });
+      if (!archived.length) {
+        box.innerHTML = '<div class="notification-empty">🗄️ لا توجد فواتير مؤرشفة مطابقة للبحث.</div>';
+        return;
+      }
+      archived.sort((a,b) => getInvoiceCreatedTime(b) - getInvoiceCreatedTime(a));
+      box.innerHTML = archived.map(inv => {
+        const customer = inv.customer || {};
+        const id = String(inv.id || '').replace(/'/g, "\\'");
+        const created = getInvoiceCreatedTime(inv);
+        const createdText = created ? new Date(created).toLocaleDateString('ar-IQ') : (inv.date || 'غير معروف');
+        return `<div class="archive-card">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div style="min-width:0;">
+              <div style="font-weight:900;color:#475569;">🗄️ فاتورة: ${escapeHtml(inv.id)}</div>
+              <div style="margin-top:4px;color:var(--text-muted);font-size:.72rem;">الزبون: ${escapeHtml(customer.name || 'غير محدد')} | الهاتف: ${escapeHtml(customer.phone || 'بدون هاتف')}</div>
+              <div style="margin-top:3px;font-size:.72rem;color:var(--text-muted);">تاريخ الفاتورة: ${escapeHtml(inv.date || '')} | تاريخ الأرشفة: ${escapeHtml(inv.archivedAt ? new Date(Number(inv.archivedAt)).toLocaleDateString('ar-IQ') : 'تلقائية بعد سنة')}</div>
+              <div style="margin-top:5px;font-weight:900;">المجموع: ${formatPrice(inv.total)} د.ع <span class="archive-badge">محفوظة بدون تأثير على المخزون</span></div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;margin-top:9px;">
+            <button class="btn" style="padding:6px 10px;font-size:.74rem;" onclick="viewSavedInvoice('${id}')">عرض 👁️</button>
+            <button class="btn" style="padding:6px 10px;font-size:.74rem;background:#0f766e;color:#fff;" onclick="printSavedInvoice('${id}')">🖨️ طباعة</button>
+            <button class="btn" style="padding:6px 10px;font-size:.74rem;background:#0284c7;color:#fff;" onclick="exportSavedInvoicePDF('${id}')">📄 PDF</button>
+            ${hasAdminPermission('unarchiveInvoices') ? `<button class="btn" style="padding:6px 10px;font-size:.74rem;background:#f59e0b;color:#fff;" onclick="unarchiveInvoice('${id}')">↩️ إلغاء الأرشفة</button>` : ''}
+            ${hasAdminPermission('deleteArchivedInvoices') ? `<button class="btn btn-danger" style="padding:6px 10px;font-size:.74rem;" onclick="deleteArchivedInvoice('${id}')">حذف نهائي 🗑️</button>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    async function printSavedInvoice(invoiceId) {
+      const inv = (invoices || []).find(i => String(i.id) === String(invoiceId));
+      if (!inv) return alert('لم يتم العثور على الفاتورة.');
+      renderReceiptHTML(inv);
+      const modal = document.getElementById('receipt-modal');
+      if (modal) modal.classList.remove('hidden');
+      await waitForNextPaint();
+      window.print();
+    }
+
 
 
     function closeEditInvoiceModal() {
@@ -6820,7 +7143,7 @@
       const now = Date.now();
       const actor = loggedAdmin?.username || (isAdmin ? 'admin' : 'manager');
 
-      const updatedFields = {
+      const updatedFieldsBase = {
         customer: {
           ...(inv.customer || {}),
           name: customerName,
@@ -6839,7 +7162,7 @@
 
       if (btn) {
         btn.disabled = true;
-        btn.innerText = '⏳ جارٍ حفظ التعديلات...';
+        btn.innerText = '⏳ جارٍ تحديث الفاتورة والمخزون...';
       }
 
       try {
@@ -6860,29 +7183,115 @@
 
         if (!refs.length) throw new Error('لم يتم العثور على مستند Firestore المطابق للفاتورة.');
 
-        for (const ref of refs) {
-          await ref.set(updatedFields, { merge: true });
+        // نحدد الكميات التي كانت قد خُصمت فعلياً من المخزون عند إصدار الفاتورة.
+        // الفواتير الجديدة تحتوي stockAdjustments، والفواتير القديمة تستخدم qty كحل توافق.
+        const oldAdjustments = {};
+        if (Array.isArray(inv.stockAdjustments)) {
+          inv.stockAdjustments.forEach(a => {
+            const key = String(a.productId ?? a.id ?? '');
+            const qty = Number(a.qty ?? a.fulfilledQty ?? 0);
+            if (key && Number.isFinite(qty) && qty > 0) oldAdjustments[key] = (oldAdjustments[key] || 0) + qty;
+          });
+        } else {
+          (Array.isArray(inv.items) ? inv.items : []).forEach(item => {
+            const key = String(item.id ?? '');
+            const qty = Number(item.qty || 0);
+            if (key && Number.isFinite(qty) && qty > 0) oldAdjustments[key] = (oldAdjustments[key] || 0) + qty;
+          });
         }
 
+        // نجمع الكميات الجديدة حسب رقم المنتج لمنع أخطاء تكرار نفس المنتج في الفاتورة.
+        const newRequested = {};
+        const newMeta = {};
+        items.forEach(item => {
+          const key = String(item.id ?? '');
+          if (!key) return;
+          newRequested[key] = (newRequested[key] || 0) + Math.max(0, Number(item.qty || 0));
+          newMeta[key] = { productId: item.id, name: item.name };
+        });
+
+        const productKeys = [...new Set([...Object.keys(oldAdjustments), ...Object.keys(newRequested)])];
+        const productRefs = {};
+        productKeys.forEach(key => { productRefs[key] = db.collection('products').doc(key); });
+
+        const newStockAdjustmentsMap = {};
+        await db.runTransaction(async tx => {
+          const snapshots = {};
+          for (const key of productKeys) snapshots[key] = await tx.get(productRefs[key]);
+
+          for (const key of productKeys) {
+            const snap = snapshots[key];
+            const oldQty = Number(oldAdjustments[key] || 0);
+            const requestedQty = Number(newRequested[key] || 0);
+
+            // إذا لم يعد المنتج موجوداً، لا نوقف تعديل بيانات الفاتورة.
+            if (!snap.exists) continue;
+
+            const data = snap.data() || {};
+            const rawStock = Number(data.stock);
+            const rawSoldQty = Number(data.soldQty);
+            if (!Number.isFinite(rawStock)) continue;
+
+            // نعيد أولاً الكمية القديمة التي كانت الفاتورة قد خصمتها، ثم نخصم الكمية الجديدة.
+            // بذلك يكون التعديل آمناً حتى لو تغير المخزون بعد إصدار الفاتورة.
+            const restoredStock = Math.max(0, rawStock + oldQty);
+            const restoredSoldQty = Math.max(0, (Number.isFinite(rawSoldQty) ? rawSoldQty : 0) - oldQty);
+            const newFulfilledQty = Math.min(restoredStock, Math.max(0, requestedQty));
+            const nextStock = Math.max(0, restoredStock - newFulfilledQty);
+            const nextSoldQty = restoredSoldQty + newFulfilledQty;
+
+            tx.set(productRefs[key], {
+              stock: nextStock,
+              soldQty: nextSoldQty,
+              updatedAt: now,
+              lastStockUpdateUid: firebaseUser?.uid || null,
+              lastStockUpdateInvoiceId: id
+            }, { merge: true });
+
+            if (newFulfilledQty > 0) {
+              newStockAdjustmentsMap[key] = {
+                productId: newMeta[key]?.productId ?? key,
+                name: newMeta[key]?.name || data.name || key,
+                qty: newFulfilledQty
+              };
+            }
+          }
+
+          const updatedFields = {
+            ...updatedFieldsBase,
+            stockAdjustments: Object.values(newStockAdjustmentsMap),
+            stockAdjustedAt: now,
+            stockAdjustedBy: actor
+          };
+          for (const ref of refs) tx.set(ref, updatedFields, { merge: true });
+        });
+
+        const updatedFields = {
+          ...updatedFieldsBase,
+          stockAdjustments: Object.values(newStockAdjustmentsMap),
+          stockAdjustedAt: now,
+          stockAdjustedBy: actor
+        };
         Object.assign(inv, updatedFields);
         saveData();
         renderInvoicesList();
+        renderProducts();
         renderBusinessDashboard();
         await writeAuditLog(
           'editInvoice',
-          `تم تعديل الفاتورة ${id} بواسطة ${actor}`,
-          { invoiceId:id, updatedBy:actor, total, itemCount:items.length }
+          `تم تعديل الفاتورة ${id} بواسطة ${actor} وتحديث المخزون`,
+          { invoiceId:id, updatedBy:actor, total, itemCount:items.length, stockAdjustments:Object.values(newStockAdjustmentsMap) }
         );
 
         closeEditInvoiceModal();
-        alert(`تم تعديل الفاتورة ${id} وحفظ التغييرات بنجاح.`);
+        alert(`تم تعديل الفاتورة ${id} وتحديث المخزون بنجاح.`);
       } catch (err) {
-        console.error('فشل تعديل الفاتورة:', err);
+        console.error('فشل تعديل الفاتورة والمخزون:', err);
         const code = err?.code ? String(err.code) : '';
         if (code === 'permission-denied') {
-          alert('تم رفض تعديل الفاتورة من Firestore. يجب أن تسمح قواعد Firestore بصلاحية update للمدير المصرح له بتعديل الفواتير.');
+          alert('تم رفض تعديل الفاتورة أو تحديث المخزون من Firestore. تحقق من صلاحيات update للفاتورة والمنتجات.');
         } else {
-          alert('تعذر حفظ تعديلات الفاتورة. تحقق من اتصال الإنترنت ثم حاول مرة أخرى.');
+          alert('تعذر حفظ تعديلات الفاتورة أو تحديث المخزون. لم يتم اعتماد التعديل.');
         }
       } finally {
         if (btn) {
@@ -6947,87 +7356,124 @@
       await downloadInvoiceAsPDF('receipt-area', inv.id);
     }
 
-    async function deleteInvoice(invoiceId) {
-      if (!requireAdminPermission('deleteInvoices')) return;
-      if (!confirm('تأكيد حذف هذه الفاتورة نهائياً؟')) return;
+    async function setInvoiceArchiveState(invoiceId, archived) {
+      const permission = archived ? 'archiveInvoices' : 'unarchiveInvoices';
+      if (!requireAdminPermission(permission)) return;
+      const id = String(invoiceId || '');
+      const inv = (invoices || []).find(i => String(i.id) === id);
+      if (!inv) return alert('لم يتم العثور على الفاتورة.');
+      if (archived && isInvoiceArchived(inv)) return;
+      if (!archived && !isInvoiceArchived(inv)) return;
+      const actionText = archived ? 'أرشفة' : 'إلغاء أرشفة';
+      if (!confirm(`تأكيد ${actionText} الفاتورة ${id}؟\nلن يتم تغيير المخزون أو الكميات بسبب هذه العملية.`)) return;
+      try {
+        const refs = [];
+        const directRef = db.collection('invoices').doc(id);
+        const directSnap = await directRef.get();
+        if (directSnap.exists) refs.push(directRef);
+        const matches = await db.collection('invoices').where('id', '==', id).get();
+        matches.forEach(doc => { if (!refs.some(r => r.path === doc.ref.path)) refs.push(doc.ref); });
+        if (!refs.length) throw new Error('لم يتم العثور على مستند Firestore المطابق للفاتورة.');
+        const now = Date.now();
+        const actor = loggedAdmin?.username || (isAdmin ? 'admin' : 'manager');
+        const fields = archived ? {
+          isArchived:true, archiveStatus:'archived', archivedAt:now, archivedBy:actor, archiveReason:'manual'
+        } : {
+          isArchived:false, archiveStatus:'active', unarchivedAt:now, unarchivedBy:actor
+        };
+        await db.runTransaction(async tx => refs.forEach(ref => tx.set(ref, fields, {merge:true})));
+        Object.assign(inv, fields);
+        saveData();
+        renderInvoicesList();
+        renderArchivedInvoicesList();
+        await writeAuditLog(archived ? 'archiveInvoice' : 'unarchiveInvoice', `تم ${actionText} الفاتورة ${id} بواسطة ${actor} دون أي تغيير على المخزون.`, {invoiceId:id, archived, inventoryChanged:false});
+        alert(`تم ${actionText} الفاتورة بنجاح. لم يتم تغيير المخزون.`);
+      } catch (err) {
+        console.error(`فشل ${actionText} الفاتورة:`, err);
+        alert(`تعذر ${actionText} الفاتورة. لم يتم اعتماد العملية.`);
+      }
+    }
 
+    function archiveInvoice(invoiceId) { return setInvoiceArchiveState(invoiceId, true); }
+    function unarchiveInvoice(invoiceId) { return setInvoiceArchiveState(invoiceId, false); }
+
+    async function deleteInvoice(invoiceId, fromArchive = false) {
+      if (!requireAdminPermission(fromArchive ? 'deleteArchivedInvoices' : 'deleteInvoices')) return;
       const invoiceKey = String(invoiceId);
-      const invoiceExists = invoices.some(i => String(i.id) === invoiceKey);
-      if (!invoiceExists) {
-        alert('لم يتم العثور على الفاتورة.');
+      const inv = (invoices || []).find(i => String(i.id) === invoiceKey);
+      if (!inv) { alert('لم يتم العثور على الفاتورة.'); return; }
+      if (isInvoiceArchived(inv) && !fromArchive) {
+        alert('هذه الفاتورة مؤرشفة. استخدم حذف الفاتورة المؤرشفة من قسم الفواتير المؤرشفة.');
         return;
       }
-
+      if (!confirm(fromArchive ? 'تأكيد حذف الفاتورة المؤرشفة نهائياً؟\nسيتم أيضاً إعادة الكميات التي خُصمت فعلياً منها إلى المخزون.' : 'تأكيد حذف هذه الفاتورة نهائياً؟\nسيتم أيضاً إعادة الكميات التي خُصمت فعلياً إلى المخزون.')) return;
       try {
-        // بعض الفواتير القديمة قد يكون رقم الفاتورة داخل الحقل id
-        // لكن معرّف مستند Firestore مختلفاً. لذلك نبحث عن المستند
-        // الفعلي ثم نحذفه، بدلاً من الاعتماد على doc(invoiceId) فقط.
         const refsToDelete = [];
         const directRef = db.collection('invoices').doc(invoiceKey);
-
-        // أولاً: إذا كان رقم الفاتورة هو نفسه Document ID.
-        try {
-          const directSnap = await directRef.get();
-          if (directSnap.exists) refsToDelete.push(directRef);
-        } catch (directGetErr) {
-          console.warn('تعذر فحص المستند المباشر:', directGetErr);
-        }
-
-        // ثانياً: البحث عن الفاتورة بالحقل id لمعالجة الفواتير القديمة
-        // التي تم حفظها بمعرّف مستند مختلف.
+        try { const directSnap = await directRef.get(); if (directSnap.exists) refsToDelete.push(directRef); } catch (e) { console.warn('تعذر فحص المستند المباشر:', e); }
         try {
           const matches = await db.collection('invoices').where('id', '==', invoiceKey).get();
-          matches.forEach(doc => {
-            if (!refsToDelete.some(ref => ref.path === doc.ref.path)) refsToDelete.push(doc.ref);
-          });
-        } catch (queryErr) {
-          console.warn('تعذر البحث عن الفاتورة بالحقل id:', queryErr);
-        }
-
-        // دعم إضافي إذا كانت بعض النسخ القديمة تحفظ id كرقم بدلاً من نص.
+          matches.forEach(doc => { if (!refsToDelete.some(ref => ref.path === doc.ref.path)) refsToDelete.push(doc.ref); });
+        } catch (e) { console.warn('تعذر البحث عن الفاتورة بالحقل id:', e); }
         if (/^\d+$/.test(invoiceKey)) {
           try {
-            const numericId = Number(invoiceKey);
-            const numericMatches = await db.collection('invoices').where('id', '==', numericId).get();
-            numericMatches.forEach(doc => {
-              if (!refsToDelete.some(ref => ref.path === doc.ref.path)) refsToDelete.push(doc.ref);
-            });
+            const numericMatches = await db.collection('invoices').where('id', '==', Number(invoiceKey)).get();
+            numericMatches.forEach(doc => { if (!refsToDelete.some(ref => ref.path === doc.ref.path)) refsToDelete.push(doc.ref); });
           } catch (_) {}
         }
+        if (!refsToDelete.length) throw new Error('لم يتم العثور على مستند Firestore المطابق للفاتورة.');
 
-        if (refsToDelete.length === 0) {
-          throw new Error('لم يتم العثور على مستند Firestore المطابق للفاتورة.');
+        const adjustments = {};
+        if (Array.isArray(inv.stockAdjustments)) {
+          inv.stockAdjustments.forEach(a => {
+            const key = String(a.productId ?? a.id ?? '');
+            const qty = Number(a.qty ?? a.fulfilledQty ?? 0);
+            if (key && Number.isFinite(qty) && qty > 0) adjustments[key] = (adjustments[key] || 0) + qty;
+          });
+        } else {
+          (Array.isArray(inv.items) ? inv.items : []).forEach(item => {
+            const key = String(item.id ?? '');
+            const qty = Number(item.qty || 0);
+            if (key && Number.isFinite(qty) && qty > 0) adjustments[key] = (adjustments[key] || 0) + qty;
+          });
         }
-
-        // نحذف كل مستند مطابق حتى لا تعود الفاتورة من نسخة قديمة مكررة.
-        for (const ref of refsToDelete) {
-          await ref.delete();
-        }
-
-        // بعد نجاح الحذف من Firestore نحذفها من الذاكرة والتخزين المحلي.
+        const productRefs = Object.keys(adjustments).map(key => ({key, ref:db.collection('products').doc(key)}));
+        const now = Date.now();
+        await db.runTransaction(async tx => {
+          const productSnaps = {};
+          for (const entry of productRefs) productSnaps[entry.key] = await tx.get(entry.ref);
+          for (const entry of productRefs) {
+            const qty = Number(adjustments[entry.key] || 0), snap = productSnaps[entry.key];
+            if (!snap.exists || !Number.isFinite(qty) || qty <= 0) continue;
+            const data = snap.data() || {}, stock = Number(data.stock), soldQty = Number(data.soldQty);
+            if (!Number.isFinite(stock)) continue;
+            tx.set(entry.ref, {
+              stock: Math.max(0, stock + qty),
+              soldQty: Math.max(0, (Number.isFinite(soldQty) ? soldQty : 0) - qty),
+              updatedAt: now,
+              lastStockUpdateUid: auth.currentUser?.uid || null,
+              lastStockUpdateInvoiceId: invoiceKey,
+              lastStockUpdateAction: 'deleteInvoiceRestore'
+            }, {merge:true});
+          }
+          refsToDelete.forEach(ref => tx.delete(ref));
+        });
         invoices = invoices.filter(i => String(i.id) !== invoiceKey);
         saveData();
-
-        // تنظيف حالة القراءة والرقم من قائمة الفواتير غير المقروءة.
-        try {
-          const readIds = getReadInvoiceIds().filter(id => String(id) !== invoiceKey);
-          setReadInvoiceIds(readIds);
-        } catch (_) {}
-
-        renderInvoicesList();
-        updateUnreadInvoicesBadge();
-
-        // رسالة نجاح قصيرة للتأكد من أن الحذف تم فعلياً.
-        alert('تم حذف الفاتورة نهائياً من قاعدة البيانات والفواتير السابقة.');
+        try { setReadInvoiceIds(getReadInvoiceIds().filter(id => String(id) !== invoiceKey)); } catch (_) {}
+        renderInvoicesList(); renderArchivedInvoicesList(); renderProducts(); renderBusinessDashboard();
+        await writeAuditLog(fromArchive ? 'deleteArchivedInvoice' : 'deleteInvoice', `تم حذف الفاتورة ${invoiceKey} نهائياً وإعادة الكميات التي خُصمت فعلياً منها إلى المخزون.`, {invoiceId:invoiceKey, archived:fromArchive, inventoryChanged:true});
+        alert(fromArchive ? 'تم حذف الفاتورة المؤرشفة وإعادة الكميات التي خُصمت فعلياً منها إلى المخزون بنجاح.' : 'تم حذف الفاتورة وإعادة الكميات التي خُصمت منها إلى المخزون بنجاح.');
       } catch (err) {
-        console.error('فشل حذف الفاتورة من Firestore:', err);
-        const code = err && err.code ? String(err.code) : '';
-        if (code === 'permission-denied') {
-          alert('تم رفض حذف الفاتورة من Firestore. يجب السماح بصلاحية delete لمجموعة invoices في قواعد Firestore للمدير الرئيسي/المدير المسموح له بحذف الفواتير.');
-        } else {
-          alert('تعذر حذف الفاتورة من قاعدة البيانات. لم يتم حذفها من القائمة. تحقق من اتصال الإنترنت ثم حاول مرة أخرى.');
-        }
+        console.error('فشل حذف الفاتورة وإعادة المخزون:', err);
+        const code = err?.code ? String(err.code) : '';
+        if (code === 'permission-denied') alert('تم رفض العملية من Firestore. يجب السماح بصلاحية الحذف للفواتير وتحديث المنتجات للمدير المصرح له.');
+        else alert('تعذر حذف الفاتورة أو إعادة المخزون. لم يتم اعتماد العملية.');
       }
+    }
+
+    async function deleteArchivedInvoice(invoiceId) {
+      return deleteInvoice(invoiceId, true);
     }
 
     function closeInvoicesModal() { document.getElementById('invoices-modal').classList.add('hidden'); }
@@ -7047,7 +7493,7 @@
       container.innerHTML = '';
 
       const statsMap = {};
-      invoices.forEach(inv => {
+      getActiveInvoices().forEach(inv => {
         if (inv.customer && inv.customer.name) {
           const name = inv.customer.name.trim();
           const phone = inv.customer.phone || 'بدون هاتف';
@@ -7155,7 +7601,7 @@
         return;
       }
 
-      const filteredInvoices = invoices.filter(inv => {
+      const filteredInvoices = getActiveInvoices().filter(inv => {
         let invDate = inv.createdAt ? new Date(inv.createdAt) : null;
         if (!invDate || isNaN(invDate.getTime())) invDate = parseInvoiceDateString(inv.date, inv.rawDate);
         if (!invDate || isNaN(invDate.getTime())) return !fromDate && !toDate;
