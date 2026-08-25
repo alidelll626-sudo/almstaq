@@ -5340,6 +5340,37 @@
         return;
       }
 
+      // فحص سريع قبل Transaction: يمنع الرسالة العامة إذا كانت بيانات userProfiles
+      // لا تطابق الحساب المسجل فعلياً في Firebase Authentication.
+      try {
+        const ownProfileSnap = await db.collection('userProfiles').doc(firebaseUser.uid).get();
+        if (!ownProfileSnap.exists) {
+          alert('تعذر اعتماد الطلب لأن ملف صلاحيات هذا الحساب غير موجود. سجّل الخروج ثم ادخل مرة أخرى، وإذا استمرت المشكلة راجع بيانات userProfiles.');
+          return;
+        }
+        const ownProfile = ownProfileSnap.data() || {};
+        const expectedRole = loggedCustomer ? 'customer' : 'delegate';
+        const expectedUsername = String(loggedCustomer ? loggedCustomer.username : loggedDelegate.username || '');
+        if (ownProfile.active !== true || String(ownProfile.role || '') !== expectedRole || String(ownProfile.username || '') !== expectedUsername) {
+          alert('تعذر اعتماد الطلب لأن بيانات صلاحيات الحساب لا تطابق الحساب المسجل. سجّل الخروج ثم ادخل مرة أخرى.');
+          console.warn('Invoice permission profile mismatch', {
+            authUid: firebaseUser.uid,
+            expectedRole,
+            expectedUsername,
+            profileRole: ownProfile.role,
+            profileUsername: ownProfile.username,
+            profileActive: ownProfile.active
+          });
+          return;
+        }
+      } catch (profileErr) {
+        console.error('فشل فحص صلاحيات الحساب قبل اعتماد الطلب:', profileErr);
+        if (profileErr?.code === 'permission-denied') {
+          alert('تعذر التحقق من صلاحيات الحساب قبل اعتماد الطلب. حدّث قواعد Firestore ثم سجّل الدخول مرة أخرى.');
+          return;
+        }
+      }
+
       const totalAmount = currentCart.reduce((acc, item) => acc + ((Number(item.price) || 0) * (Number(item.qty) || 0)), 0);
       const paidAmount = null;
       const remainingAmount = null;
@@ -5399,7 +5430,7 @@
             updatedProducts.push({
               ref: productRefs[i],
               data,
-              stock: stock - fulfilledQty,
+              stock: availableQty - fulfilledQty,
               soldQty: Number(data.soldQty || 0) + fulfilledQty,
               backorderQty
             });
@@ -5464,8 +5495,61 @@
         } else if (message.startsWith('PRODUCT_NOT_FOUND:')) {
           alert(`المنتج "${message.split(':')[1]}" لم يعد موجوداً في قاعدة البيانات. حدّث الصفحة وحاول مرة أخرى.`);
         } else if (err?.code === 'permission-denied') {
-          // لا نعرض اسم قاعدة البيانات أو تفاصيل Firebase الحساسة للمستخدم.
-          alert('تعذر اعتماد الطلب بسبب عدم تطابق صلاحيات الحساب. تأكد من أن حسابك مسجل دخولاً بشكل صحيح، ثم حدّث التطبيق وحاول مرة أخرى.');
+          // نجمع تشخيصاً آمناً بعد الرفض لتحديد السبب المحتمل بدون كشف تفاصيل Firebase للمستخدم.
+          let diagnosticMessage = 'تعذر اعتماد الطلب لأن Firestore رفض إحدى عمليات الحفظ. حدّث التطبيق ثم حاول مرة أخرى.';
+          try {
+            const firebaseUserNow = auth.currentUser;
+            if (!firebaseUserNow?.uid) {
+              diagnosticMessage = 'تعذر اعتماد الطلب لأن جلسة تسجيل الدخول انتهت. سجّل الخروج ثم ادخل مرة أخرى.';
+            } else {
+              const profileSnap = await db.collection('userProfiles').doc(firebaseUserNow.uid).get();
+              const profile = profileSnap.exists ? (profileSnap.data() || {}) : null;
+              const expectedRole = loggedCustomer ? 'customer' : 'delegate';
+              const expectedUsername = String(loggedCustomer ? loggedCustomer.username : loggedDelegate?.username || '');
+
+              if (!profile) {
+                diagnosticMessage = 'تم رفض الطلب لأن ملف صلاحيات الحساب غير موجود في userProfiles.';
+              } else if (profile.active !== true) {
+                diagnosticMessage = 'تم رفض الطلب لأن الحساب غير فعال في صلاحيات Firestore.';
+              } else if (String(profile.role || '') !== expectedRole) {
+                diagnosticMessage = 'تم رفض الطلب لأن دور الحساب في userProfiles لا يطابق نوع الحساب المسجل.';
+              } else if (String(profile.username || '') !== expectedUsername) {
+                diagnosticMessage = 'تم رفض الطلب لأن اسم المستخدم في userProfiles لا يطابق الحساب الحالي.';
+              } else {
+                // نتحقق من المنتجات فقط لمعرفة ما إذا كان أحدها يخالف شروط تحديث المخزون.
+                const checks = await Promise.all(currentCart.map(async item => {
+                  const snap = await db.collection('products').doc(String(item.id)).get();
+                  if (!snap.exists) return {id: item.id, reason: 'غير موجود'};
+                  const data = snap.data() || {};
+                  const stock = Number(data.stock ?? 0);
+                  const availableQty = Math.max(0, stock);
+                  const qty = Math.max(0, Number(item.qty || 0));
+                  const fulfilledQty = Math.min(availableQty, qty);
+                  const nextStock = availableQty - fulfilledQty;
+                  const nextSold = Number(data.soldQty || 0) + fulfilledQty;
+                  const validDelta = (stock >= 0) && nextStock >= 0 && ((stock - nextStock) === (nextSold - Number(data.soldQty || 0)));
+                  return {id: item.id, name: data.name || item.name || item.id, validDelta};
+                }));
+                const badProduct = checks.find(x => x.reason || x.validDelta === false);
+                if (badProduct) {
+                  diagnosticMessage = `تم رفض الطلب أثناء تحديث مخزون المنتج: ${badProduct.name || badProduct.id}. راجع بيانات المخزون لهذا المنتج.`;
+                } else {
+                  diagnosticMessage = 'تم رفض الطلب رغم تطابق الحساب والمنتجات محلياً؛ السبب المتبقي على الأرجح هو أن قواعد Firestore المنشورة تختلف عن ملف القواعد الذي تم تعديله. تأكد من الضغط على Publish.';
+                }
+              }
+              console.warn('Invoice permission diagnostic', {
+                authUid: firebaseUserNow.uid,
+                expectedRole,
+                expectedUsername,
+                profile,
+                invoiceId: newInvoice.id,
+                errorCode: err?.code
+              });
+            }
+          } catch (diagnosticErr) {
+            console.error('فشل تشخيص رفض صلاحيات اعتماد الطلب:', diagnosticErr);
+          }
+          alert(diagnosticMessage);
         } else {
           alert('تعذر إصدار الفاتورة. لم يتم اعتماد الطلب.');
         }
