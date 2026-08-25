@@ -5196,25 +5196,20 @@
       const label = document.getElementById('invoice-type-label');
       if (!select) return;
 
+      // حالات الطلب (جديد/قيد التجهيز/جاهز/مع المندوب/تم التسليم)
+      // ليست من اختصاص الزبون أو المندوب. المدير وحده يديرها من "تتبع الطلب".
+      // هذا الحقل مخصص فقط لتحديد نوع الزبون في الفاتورة.
+      if (label) label.textContent = 'نوع الزبون';
+      select.innerHTML = `
+        <option value="new_customer">🆕 زبون جديد</option>
+        <option value="old_customer">👤 زبون قديم</option>
+      `;
+
+      // المندوب يختار النوع، والزبون المسجل يكون "زبون قديم" افتراضياً.
       if (loggedDelegate) {
-        // في فاتورة المندوب: هذا الحقل يحدد نوع الزبون فقط.
-        if (label) label.textContent = 'نوع الفاتورة';
-        select.innerHTML = `
-          <option value="new_customer">🆕 زبون جديد</option>
-          <option value="old_customer">👤 زبون قديم</option>
-        `;
         select.value = select.value === 'old_customer' ? 'old_customer' : 'new_customer';
       } else {
-        // في فاتورة الزبون يبقى الحقل خاصاً بحالة الطلب.
-        if (label) label.textContent = 'حالة الطلب';
-        select.innerHTML = `
-          <option value="new">🟡 جديد</option>
-          <option value="preparing">🔵 قيد التجهيز</option>
-          <option value="ready">🟠 جاهز للتسليم</option>
-          <option value="with_delegate">🛵 مع المندوب</option>
-          <option value="delivered">🟢 تم التسليم</option>
-        `;
-        select.value = 'new';
+        select.value = 'old_customer';
       }
     }
 
@@ -5327,11 +5322,10 @@
       // طريقة الدفع معلومة فقط على الفاتورة: نقدي أو آجل.
       // لا يتم تسجيل مدفوع/متبقي أو أي حركة مالية إضافية.
       const paymentStatus = null;
-      const selectedInvoiceType = document.getElementById('invoice-order-status')?.value || 'new_customer';
-      // المندوب يختار نوع الزبون (جديد/قديم)، بينما حالة الطلب تبدأ دائماً بالقيمة الآمنة "new".
-      const customerType = isDelegateOrder
-        ? selectedInvoiceType
-        : null;
+      const selectedInvoiceType = document.getElementById('invoice-order-status')?.value || (loggedCustomer ? 'old_customer' : 'new_customer');
+      // نوع الزبون يُحفظ للمندوب والزبون معاً، بينما حالة الطلب داخلية وتبدأ دائماً بـ "new".
+      // المدير فقط يغير orderStatus من لوحة "تتبع الطلب".
+      const customerType = selectedInvoiceType;
       const orderStatus = 'new';
 
       const firebaseUser = auth.currentUser;
@@ -5658,9 +5652,9 @@
                     : badProduct.failed.map(key => labels[key] || key).join('، ');
                   diagnosticMessage = `تم رفض الطلب أثناء فحص المنتج: ${badProduct.name || badProduct.id}. السبب: ${details}.`;
                 } else {
-                  // إذا مرّت كل شروط الحساب المحلي، فالرفض غالباً في ربط getAfter بالفاتورة
-                  // أو في شرط إنشاء الفاتورة. نعرض ذلك بوضوح بدلاً من اتهام القواعد المنشورة.
-                  diagnosticMessage = 'تم فحص الحساب وكل شروط المخزون محلياً ونجحت. الرفض المتبقي غالباً في ربط تحديث المخزون بالفاتورة داخل Transaction (getAfter) أو في شرط إنشاء الفاتورة. تم تسجيل التفاصيل في Console للفحص الدقيق.';
+                  // إذا نجح فحص الحساب محلياً، فالرفض المتبقي غالباً من قواعد Firestore
+                  // الخاصة بإنشاء الفاتورة أو تحديث المنتج. تحديث المخزون منفصل عن إنشاء الفاتورة.
+                  diagnosticMessage = 'تم فحص الحساب وبيانات الطلب محلياً بنجاح، لكن Firestore رفض إحدى عمليات الحفظ. تم تسجيل التفاصيل في Console للفحص الدقيق.';
                 }
 
                 console.warn('Invoice permission diagnostic - detailed', {
@@ -5755,6 +5749,7 @@
         with_delegate:'🚚 الطلب مع السائق', delivered:'✅ تم تسليم الطلب', cancelled:'🔴 ملغي'
       })[status] || '🟡 جديد';
     }
+
     function getPaymentMethodLabel(method) {
       return ({cash:'نقدي', transfer:'تحويل', credit:'آجل'})[method] || 'نقدي';
     }
@@ -6022,9 +6017,10 @@
           <tbody>${itemsRows}</tbody>
         </table>
         <div style="display:grid;gap:6px;margin-top:10px;font-size:.78rem;">
-          <div><strong>حالة الطلب:</strong> <span class="order-status-chip">${getOrderStatusLabel(invoice.orderStatus)}</span></div>
+          ${(isAdmin || loggedAdmin)
+            ? `<div><strong>حالة الطلب:</strong> <span class="order-status-chip">${getOrderStatusLabel(invoice.orderStatus)}</span></div>`
+            : `<div style="background:#ecfdf5;border:1px solid #bbf7d0;color:#166534;padding:9px 10px;border-radius:10px;text-align:center;font-weight:700;">📩 تم إرسال طلبك بنجاح</div>`}
           <div><strong>طريقة الدفع:</strong> ${getPaymentMethodLabel(invoice.paymentMethod)}</div>
-          ${invoice.ownerRole === 'delegate' && invoice.paymentMethod ? `<div><strong>طريقة الدفع:</strong> ${getPaymentMethodLabel(invoice.paymentMethod)}</div>` : ''}
         </div>
         <div class="receipt-total-box">المجموع الكلي: ${formatPrice(Number(invoice.total) || 0)} د.ع</div>
       `;
