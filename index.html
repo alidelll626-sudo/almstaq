@@ -5446,11 +5446,21 @@
 
           if (backorderedItems.length) {
             newInvoice.orderStatus = 'backorder';
-            newInvoice.stockNote = 'يوجد صنف/أصناف مطلوبة غير متوفرة حالياً بالكامل، وتم تسجيل الكمية المتبقية كطلب مؤجل.';
+            newInvoice.stockNote = 'تم قبول الطلب وإصدار الفاتورة حتى مع عدم توفر بعض المنتجات أو كون مخزونها صفراً. الكميات غير المتوفرة سُجلت كطلب مؤجل دون منع الفاتورة.';
             newInvoice.backorderedItems = backorderedItems;
           }
 
+          // تحديث المنتجات التي يوجد منها مخزون فعلي فقط.
+          // إذا كان المخزون صفراً أو أقل، لا نحدّث المنتج إطلاقاً ولا نمنع إنشاء الفاتورة.
+          // تبقى الكمية المطلوبة مسجلة في backorderedItems وتُحفظ الفاتورة بحالة backorder.
           updatedProducts.forEach(p => {
+            const originalStock = Math.max(0, Number(p.data.stock ?? 0));
+            const stockWasFulfilled = Number(p.soldQty || 0) > Number(p.data.soldQty || 0);
+
+            if (!stockWasFulfilled || originalStock <= 0) {
+              return;
+            }
+
             tx.set(p.ref, {
               stock: p.stock,
               soldQty: p.soldQty,
