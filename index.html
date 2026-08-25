@@ -5469,12 +5469,17 @@
         }
 
         // أولاً: إنشاء الفاتورة وحدها. لا يدخل تحديث المخزون في نفس Transaction.
-        // لذلك فشل stock أو getAfter لا يمكنه إلغاء الفاتورة.
-        await db.runTransaction(async tx => {
-          const invoiceSnap = await tx.get(invoiceRef);
-          if (invoiceSnap.exists) throw new Error('DUPLICATE_INVOICE');
-          tx.set(invoiceRef, newInvoice);
-        });
+        // create() ينشئ المستند فقط إذا لم يكن موجوداً مسبقاً، من دون tx.get().
+        // لذلك لا يحدث رفض بسبب محاولة قراءة فاتورة غير موجودة قبل إنشائها،
+        // وتبقى حماية تكرار رقم الفاتورة موجودة على مستوى Firestore.
+        try {
+          await invoiceRef.create(newInvoice);
+        } catch (createErr) {
+          if (createErr?.code === 'already-exists') {
+            throw new Error('DUPLICATE_INVOICE');
+          }
+          throw createErr;
+        }
 
         // ثانياً: محاولة مزامنة المخزون بعد نجاح الفاتورة.
         // أي فشل هنا يُسجل في Console فقط ولا يلغي الفاتورة.
