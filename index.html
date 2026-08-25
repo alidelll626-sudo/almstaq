@@ -851,6 +851,16 @@
     }
 
     @media (max-width: 520px) {
+      #edit-invoice-modal .modal-content { width:calc(100% - 12px) !important; }
+      #edit-invoice-items .edit-invoice-item-row {
+        grid-template-columns:1fr 1fr !important;
+      }
+      #edit-invoice-items .edit-invoice-item-name,
+      #edit-invoice-items .edit-invoice-item-note,
+      #edit-invoice-items .edit-invoice-item-id {
+        grid-column:1 / -1;
+      }
+      #edit-invoice-items .edit-invoice-item-row button { grid-column:1 / -1; }
       .invoice-export-actions {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -1005,6 +1015,7 @@
     .notification-filter-tabs button.active { background:var(--primary); color:#fff; border-color:var(--primary); }
 
 
+    .admin-permissions-toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:4px 0 10px;padding:10px 12px;border:1px solid #dbe7f0;background:linear-gradient(135deg,#f8fbff,#eef7fb);border-radius:14px;color:#496273;font-size:.72rem;font-weight:800}.admin-permission-count{background:#0f3d56;color:#fff;padding:5px 9px;border-radius:999px;white-space:nowrap}.admin-permissions-groups{display:grid;gap:10px;max-height:470px;overflow:auto;padding-right:2px}.admin-permission-group{border:1px solid #dbe5ec;border-radius:16px;background:#fff;overflow:hidden;box-shadow:0 3px 12px rgba(15,23,42,.04)}.admin-permission-group-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 12px;background:#f7fafc;border-bottom:1px solid #e6edf2}.admin-permission-group-head b{display:block;color:#173b4d;font-size:.82rem}.admin-permission-group-head small{display:block;color:#718496;font-size:.64rem;margin-top:2px}.permission-group-toggle{border:1px solid #cbdbe5;background:#fff;color:#0f5a78;border-radius:10px;padding:7px 9px;font-size:.65rem;font-weight:900;cursor:pointer;white-space:nowrap}.permission-group-toggle:active{transform:scale(.97)}
     .admin-permissions-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
     .admin-permission-item { display:flex; align-items:center; gap:9px; padding:10px 11px; background:#f8fafc; border:1px solid var(--border-color); border-radius:12px; cursor:pointer; font-size:.78rem; font-weight:700; }
     .admin-permission-item input { width:18px; height:18px; accent-color:var(--primary); }
@@ -1628,6 +1639,77 @@
       </div>
     </div>
 
+    <!-- نافذة تعديل الفاتورة السابقة - متاحة للمدير الرئيسي أو المدير الفرعي صاحب صلاحية editInvoices -->
+    <div id="edit-invoice-modal" class="modal hidden" style="z-index:3200 !important; align-items:center;">
+      <div class="modal-content" style="max-width:760px; width:calc(100% - 20px); max-height:92vh; border-radius:24px;">
+        <div class="modal-header">
+          <h3>✏️ تعديل الفاتورة السابقة</h3>
+          <button class="close-modal" type="button" onclick="closeEditInvoiceModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="edit-invoice-id">
+          <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+            <div>
+              <label style="font-size:.72rem;font-weight:800;color:var(--text-muted);display:block;margin-bottom:5px;">اسم الزبون</label>
+              <input id="edit-invoice-customer-name" class="compact-input" type="text">
+            </div>
+            <div>
+              <label style="font-size:.72rem;font-weight:800;color:var(--text-muted);display:block;margin-bottom:5px;">رقم الهاتف</label>
+              <input id="edit-invoice-customer-phone" class="compact-input" type="text">
+            </div>
+            <div style="grid-column:1/-1;">
+              <label style="font-size:.72rem;font-weight:800;color:var(--text-muted);display:block;margin-bottom:5px;">العنوان</label>
+              <input id="edit-invoice-customer-address" class="compact-input" type="text">
+            </div>
+          </div>
+
+          <div class="payment-box">
+            <div style="font-size:.78rem;font-weight:900;color:var(--primary-dark);">بيانات الفاتورة</div>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;">
+              <div>
+                <label style="font-size:.68rem;color:var(--text-muted);display:block;margin-bottom:4px;">طريقة الدفع</label>
+                <select id="edit-invoice-payment-method" class="compact-input">
+                  <option value="cash">نقدي</option>
+                  <option value="credit">أجل</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:.68rem;color:var(--text-muted);display:block;margin-bottom:4px;">حالة الدفع</label>
+                <select id="edit-invoice-payment-status" class="compact-input">
+                  <option value="paid">مدفوع</option>
+                  <option value="unpaid">غير مدفوع</option>
+                  <option value="partial">مدفوع جزئياً</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="payment-box">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+              <div style="font-size:.78rem;font-weight:900;color:var(--primary-dark);">المنتجات والكميات والأسعار</div>
+              <span style="font-size:.65rem;color:var(--text-muted);">تعديل الفاتورة لا يغيّر المخزون تلقائياً</span>
+            </div>
+            <div id="edit-invoice-items" style="display:flex;flex-direction:column;gap:8px;"></div>
+          </div>
+
+          <div>
+            <label style="font-size:.72rem;font-weight:800;color:var(--text-muted);display:block;margin-bottom:5px;">ملاحظة الفاتورة</label>
+            <textarea id="edit-invoice-general-note" class="compact-input" rows="3" style="resize:vertical;"></textarea>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:14px;background:var(--primary-light);border:1px solid #bae6fd;">
+            <span style="font-size:.8rem;font-weight:900;color:#475569;">المجموع الجديد</span>
+            <strong id="edit-invoice-total" style="font-size:1.1rem;color:var(--primary-dark);">0 د.ع</strong>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-secondary" onclick="closeEditInvoiceModal()">إلغاء</button>
+            <button type="button" class="btn" id="save-edited-invoice-btn" onclick="saveEditedInvoice()">💾 حفظ التعديلات</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- نافذة الزبائن الأكثر نشاطاً -->
     <div id="top-customers-modal" class="modal hidden">
       <div class="modal-content">
@@ -1736,14 +1818,53 @@
             <input type="text" id="new-admin-fullname" placeholder="اسم المدير" required class="compact-input">
             <div>
               <div style="font-size:.78rem;font-weight:800;color:var(--primary-dark);margin-bottom:7px;">الصلاحيات</div>
-              <div class="admin-permissions-grid">
-                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="addProducts"> إضافة منتجات</label>
-                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="editProducts"> التعديل على المنتجات</label>
-                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="deleteProducts"> حذف المنتجات</label>
-                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="createCustomers"> إنشاء حسابات الزبائن</label>
-                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="createDelegates"> إنشاء حسابات المندوبين</label>
-                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="deleteInvoices"> حذف الفواتير السابقة</label>
-                <label class="admin-permission-item"><input type="checkbox" data-admin-permission="sendNotifications"> إرسال الإشعارات</label>
+              <div class="admin-permissions-toolbar">
+                <span>حدد فقط ما يحتاجه هذا المدير</span>
+                <span id="selected-admin-permissions-count" class="admin-permission-count">0 صلاحية</span>
+              </div>
+              <div class="admin-permissions-groups">
+                <div class="admin-permission-group" data-permission-group="products">
+                  <div class="admin-permission-group-head"><div><b>📦 المنتجات والمخزون</b><small>إدارة المنتجات والكميات والأسعار</small></div><button type="button" class="permission-group-toggle" onclick="togglePermissionGroup('products')">تحديد القسم</button></div>
+                  <div class="admin-permissions-grid">
+                    <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewProducts"> مشاهدة المنتجات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="addProducts"> إضافة منتجات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editProducts"> التعديل على المنتجات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="deleteProducts"> حذف المنتجات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editProductPrices"> تعديل أسعار المنتجات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editStock"> تعديل كميات المخزون</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editMinStock"> تعديل حد تنبيه المخزون</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewProductStats"> مشاهدة إحصائيات المنتجات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewLowStock"> مشاهدة المنتجات قليلة المخزون</label>
+                  </div>
+                </div>
+                <div class="admin-permission-group" data-permission-group="invoices">
+                  <div class="admin-permission-group-head"><div><b>🧾 الفواتير والطلبات</b><small>الوصول للفواتير وحالات الطلب والدفع</small></div><button type="button" class="permission-group-toggle" onclick="togglePermissionGroup('invoices')">تحديد القسم</button></div>
+                  <div class="admin-permissions-grid">
+                    <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewInvoices"> مشاهدة الفواتير السابقة</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editInvoices"> تعديل الفواتير السابقة</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="deleteInvoices"> حذف الفواتير السابقة</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="createInvoices"> اعتماد وإصدار الفواتير</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editOrderStatus"> تعديل حالة الطلب</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewCustomerOrders"> مشاهدة طلبات الزبائن</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegateOrders"> مشاهدة طلبات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="cancelOrders"> إلغاء الطلبات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewPaymentDetails"> مشاهدة تفاصيل الدفع</label>
+                  </div>
+                </div>
+                <div class="admin-permission-group" data-permission-group="customers">
+                  <div class="admin-permission-group-head"><div><b>👥 الزبائن</b><small>إدارة حسابات الزبائن وحالتها</small></div><button type="button" class="permission-group-toggle" onclick="togglePermissionGroup('customers')">تحديد القسم</button></div>
+                  <div class="admin-permissions-grid">
+                    <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewCustomers"> مشاهدة حسابات الزبائن</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="createCustomers"> إنشاء حسابات الزبائن</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editCustomers"> تعديل حسابات الزبائن</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="toggleCustomers"> تعطيل / تفعيل حسابات الزبائن</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="deleteCustomers"> حذف حسابات الزبائن</label>
+                  </div>
+                </div>
+                <div class="admin-permission-group" data-permission-group="delegates">
+                  <div class="admin-permission-group-head"><div><b>🛵 المندوبون</b><small>إدارة حسابات المندوبين وطلباتهم</small></div><button type="button" class="permission-group-toggle" onclick="togglePermissionGroup('delegates')">تحديد القسم</button></div>
+                  <div class="admin-permissions-grid">
+                    <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegates"> مشاهدة حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="createDelegates"> إنشاء حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editDelegates"> تعديل حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="toggleDelegates"> تعطيل / تفعيل حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="deleteDelegates"> حذف حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegateOrders"> مشاهدة طلبات المندوبين</label>
+                  </div>
+                </div>
+                <div class="admin-permission-group" data-permission-group="reports">
+                  <div class="admin-permission-group-head"><div><b>📊 التقارير والإحصائيات</b><small>عرض المؤشرات والتقارير وتحليل المخزون</small></div><button type="button" class="permission-group-toggle" onclick="togglePermissionGroup('reports')">تحديد القسم</button></div>
+                  <div class="admin-permissions-grid">
+                    <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDashboard"> مشاهدة لوحة المؤشرات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewSalesStats"> مشاهدة إحصائيات المبيعات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewProductStats"> مشاهدة إحصائيات المنتجات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewInventoryStats"> مشاهدة إحصائيات المخزون</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegateStats"> مشاهدة تقارير المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="exportReports"> تصدير التقارير PDF</label>
+                  </div>
+                </div>
+                <div class="admin-permission-group" data-permission-group="notifications">
+                  <div class="admin-permission-group-head"><div><b>🔔 الإشعارات</b><small>تحكم دقيق في جهات إرسال الإشعارات</small></div><button type="button" class="permission-group-toggle" onclick="togglePermissionGroup('notifications')">تحديد القسم</button></div>
+                  <div class="admin-permissions-grid">
+                    <label class="admin-permission-item"><input type="checkbox" data-admin-permission="sendNotifications"> إرسال الإشعارات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="notifyCustomers"> إرسال إشعارات للزبائن</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="notifyDelegates"> إرسال إشعارات للمندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="notifySpecific"> إرسال إشعار لشخص محدد</label>
+                  </div>
+                </div>
+                <div class="admin-permission-group" data-permission-group="audit">
+                  <div class="admin-permission-group-head"><div><b>🛡️ المراقبة والأمان</b><small>مراجعة النشاط وسجل عمليات الإدارة</small></div><button type="button" class="permission-group-toggle" onclick="togglePermissionGroup('audit')">تحديد القسم</button></div>
+                  <div class="admin-permissions-grid">
+                    <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewAuditLog"> مشاهدة سجل عمليات الإدارة</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewManagerActivity"> مشاهدة نشاط المدراء الفرعيين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewInvoiceActor"> مشاهدة من قام بتعديل الفاتورة</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewProductActor"> مشاهدة من قام بتعديل المنتج</label>
+                  </div>
+                </div>
               </div>
             </div>
             <div style="display:flex;gap:7px;">
@@ -2997,12 +3118,39 @@
     let customers = JSON.parse(localStorage.getItem('mustaqbal_customers')) || [];
     let delegates = JSON.parse(localStorage.getItem('mustaqbal_delegates')) || [];
     let adminPassword = localStorage.getItem('mustaqbal_admin_pass') || '799673';
-    const ADMIN_PERMISSION_KEYS = ['addProducts','editProducts','deleteProducts','createCustomers','createDelegates','deleteInvoices','sendNotifications'];
-    const ADMIN_PERMISSION_LABELS = {
-      addProducts:'إضافة منتجات', editProducts:'التعديل على المنتجات', deleteProducts:'حذف المنتجات',
-      createCustomers:'إنشاء حسابات الزبائن', createDelegates:'إنشاء حسابات المندوبين',
-      deleteInvoices:'حذف الفواتير السابقة', sendNotifications:'إرسال الإشعارات'
-    };
+    // نظام الصلاحيات المتقدم للمدراء الفرعيين — المدير الرئيسي يمتلكها كلها تلقائياً.
+    const ADMIN_PERMISSION_GROUPS = [
+      { key:'products', icon:'📦', title:'المنتجات والمخزون', items:[
+        ['viewProducts','مشاهدة المنتجات'], ['addProducts','إضافة منتجات'], ['editProducts','التعديل على المنتجات'],
+        ['deleteProducts','حذف المنتجات'], ['editProductPrices','تعديل أسعار المنتجات'], ['editStock','تعديل كميات المخزون'],
+        ['editMinStock','تعديل حد تنبيه المخزون'], ['viewProductStats','مشاهدة إحصائيات المنتجات'], ['viewLowStock','مشاهدة المنتجات قليلة المخزون']
+      ]},
+      { key:'invoices', icon:'🧾', title:'الفواتير والطلبات', items:[
+        ['viewInvoices','مشاهدة الفواتير السابقة'], ['editInvoices','تعديل الفواتير السابقة'], ['deleteInvoices','حذف الفواتير السابقة'], ['createInvoices','اعتماد وإصدار الفواتير'],
+        ['editOrderStatus','تعديل حالة الطلب'], ['viewCustomerOrders','مشاهدة طلبات الزبائن'], ['viewDelegateOrders','مشاهدة طلبات المندوبين'],
+        ['cancelOrders','إلغاء الطلبات'], ['viewPaymentDetails','مشاهدة تفاصيل الدفع']
+      ]},
+      { key:'customers', icon:'👥', title:'الزبائن', items:[
+        ['viewCustomers','مشاهدة حسابات الزبائن'], ['createCustomers','إنشاء حسابات الزبائن'], ['editCustomers','تعديل حسابات الزبائن'],
+        ['toggleCustomers','تعطيل / تفعيل حسابات الزبائن'], ['deleteCustomers','حذف حسابات الزبائن']
+      ]},
+      { key:'delegates', icon:'🛵', title:'المندوبون', items:[
+        ['viewDelegates','مشاهدة حسابات المندوبين'], ['createDelegates','إنشاء حسابات المندوبين'], ['editDelegates','تعديل حسابات المندوبين'],
+        ['toggleDelegates','تعطيل / تفعيل حسابات المندوبين'], ['deleteDelegates','حذف حسابات المندوبين'], ['viewDelegateOrders','مشاهدة طلبات المندوبين']
+      ]},
+      { key:'reports', icon:'📊', title:'التقارير والإحصائيات', items:[
+        ['viewDashboard','مشاهدة لوحة المؤشرات'], ['viewSalesStats','مشاهدة إحصائيات المبيعات'], ['viewProductStats','مشاهدة إحصائيات المنتجات'],
+        ['viewInventoryStats','مشاهدة إحصائيات المخزون'], ['viewDelegateStats','مشاهدة تقارير المندوبين'], ['exportReports','تصدير التقارير PDF']
+      ]},
+      { key:'notifications', icon:'🔔', title:'الإشعارات', items:[
+        ['sendNotifications','إرسال الإشعارات'], ['notifyCustomers','إرسال إشعارات للزبائن'], ['notifyDelegates','إرسال إشعارات للمندوبين'], ['notifySpecific','إرسال إشعار لشخص محدد']
+      ]},
+      { key:'audit', icon:'🛡️', title:'المراقبة والأمان', items:[
+        ['viewAuditLog','مشاهدة سجل عمليات الإدارة'], ['viewManagerActivity','مشاهدة نشاط المدراء الفرعيين'], ['viewInvoiceActor','مشاهدة من قام بتعديل الفاتورة'], ['viewProductActor','مشاهدة من قام بتعديل المنتج']
+      ]}
+    ];
+    const ADMIN_PERMISSION_KEYS = [...new Set(ADMIN_PERMISSION_GROUPS.flatMap(g => g.items.map(x => x[0])))];
+    const ADMIN_PERMISSION_LABELS = Object.fromEntries(ADMIN_PERMISSION_GROUPS.flatMap(g => g.items));
     let adminAccounts = JSON.parse(localStorage.getItem('mustaqbal_admin_accounts') || '[]');
     let loggedAdmin = JSON.parse(localStorage.getItem('loggedAdmin') || 'null');
     let adminForceLogoutUnsubscribe = null;
@@ -3238,9 +3386,9 @@
     function openLoginModal() { document.getElementById('login-modal').classList.remove('hidden'); }
     function closeLoginModal() { document.getElementById('login-modal').classList.add('hidden'); }
 
-    async function openAdminCustomersModal() { if (!requireAdminPermission('createCustomers')) return; document.getElementById('admin-customers-modal').classList.remove('hidden'); await loadCustomersFromFirestore(); }
+    async function openAdminCustomersModal() { if (!requireAdminPermission('viewCustomers') && !requireAdminPermission('createCustomers')) return; document.getElementById('admin-customers-modal').classList.remove('hidden'); await loadCustomersFromFirestore(); }
     function closeAdminCustomersModal() { document.getElementById('admin-customers-modal').classList.add('hidden'); }
-    async function openAdminDelegatesModal() { if (!requireAdminPermission('createDelegates')) return; document.getElementById('admin-delegates-modal').classList.remove('hidden'); await loadDelegatesFromFirestore(); }
+    async function openAdminDelegatesModal() { if (!requireAdminPermission('viewDelegates') && !requireAdminPermission('createDelegates')) return; document.getElementById('admin-delegates-modal').classList.remove('hidden'); await loadDelegatesFromFirestore(); }
     function closeAdminDelegatesModal() { document.getElementById('admin-delegates-modal').classList.add('hidden'); }
 
     async function handleUnifiedLogin(e) {
@@ -3670,27 +3818,29 @@
 
     function applyAdminPermissionsUI() {
       if (!(isAdmin || loggedAdmin)) return;
-      const rules = [
-        ['admin-accounts-card', isAdmin],
-        ['save-product-btn', hasAdminPermission('addProducts') || hasAdminPermission('editProducts')],
-      ];
-      rules.forEach(([id,show]) => { const el=document.getElementById(id); if(el) el.classList.toggle('hidden', !show); });
-      const custCard = document.querySelector('[onclick="openAdminCustomersModal()"]');
-      const delCard = document.querySelector('[onclick="openAdminDelegatesModal()"]');
-      const invCard = document.querySelector('[onclick="openInvoicesModal()"]');
-      const notifCard = document.querySelector('[onclick="openAdminNotificationsModal()"]');
-      const whatsappCard = document.getElementById('admin-whatsapp-card');
-      if (whatsappCard) whatsappCard.classList.toggle('hidden', !isAdmin);
-      if (custCard) custCard.classList.toggle('hidden', !hasAdminPermission('createCustomers'));
-      if (delCard) delCard.classList.toggle('hidden', !hasAdminPermission('createDelegates'));
-      if (invCard) invCard.classList.toggle('hidden', !hasAdminPermission('deleteInvoices'));
-      if (notifCard) notifCard.classList.toggle('hidden', !hasAdminPermission('sendNotifications'));
-      const productForm = document.getElementById('product-form');
-      if (productForm) productForm.classList.toggle('hidden', !(hasAdminPermission('addProducts') || hasAdminPermission('editProducts')));
-      const tabCreator = document.getElementById('admin-tab-creator');
-      if (tabCreator) tabCreator.classList.toggle('hidden', !(isAdmin || hasAdminPermission('addProducts')));
-      const ownerPassBox = document.getElementById('owner-password-change-box');
-      if (ownerPassBox) ownerPassBox.classList.toggle('hidden', !isAdmin);
+      const any = (...keys) => isAdmin || keys.some(k => hasAdminPermission(k));
+      const show = (id, ok) => { const el=document.getElementById(id); if(el) el.classList.toggle('hidden', !ok); };
+      show('admin-accounts-card', isAdmin); show('admin-whatsapp-card', isAdmin);
+      show('save-product-btn', any('addProducts','editProducts'));
+      show('admin-invoices-card', any('viewInvoices','editInvoices','deleteInvoices'));
+      document.querySelectorAll('.admin-dashboard-cards .admin-card-btn').forEach(card => {
+        const fn=card.getAttribute('onclick')||'';
+        if(fn.includes('openAdminCustomersModal')) card.classList.toggle('hidden', !any('viewCustomers','createCustomers'));
+        else if(fn.includes('openAdminDelegatesModal')) card.classList.toggle('hidden', !any('viewDelegates','createDelegates'));
+        else if(fn.includes('openInvoicesModal')) card.classList.toggle('hidden', !any('viewInvoices','editInvoices','deleteInvoices'));
+        else if(fn.includes('openProductStatsModal')) card.classList.toggle('hidden', !any('viewProductStats'));
+        else if(fn.includes('openAdminNotificationsModal')) card.classList.toggle('hidden', !any('sendNotifications'));
+      });
+      document.querySelectorAll('.admin-tools-grid .admin-tool-btn').forEach(btn => {
+        const fn=btn.getAttribute('onclick')||'';
+        if(fn.includes('renderBusinessDashboard')) btn.classList.toggle('hidden', !any('viewDashboard'));
+        else if(fn.includes('openLowStockReport')) btn.classList.toggle('hidden', !any('viewLowStock'));
+        else if(fn.includes('openAuditLogModal')) btn.classList.toggle('hidden', !any('viewAuditLog'));
+      });
+      const productForm=document.getElementById('product-form'); if(productForm) productForm.classList.toggle('hidden', !any('addProducts','editProducts'));
+      const tabCreator=document.getElementById('admin-tab-creator'); if(tabCreator) tabCreator.classList.toggle('hidden', !(isAdmin || any('addProducts','editProducts')));
+      const ownerPassBox=document.getElementById('owner-password-change-box'); if(ownerPassBox) ownerPassBox.classList.toggle('hidden', !isAdmin);
+      const dash=document.getElementById('business-dashboard'); if(dash) dash.classList.toggle('hidden', !any('viewDashboard'));
     }
 
     function finishLoginProcess() {
@@ -3825,6 +3975,9 @@
       e.preventDefault();
       if (!requireAdminPermission('sendNotifications')) return;
       const audience = document.getElementById('notification-audience').value;
+      if ((audience === 'customer' || audience === 'all-customers') && !hasAdminPermission('notifyCustomers')) return alert('لا تملك صلاحية إرسال إشعارات للزبائن.');
+      if ((audience === 'delegate' || audience === 'all-delegates') && !hasAdminPermission('notifyDelegates')) return alert('لا تملك صلاحية إرسال إشعارات للمندوبين.');
+      if ((audience === 'customer' || audience === 'delegate') && !hasAdminPermission('notifySpecific')) return alert('لا تملك صلاحية إرسال إشعار لشخص محدد.');
       const subject = document.getElementById('notification-subject').value.trim();
       const details = document.getElementById('notification-details').value.trim();
       const recipient = document.getElementById('notification-recipient').value;
@@ -4073,9 +4226,15 @@
     function closeAdminAccountsModal() { document.getElementById('admin-accounts-modal').classList.add('hidden'); }
     function setAdminPermissionCheckboxes(perms) {
       document.querySelectorAll('[data-admin-permission]').forEach(cb => { cb.checked = !!(perms && perms[cb.dataset.adminPermission]); });
+      updateAdminPermissionCount();
     }
     function selectAllAdminPermissions() { setAdminPermissionCheckboxes(Object.fromEntries(ADMIN_PERMISSION_KEYS.map(k=>[k,true]))); }
     function clearAllAdminPermissions() { setAdminPermissionCheckboxes({}); }
+    function updateAdminPermissionCount(){ const n=document.querySelectorAll('[data-admin-permission]:checked').length; const el=document.getElementById('selected-admin-permissions-count'); if(el) el.textContent=n+' صلاحية'; }
+    function togglePermissionGroup(groupKey){ const group=document.querySelector('[data-permission-group="'+groupKey+'"]'); if(!group)return; const boxes=group.querySelectorAll('[data-admin-permission]'); const shouldCheck=[...boxes].some(cb=>!cb.checked); boxes.forEach(cb=>cb.checked=shouldCheck); updateAdminPermissionCount(); }
+
+    document.addEventListener('change', e => { if (e.target && e.target.matches('[data-admin-permission]')) updateAdminPermissionCount(); });
+
     function getSelectedAdminPermissions() {
       const perms = {};
       document.querySelectorAll('[data-admin-permission]').forEach(cb => perms[cb.dataset.adminPermission] = cb.checked);
@@ -4157,15 +4316,7 @@
         const fullname = String(a.fullname || a.name || username);
         const permissions = (a.permissions && typeof a.permissions === 'object') ? a.permissions : {};
 
-        const labels = {
-          addProducts:'إضافة منتجات',
-          editProducts:'التعديل على المنتجات',
-          deleteProducts:'حذف المنتجات',
-          createCustomers:'إنشاء حسابات الزبائن',
-          createDelegates:'إنشاء حسابات المندوبين',
-          deleteInvoices:'حذف الفواتير السابقة',
-          sendNotifications:'إرسال الإشعارات'
-        };
+        const labels = ADMIN_PERMISSION_LABELS;
 
         const activePermissions = Object.keys(labels)
           .filter(k => permissions[k] === true)
@@ -4310,7 +4461,7 @@
 
     async function handleDelegateMgmtSubmit(e) {
       e.preventDefault();
-      if (!requireAdminPermission('createDelegates')) return;
+      const editingDelegate = !!document.getElementById('edit-del-username-flag').value.trim(); if (editingDelegate ? !requireAdminPermission('editDelegates') : !requireAdminPermission('createDelegates')) return;
 
       const username = document.getElementById('new-del-username').value.trim();
       const password = document.getElementById('new-del-password').value.trim();
@@ -4437,6 +4588,7 @@
     }
 
     async function deleteDelegate(username) {
+      if (!requireAdminPermission('deleteDelegates')) return;
       if (confirm('تأكيد حذف حساب المندوب؟')) {
         delegates = delegates.filter(d => d.username !== username);
         try { await db.collection('delegates').doc(String(username)).delete(); } catch(err){}
@@ -4617,8 +4769,9 @@
     });
 
     async function handleCustomerMgmtSubmit(e) {
-      if (!requireAdminPermission('createCustomers')) return;
       e.preventDefault();
+      const editingCustomer = !!document.getElementById('edit-cust-username-flag').value.trim();
+      if (editingCustomer ? !requireAdminPermission('editCustomers') : !requireAdminPermission('createCustomers')) return;
 
       const username = document.getElementById('new-cust-username').value.trim();
       const password = document.getElementById('new-cust-password').value.trim();
@@ -4746,6 +4899,7 @@
     }
 
     async function deleteCustomer(username) {
+      if (!requireAdminPermission('deleteCustomers')) return;
       if (confirm('تأكيد حذف حساب الزبون؟')) {
         customers = customers.filter(c => c.username !== username);
         try { await db.collection('customers').doc(String(username)).delete(); } catch(err){}
@@ -4940,6 +5094,11 @@
       if (!name || !Number.isFinite(price)) return;
 
       const existingProduct = id ? products.find(p => p.id == id) : null;
+      if (existingProduct) {
+        if (Number(existingProduct.price) !== Number(price) && !hasAdminPermission('editProductPrices')) return alert('لا تملك صلاحية تعديل أسعار المنتجات.');
+        if (Number(existingProduct.stock) !== Number(stock) && !hasAdminPermission('editStock')) return alert('لا تملك صلاحية تعديل كميات المخزون.');
+        if (Number(existingProduct.minStock) !== Number(minStock) && !hasAdminPermission('editMinStock')) return alert('لا تملك صلاحية تعديل حد تنبيه المخزون.');
+      }
       const productCreatedAt = existingProduct ? getProductCreatedTime(existingProduct) : Date.now();
       const productData = {
         id: id ? Number(id) : Date.now(),
@@ -5915,7 +6074,7 @@
     }
 
     function renderBusinessDashboard() {
-      if (!(isAdmin || loggedAdmin)) return;
+      if (!requireAdminPermission('viewDashboard')) return;
       const today = new Date();
       const y = today.getFullYear(), m = String(today.getMonth()+1).padStart(2,'0'), d = String(today.getDate()).padStart(2,'0');
       const todayKey = `${y}-${m}-${d}`;
@@ -5930,7 +6089,7 @@
     }
 
     function openLowStockReport() {
-      if (!requireAdminPermission('editProducts')) return;
+      if (!requireAdminPermission('viewLowStock')) return;
       const box = document.getElementById('low-stock-list');
       if (!box) return;
       const list = (products || []).filter(p => Number(p.stock ?? 0) <= Number(p.minStock ?? 5))
@@ -5947,10 +6106,7 @@
     function closeLowStockReport() { document.getElementById('low-stock-modal')?.classList.add('hidden'); }
 
     async function openAuditLogModal() {
-      if (!(isAdmin || loggedAdmin)) {
-        alert('هذه الصفحة متاحة للمدير فقط.');
-        return;
-      }
+      if (!requireAdminPermission('viewAuditLog')) return;
 
       const modal = document.getElementById('audit-log-modal');
       const list = document.getElementById('audit-log-list');
@@ -6494,7 +6650,9 @@
     }
 
     async function openInvoicesModal() {
-      if ((isAdmin || loggedAdmin) && !requireAdminPermission('deleteInvoices')) return;
+      if (!hasAdminPermission('viewInvoices') && !hasAdminPermission('editInvoices') && !hasAdminPermission('deleteInvoices')) {
+        return requireAdminPermission('viewInvoices');
+      }
       document.getElementById('invoices-modal').classList.remove('hidden');
       await loadInvoicesFromFirestore();
       renderInvoicesList();
@@ -6543,13 +6701,190 @@
           </div>
           <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
             <button class="btn" style="padding:6px 10px; font-size:0.75rem;" onclick="viewSavedInvoice('${inv.id}')">عرض 👁️</button>
+            ${hasAdminPermission('editInvoices') ? `<button class="btn" style="padding:6px 10px; font-size:0.75rem; background:#f59e0b;color:#fff;" onclick="openEditInvoiceModal('${inv.id}')">تعديل ✏️</button>` : ''}
             <button class="btn" style="padding:6px 10px; font-size:0.75rem; background:var(--success);" onclick="exportSavedInvoiceImage('${inv.id}')">🖼️ صورة</button>
             <button class="btn" style="padding:6px 10px; font-size:0.75rem; background:#dc2626;" onclick="exportSavedInvoicePDF('${inv.id}')">📄 PDF</button>
-            ${isAdmin ? `<button class="btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteInvoice('${inv.id}')">حذف 🗑️</button>` : ''}
+            ${hasAdminPermission('deleteInvoices') ? `<button class="btn btn-danger" style="padding:6px 10px; font-size:0.75rem;" onclick="deleteInvoice('${inv.id}')">حذف 🗑️</button>` : ''}
           </div>
         `;
         listContainer.appendChild(div);
       });
+    }
+
+
+    function closeEditInvoiceModal() {
+      const modal = document.getElementById('edit-invoice-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function updateEditedInvoiceTotal() {
+      const box = document.getElementById('edit-invoice-items');
+      const totalEl = document.getElementById('edit-invoice-total');
+      if (!box || !totalEl) return;
+      let total = 0;
+      box.querySelectorAll('.edit-invoice-item-row').forEach(row => {
+        const price = Number(row.querySelector('.edit-invoice-item-price')?.value || 0);
+        const qty = Number(row.querySelector('.edit-invoice-item-qty')?.value || 0);
+        if (Number.isFinite(price) && Number.isFinite(qty)) total += price * qty;
+      });
+      totalEl.textContent = `${formatPrice(total)} د.ع`;
+    }
+
+    function addEditedInvoiceItemRow(item = {}) {
+      const box = document.getElementById('edit-invoice-items');
+      if (!box) return;
+      const row = document.createElement('div');
+      row.className = 'edit-invoice-item-row';
+      row.style.cssText = 'display:grid;grid-template-columns:minmax(120px,1.6fr) 80px 90px minmax(100px,1fr) 38px;gap:6px;align-items:center;padding:9px;background:#fff;border:1px solid var(--border-color);border-radius:12px;';
+      row.innerHTML = `
+        <input type="hidden" class="edit-invoice-item-id" value="${String(item.id ?? '').replace(/"/g,'&quot;')}">
+        <input class="compact-input edit-invoice-item-name" type="text" value="${String(item.name ?? '').replace(/"/g,'&quot;')}" placeholder="المنتج" style="padding:8px;font-size:.72rem;">
+        <input class="compact-input edit-invoice-item-qty" type="number" min="0" step="1" value="${Number(item.qty || 0)}" placeholder="الكمية" style="padding:8px;font-size:.72rem;">
+        <input class="compact-input edit-invoice-item-price" type="number" min="0" step="1" value="${Number(item.price || 0)}" placeholder="السعر" style="padding:8px;font-size:.72rem;">
+        <input class="compact-input edit-invoice-item-note" type="text" value="${String(item.note ?? '').replace(/"/g,'&quot;')}" placeholder="ملاحظة" style="padding:8px;font-size:.72rem;">
+        <button type="button" class="btn btn-danger" style="padding:7px 8px;font-size:.8rem;" title="حذف المنتج">✕</button>
+      `;
+      row.querySelector('.edit-invoice-item-qty').addEventListener('input', updateEditedInvoiceTotal);
+      row.querySelector('.edit-invoice-item-price').addEventListener('input', updateEditedInvoiceTotal);
+      row.querySelector('button').addEventListener('click', () => { row.remove(); updateEditedInvoiceTotal(); });
+      box.appendChild(row);
+    }
+
+    async function openEditInvoiceModal(invoiceId) {
+      if (!requireAdminPermission('editInvoices')) return;
+      const id = String(invoiceId || '');
+      const inv = (invoices || []).find(i => String(i.id) === id);
+      if (!inv) {
+        alert('لم يتم العثور على الفاتورة.');
+        return;
+      }
+
+      document.getElementById('edit-invoice-id').value = id;
+      document.getElementById('edit-invoice-customer-name').value = inv.customer?.name || '';
+      document.getElementById('edit-invoice-customer-phone').value = inv.customer?.phone || '';
+      document.getElementById('edit-invoice-customer-address').value = inv.customer?.address || '';
+      document.getElementById('edit-invoice-payment-method').value = inv.paymentMethod || 'cash';
+      document.getElementById('edit-invoice-payment-status').value = inv.paymentStatus || 'paid';
+      document.getElementById('edit-invoice-general-note').value = inv.generalNote || '';
+
+      const itemsBox = document.getElementById('edit-invoice-items');
+      itemsBox.innerHTML = '';
+      (Array.isArray(inv.items) ? inv.items : []).forEach(item => addEditedInvoiceItemRow(item));
+      updateEditedInvoiceTotal();
+
+      document.getElementById('edit-invoice-modal').classList.remove('hidden');
+    }
+
+    async function saveEditedInvoice() {
+      if (!requireAdminPermission('editInvoices')) return;
+
+      const btn = document.getElementById('save-edited-invoice-btn');
+      const id = String(document.getElementById('edit-invoice-id')?.value || '');
+      const inv = (invoices || []).find(i => String(i.id) === id);
+      if (!inv) {
+        alert('لم يتم العثور على الفاتورة.');
+        return;
+      }
+
+      const rows = [...document.querySelectorAll('#edit-invoice-items .edit-invoice-item-row')];
+      const items = rows.map(row => ({
+        id: row.querySelector('.edit-invoice-item-id')?.value || '',
+        name: row.querySelector('.edit-invoice-item-name')?.value.trim() || '',
+        qty: Math.max(0, Number(row.querySelector('.edit-invoice-item-qty')?.value || 0)),
+        price: Math.max(0, Number(row.querySelector('.edit-invoice-item-price')?.value || 0)),
+        note: row.querySelector('.edit-invoice-item-note')?.value.trim() || ''
+      })).filter(item => item.name && item.qty > 0);
+
+      if (!items.length) {
+        alert('يجب أن تحتوي الفاتورة على منتج واحد على الأقل.');
+        return;
+      }
+
+      const customerName = document.getElementById('edit-invoice-customer-name').value.trim();
+      if (!customerName) {
+        alert('يرجى إدخال اسم الزبون.');
+        return;
+      }
+
+      const paymentMethod = document.getElementById('edit-invoice-payment-method').value || 'cash';
+      const customerDiscount = Number(inv.customer?.discount ?? inv.customerDiscount ?? 0) || 0;
+      const effectivePaymentMethod = customerDiscount > 0 ? 'cash' : paymentMethod;
+      const paymentStatus = document.getElementById('edit-invoice-payment-status').value || 'paid';
+      const generalNote = document.getElementById('edit-invoice-general-note').value.trim();
+      const total = items.reduce((sum, item) => sum + (Number(item.price) || 0) * (Number(item.qty) || 0), 0);
+      const now = Date.now();
+      const actor = loggedAdmin?.username || (isAdmin ? 'admin' : 'manager');
+
+      const updatedFields = {
+        customer: {
+          ...(inv.customer || {}),
+          name: customerName,
+          phone: document.getElementById('edit-invoice-customer-phone').value.trim(),
+          address: document.getElementById('edit-invoice-customer-address').value.trim()
+        },
+        items,
+        generalNote,
+        total,
+        paymentMethod: effectivePaymentMethod,
+        paymentStatus,
+        updatedAt: now,
+        updatedBy: actor,
+        lastEditedBy: actor
+      };
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerText = '⏳ جارٍ حفظ التعديلات...';
+      }
+
+      try {
+        // لا نعتمد على Document ID فقط؛ ندعم الفواتير القديمة التي يختلف فيها docId عن invoice.id.
+        const refs = [];
+        const directRef = db.collection('invoices').doc(id);
+        try {
+          const snap = await directRef.get();
+          if (snap.exists) refs.push(directRef);
+        } catch (_) {}
+
+        try {
+          const matches = await db.collection('invoices').where('id', '==', id).get();
+          matches.forEach(doc => {
+            if (!refs.some(ref => ref.path === doc.ref.path)) refs.push(doc.ref);
+          });
+        } catch (_) {}
+
+        if (!refs.length) throw new Error('لم يتم العثور على مستند Firestore المطابق للفاتورة.');
+
+        for (const ref of refs) {
+          await ref.set(updatedFields, { merge: true });
+        }
+
+        Object.assign(inv, updatedFields);
+        saveData();
+        renderInvoicesList();
+        renderBusinessDashboard();
+        await writeAuditLog(
+          'editInvoice',
+          `تم تعديل الفاتورة ${id} بواسطة ${actor}`,
+          { invoiceId:id, updatedBy:actor, total, itemCount:items.length }
+        );
+
+        closeEditInvoiceModal();
+        alert(`تم تعديل الفاتورة ${id} وحفظ التغييرات بنجاح.`);
+      } catch (err) {
+        console.error('فشل تعديل الفاتورة:', err);
+        const code = err?.code ? String(err.code) : '';
+        if (code === 'permission-denied') {
+          alert('تم رفض تعديل الفاتورة من Firestore. يجب أن تسمح قواعد Firestore بصلاحية update للمدير المصرح له بتعديل الفواتير.');
+        } else {
+          alert('تعذر حفظ تعديلات الفاتورة. تحقق من اتصال الإنترنت ثم حاول مرة أخرى.');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerText = '💾 حفظ التعديلات';
+        }
+      }
     }
 
     async function viewSavedInvoice(invoiceId) {
@@ -6588,6 +6923,7 @@
     }
 
     async function exportSavedInvoicePDF(invoiceId) {
+      if (!requireAdminPermission('exportReports')) return;
       const inv = invoices.find(i => String(i.id) === String(invoiceId));
 
       if (!inv) {
@@ -6748,7 +7084,7 @@
 
     /* --- وظائف إحصائيات المنتجات المعدلة بالكامل لحل مشكلة الفلترة --- */
     function openProductStatsModal() {
-      renderProductStatsReceipt();
+      if (!requireAdminPermission('viewProductStats')) return; renderProductStatsReceipt();
       document.getElementById('product-stats-modal').classList.remove('hidden');
     }
 
