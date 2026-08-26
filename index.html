@@ -4040,7 +4040,29 @@
       await migrateAllLegacyAccountsToAuth();
     }
 
-    function openLoginModal() { document.getElementById('login-modal').classList.remove('hidden'); }
+    function openLoginModal() {
+      const modal = document.getElementById('login-modal');
+      if (!modal) return;
+      const body = modal.querySelector('.modal-body');
+      if (body) {
+        body.innerHTML = `
+          <form id="unified-login-form" style="display:flex!important;flex-direction:column!important;gap:10px!important;visibility:visible!important;opacity:1!important;" onsubmit="handleUnifiedLogin(event)">
+            <input type="text" id="login-username" placeholder="اسم المستخدم" required autocomplete="username" style="display:block!important;visibility:visible!important;opacity:1!important;width:100%!important;min-height:46px!important;box-sizing:border-box!important;padding:11px 13px!important;border:1px solid #dbe3ec!important;border-radius:12px!important;background:#fff!important;color:#111827!important;-webkit-text-fill-color:#111827!important;font-size:16px!important;">
+            <input type="password" id="login-password" placeholder="كلمة المرور" required autocomplete="current-password" style="display:block!important;visibility:visible!important;opacity:1!important;width:100%!important;min-height:46px!important;box-sizing:border-box!important;padding:11px 13px!important;border:1px solid #dbe3ec!important;border-radius:12px!important;background:#fff!important;color:#111827!important;-webkit-text-fill-color:#111827!important;font-size:16px!important;">
+            <button type="submit" class="btn" style="width:100%;padding:12px;margin-top:5px;">دخول</button>
+          </form>
+          <button type="button" class="prelogin-whatsapp-btn" onclick="openWhatsAppContactPreLogin()" style="margin-top:14px;">
+            <span class="prelogin-whatsapp-icon">💬</span>
+            <span><strong>تواصل معنا عبر واتساب</strong><small>يمكنك التواصل معنا مباشرة دون تسجيل الدخول</small></span>
+            <span class="prelogin-whatsapp-arrow">‹</span>
+          </button>`;
+      }
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+      modal.style.visibility = 'visible';
+      modal.style.opacity = '1';
+      setTimeout(() => document.getElementById('login-username')?.focus(), 50);
+    }
     function closeLoginModal() { document.getElementById('login-modal').classList.add('hidden'); }
 
     async function openAdminCustomersModal() { if (!requireAdminPermission('viewCustomers') && !requireAdminPermission('createCustomers')) return; document.getElementById('admin-customers-modal').classList.remove('hidden'); await loadCustomersFromFirestore(); }
