@@ -1489,6 +1489,81 @@
   }
 </style>
 
+
+<style id="login-modal-fields-fix">
+  /* إصلاح نافذة تسجيل الدخول بعد إضافة طبقة منع النسخ */
+  #login-modal {
+    z-index: 10000 !important;
+    align-items: center !important;
+    opacity: 1 !important;
+  }
+
+  #login-modal.hidden {
+    display: none !important;
+  }
+
+  #login-modal .modal-content {
+    display: flex !important;
+    flex-direction: column !important;
+    width: min(430px, calc(100% - 24px)) !important;
+    max-width: 430px !important;
+    max-height: 90vh !important;
+    overflow: hidden !important;
+    position: relative !important;
+    z-index: 10001 !important;
+    background: var(--card-bg, #fff) !important;
+  }
+
+  #login-modal .modal-body {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    overflow-y: auto !important;
+    padding: 18px !important;
+  }
+
+  #login-modal form {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  #login-modal #login-username,
+  #login-modal #login-password {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100% !important;
+    min-height: 46px !important;
+    box-sizing: border-box !important;
+    padding: 11px 13px !important;
+    border: 1px solid var(--border-color, #dbe3ec) !important;
+    border-radius: 12px !important;
+    background: #fff !important;
+    color: #111827 !important;
+    -webkit-text-fill-color: #111827 !important;
+    font-size: 16px !important;
+    line-height: 1.4 !important;
+    position: relative !important;
+    z-index: 10002 !important;
+  }
+
+  #login-modal #login-username::placeholder,
+  #login-modal #login-password::placeholder {
+    color: #94a3b8 !important;
+    opacity: 1 !important;
+  }
+
+  #login-modal #login-username:focus,
+  #login-modal #login-password:focus {
+    border-color: var(--primary, #0284c7) !important;
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(2,132,199,.12) !important;
+  }
+</style>
+
 </head>
 <body>
 
