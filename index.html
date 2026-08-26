@@ -1489,81 +1489,6 @@
   }
 </style>
 
-
-<style id="login-modal-fields-fix">
-  /* إصلاح نافذة تسجيل الدخول بعد إضافة طبقة منع النسخ */
-  #login-modal {
-    z-index: 10000 !important;
-    align-items: center !important;
-    opacity: 1 !important;
-  }
-
-  #login-modal.hidden {
-    display: none !important;
-  }
-
-  #login-modal .modal-content {
-    display: flex !important;
-    flex-direction: column !important;
-    width: min(430px, calc(100% - 24px)) !important;
-    max-width: 430px !important;
-    max-height: 90vh !important;
-    overflow: hidden !important;
-    position: relative !important;
-    z-index: 10001 !important;
-    background: var(--card-bg, #fff) !important;
-  }
-
-  #login-modal .modal-body {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    overflow-y: auto !important;
-    padding: 18px !important;
-  }
-
-  #login-modal form {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 10px !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-  }
-
-  #login-modal #login-username,
-  #login-modal #login-password {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    width: 100% !important;
-    min-height: 46px !important;
-    box-sizing: border-box !important;
-    padding: 11px 13px !important;
-    border: 1px solid var(--border-color, #dbe3ec) !important;
-    border-radius: 12px !important;
-    background: #fff !important;
-    color: #111827 !important;
-    -webkit-text-fill-color: #111827 !important;
-    font-size: 16px !important;
-    line-height: 1.4 !important;
-    position: relative !important;
-    z-index: 10002 !important;
-  }
-
-  #login-modal #login-username::placeholder,
-  #login-modal #login-password::placeholder {
-    color: #94a3b8 !important;
-    opacity: 1 !important;
-  }
-
-  #login-modal #login-username:focus,
-  #login-modal #login-password:focus {
-    border-color: var(--primary, #0284c7) !important;
-    outline: none !important;
-    box-shadow: 0 0 0 3px rgba(2,132,199,.12) !important;
-  }
-</style>
-
 </head>
 <body>
 
@@ -3787,12 +3712,6 @@
       ]},
       { key:'delegateCustomers', icon:'👥', title:'حسابات زبائن المندوبين', items:[
         ['viewDelegateCustomers','مشاهدة حسابات زبائن المندوبين'],
-        ['viewDelegateCustomerContact','مشاهدة أرقام هواتف وعناوين زبائن المندوبين'],
-        ['editDelegateCustomers','تعديل زبائن المندوبين'],
-        ['deleteDelegateCustomers','حذف زبائن المندوبين']
-      ]},
-      { key:'delegateCustomers', icon:'👥', title:'حسابات زبائن المندوبين', items:[
-        ['viewDelegateCustomers','مشاهدة حسابات زبائن المندوبين'],
         ['viewDelegateCustomerContacts','مشاهدة بيانات الاتصال لزبائن المندوبين']
       ]},
       { key:'reports', icon:'📊', title:'التقارير والإحصائيات', items:[
@@ -4040,29 +3959,7 @@
       await migrateAllLegacyAccountsToAuth();
     }
 
-    function openLoginModal() {
-      const modal = document.getElementById('login-modal');
-      if (!modal) return;
-      const body = modal.querySelector('.modal-body');
-      if (body) {
-        body.innerHTML = `
-          <form id="unified-login-form" style="display:flex!important;flex-direction:column!important;gap:10px!important;visibility:visible!important;opacity:1!important;" onsubmit="handleUnifiedLogin(event)">
-            <input type="text" id="login-username" placeholder="اسم المستخدم" required autocomplete="username" style="display:block!important;visibility:visible!important;opacity:1!important;width:100%!important;min-height:46px!important;box-sizing:border-box!important;padding:11px 13px!important;border:1px solid #dbe3ec!important;border-radius:12px!important;background:#fff!important;color:#111827!important;-webkit-text-fill-color:#111827!important;font-size:16px!important;">
-            <input type="password" id="login-password" placeholder="كلمة المرور" required autocomplete="current-password" style="display:block!important;visibility:visible!important;opacity:1!important;width:100%!important;min-height:46px!important;box-sizing:border-box!important;padding:11px 13px!important;border:1px solid #dbe3ec!important;border-radius:12px!important;background:#fff!important;color:#111827!important;-webkit-text-fill-color:#111827!important;font-size:16px!important;">
-            <button type="submit" class="btn" style="width:100%;padding:12px;margin-top:5px;">دخول</button>
-          </form>
-          <button type="button" class="prelogin-whatsapp-btn" onclick="openWhatsAppContactPreLogin()" style="margin-top:14px;">
-            <span class="prelogin-whatsapp-icon">💬</span>
-            <span><strong>تواصل معنا عبر واتساب</strong><small>يمكنك التواصل معنا مباشرة دون تسجيل الدخول</small></span>
-            <span class="prelogin-whatsapp-arrow">‹</span>
-          </button>`;
-      }
-      modal.classList.remove('hidden');
-      modal.style.display = 'flex';
-      modal.style.visibility = 'visible';
-      modal.style.opacity = '1';
-      setTimeout(() => document.getElementById('login-username')?.focus(), 50);
-    }
+    function openLoginModal() { document.getElementById('login-modal').classList.remove('hidden'); }
     function closeLoginModal() { document.getElementById('login-modal').classList.add('hidden'); }
 
     async function openAdminCustomersModal() { if (!requireAdminPermission('viewCustomers') && !requireAdminPermission('createCustomers')) return; document.getElementById('admin-customers-modal').classList.remove('hidden'); await loadCustomersFromFirestore(); }
@@ -4123,72 +4020,6 @@
 
       if (sortedDelegates.some(d => String(d.username || '') === String(previous))) {
         select.value = previous;
-      }
-    }
-
-
-    async function editDelegateCustomerFromAdmin(encodedDelegateUsername, encodedClientId) {
-      if (isAdmin && !requireAdminPermission('editDelegateCustomers')) return;
-      const delegateUsername = decodeURIComponent(encodedDelegateUsername || '');
-      const clientId = decodeURIComponent(encodedClientId || '');
-      const del = (delegates || []).find(d => String(d.username || '') === delegateUsername);
-      const client = del && Array.isArray(del.clients) ? del.clients.find(c => String(c.id || '') === clientId) : null;
-      if (!client) return alert('تعذر العثور على الزبون.');
-
-      const name = prompt('اسم الزبون / المحل:', client.name || '');
-      if (name === null) return;
-      const phone = prompt('رقم الهاتف:', client.phone || '');
-      if (phone === null) return;
-      const address = prompt('العنوان:', client.address || '');
-      if (address === null) return;
-      if (!name.trim()) return alert('اسم الزبون مطلوب.');
-
-      client.name = name.trim();
-      client.phone = phone.trim();
-      client.address = address.trim();
-
-      try {
-        await db.collection('delegates').doc(delegateUsername).set({clients: del.clients}, {merge:true});
-        const idx = delegates.findIndex(d => String(d.username || '') === delegateUsername);
-        if (idx !== -1) delegates[idx] = del;
-        saveData();
-        if (loggedDelegate && String(loggedDelegate.username || '') === delegateUsername) {
-          loggedDelegate = del;
-          localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
-        }
-        renderDelegateCustomerAccounts();
-        alert('تم تعديل بيانات الزبون بنجاح.');
-      } catch (err) {
-        console.error(err);
-        alert('تعذر حفظ تعديل الزبون.');
-      }
-    }
-
-    async function deleteDelegateCustomerFromAdmin(encodedDelegateUsername, encodedClientId) {
-      if (isAdmin && !requireAdminPermission('deleteDelegateCustomers')) return;
-      const delegateUsername = decodeURIComponent(encodedDelegateUsername || '');
-      const clientId = decodeURIComponent(encodedClientId || '');
-      const del = (delegates || []).find(d => String(d.username || '') === delegateUsername);
-      if (!del || !Array.isArray(del.clients)) return alert('تعذر العثور على الزبون.');
-      const client = del.clients.find(c => String(c.id || '') === clientId);
-      if (!client) return alert('تعذر العثور على الزبون.');
-      if (!confirm(`تأكيد حذف الزبون "${client.name || ''}" من حساب المندوب؟`)) return;
-
-      del.clients = del.clients.filter(c => String(c.id || '') !== clientId);
-      try {
-        await db.collection('delegates').doc(delegateUsername).set({clients: del.clients}, {merge:true});
-        const idx = delegates.findIndex(d => String(d.username || '') === delegateUsername);
-        if (idx !== -1) delegates[idx] = del;
-        saveData();
-        if (loggedDelegate && String(loggedDelegate.username || '') === delegateUsername) {
-          loggedDelegate = del;
-          localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
-        }
-        renderDelegateCustomerAccounts();
-        alert('تم حذف الزبون بنجاح.');
-      } catch (err) {
-        console.error(err);
-        alert('تعذر حذف الزبون من السحابة.');
       }
     }
 
@@ -4294,18 +4125,6 @@
           ? `<span>📞 ${phone}</span><span>📍 ${address}</span>`
           : `<span style="color:#94a3b8;">🔒 بيانات الاتصال مخفية حسب الصلاحية</span>`;
 
-        const canViewContact = !isAdmin || requireAdminPermission('viewDelegateCustomerContact', false);
-        const canEdit = !isAdmin || requireAdminPermission('editDelegateCustomers', false);
-        const canDelete = !isAdmin || requireAdminPermission('deleteDelegateCustomers', false);
-        const contactHtml = canViewContact
-          ? `<span>📞 ${phone}</span><span>📍 ${address}</span>`
-          : `<span style="color:#94a3b8;">🔒 بيانات الاتصال مخفية حسب الصلاحية</span>`;
-        const actionHtml = (canEdit || canDelete) ? `
-          <div style="display:flex;gap:6px;margin-top:10px;">
-            ${canEdit ? `<button type="button" onclick="editDelegateCustomerFromAdmin('${encodeURIComponent(client.__delegateUsername)}','${encodeURIComponent(client.id || '')}')" style="flex:1;background:#eff6ff;color:#2563eb;border:1px solid #dbeafe;padding:7px 8px;border-radius:9px;cursor:pointer;font-weight:800;">تعديل</button>` : ''}
-            ${canDelete ? `<button type="button" onclick="deleteDelegateCustomerFromAdmin('${encodeURIComponent(client.__delegateUsername)}','${encodeURIComponent(client.id || '')}')" style="flex:1;background:#fef2f2;color:#dc2626;border:1px solid #fee2e2;padding:7px 8px;border-radius:9px;cursor:pointer;font-weight:800;">حذف</button>` : ''}
-          </div>` : '';
-
         div.innerHTML = `
           <div class="delegate-customer-item-head">
             <div class="delegate-customer-avatar">👤</div>
@@ -4318,8 +4137,8 @@
             ${contactHtml}
             <span>🛵 حساب المندوب: ${delegateUsername || '—'}</span>
           </div>
-          ${actionHtml}
         `;
+
         listContainer.appendChild(div);
       });
     }
@@ -8579,25 +8398,5 @@
         </div>`;
     }
   </script>
-
-<style id="mustaqbal-no-copy">
-html,body,#app,.app-container{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}
-input,textarea,select,[contenteditable="true"]{-webkit-user-select:text!important;user-select:text!important;-webkit-touch-callout:default!important}
-img{-webkit-user-drag:none!important;user-drag:none!important}
-</style>
-<script id="mustaqbal-no-copy-script">
-(function(){
-  function editable(t){return t&&t.matches&&t.matches('input,textarea,select,[contenteditable="true"]')}
-  document.addEventListener('copy',function(e){if(!editable(e.target))e.preventDefault()},true);
-  document.addEventListener('cut',function(e){if(!editable(e.target))e.preventDefault()},true);
-  document.addEventListener('contextmenu',function(e){e.preventDefault()},true);
-  document.addEventListener('dragstart',function(e){e.preventDefault()},true);
-  document.addEventListener('keydown',function(e){
-    const k=(e.key||'').toLowerCase();
-    if((e.ctrlKey||e.metaKey)&&['c','x','p'].includes(k)&&!editable(e.target))e.preventDefault();
-  },true);
-})();
-</script>
-
 </body>
 </html>
