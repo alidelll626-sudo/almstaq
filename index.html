@@ -4,7 +4,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- BUILD: business-v14-invoice-sequence-readability-20260827 -->
+  <!-- BUILD: business-v16-invoice-a4-pdf-20260827 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>متجر المستقبل للجملة - النظام التجاري</title>
@@ -2463,6 +2463,71 @@
     #receipt-area .receipt-table td:nth-child(4) { width: 16.5% !important; }
     #receipt-area .receipt-table th:nth-child(5),
     #receipt-area .receipt-table td:nth-child(5) { width: 16.5% !important; }
+  }
+</style>
+
+
+<style id="invoice-numeric-font-final">
+  /* ===== توحيد حجم خط الكمية والسعر والمجموع مع عمود التسلسل والمنتج ===== */
+  #receipt-area .receipt-table .receipt-sequence-cell,
+  #receipt-area .receipt-table td:nth-child(3),
+  #receipt-area .receipt-table td:nth-child(4),
+  #receipt-area .receipt-table td:nth-child(5) {
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+    font-weight: 900 !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+
+  /* عمود التسلسل يكون بنفس وضوح الأرقام */
+  #receipt-area .receipt-table .receipt-sequence-cell {
+    font-size: 12px !important;
+  }
+
+  /* اسم المنتج يبقى بنفس مستوى الوضوح */
+  #receipt-area .receipt-table .receipt-product-name {
+    font-size: 12px !important;
+    line-height: 1.5 !important;
+    font-weight: 950 !important;
+  }
+
+  /* الملاحظة أصغر قليلاً حتى لا تزاحم اسم المنتج */
+  #receipt-area .receipt-table .receipt-product-note {
+    font-size: 9px !important;
+    line-height: 1.5 !important;
+    font-weight: 800 !important;
+  }
+
+  /* عناوين الأعمدة متناسقة وواضحة */
+  #receipt-area .receipt-table thead th {
+    font-size: 10px !important;
+    font-weight: 950 !important;
+    line-height: 1.35 !important;
+    text-align: center !important;
+  }
+
+  @media (max-width: 520px) {
+    #receipt-area .receipt-table .receipt-sequence-cell,
+    #receipt-area .receipt-table td:nth-child(3),
+    #receipt-area .receipt-table td:nth-child(4),
+    #receipt-area .receipt-table td:nth-child(5) {
+      font-size: 11px !important;
+    }
+
+    #receipt-area .receipt-table .receipt-product-name {
+      font-size: 11.5px !important;
+    }
+
+    #receipt-area .receipt-table .receipt-product-note {
+      font-size: 8.8px !important;
+    }
+
+    #receipt-area .receipt-table thead th {
+      font-size: 9px !important;
+    }
   }
 </style>
 
@@ -8336,7 +8401,9 @@
       const isStats = invoiceElementId === 'product-stats-receipt-area';
       const isReceipt = invoiceElementId === 'receipt-area';
       const sourceRect = invoiceElement.getBoundingClientRect();
-      const exportWidth = isStats ? 794 : (isReceipt ? 390 : Math.max(
+      // التقارير والفاتورة العادية تُجهّز للتصدير بعرض A4 (حوالي 794px عند 96dpi).
+      // هذا يمنع ظهور الفاتورة كصفحة ضيقة جداً داخل ملف PDF.
+      const exportWidth = isStats ? 794 : (isReceipt ? 794 : Math.max(
         invoiceElement.scrollWidth || 0,
         invoiceElement.clientWidth || 0,
         sourceRect.width || 0,
@@ -8365,6 +8432,86 @@
       clone.style.overflow = 'visible';
       clone.style.margin = '0';
       clone.style.boxSizing = 'border-box';
+
+      if (isReceipt) {
+        const style = document.createElement('style');
+        style.textContent = `
+          /* ===== تصدير الفاتورة العادية إلى A4 ===== */
+          #receipt-area {
+            width: 794px !important;
+            max-width: 794px !important;
+            min-width: 794px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+          }
+          #receipt-area .invoice-paper {
+            width: 794px !important;
+            max-width: 794px !important;
+            min-width: 794px !important;
+            box-sizing: border-box !important;
+            padding: 18px 18px 20px !important;
+            box-shadow: none !important;
+            border: 0 !important;
+          }
+          #receipt-area .receipt-table {
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+          #receipt-area .receipt-table .receipt-product-name {
+            font-size: 16px !important;
+            line-height: 1.5 !important;
+          }
+          #receipt-area .receipt-table .receipt-product-note {
+            font-size: 12px !important;
+            line-height: 1.5 !important;
+            padding: 5px 7px !important;
+          }
+          #receipt-area .receipt-table .receipt-sequence-cell,
+          #receipt-area .receipt-table td:nth-child(3),
+          #receipt-area .receipt-table td:nth-child(4),
+          #receipt-area .receipt-table td:nth-child(5) {
+            font-size: 15px !important;
+            line-height: 1.45 !important;
+          }
+          #receipt-area .receipt-table thead th {
+            font-size: 12px !important;
+            padding: 8px 5px !important;
+          }
+          #receipt-area .receipt-table td {
+            padding: 9px 5px !important;
+          }
+          #receipt-area .invoice-brand h2 {
+            font-size: 25px !important;
+          }
+          #receipt-area .invoice-number-date {
+            font-size: 12px !important;
+          }
+          #receipt-area .invoice-info-row {
+            font-size: 13px !important;
+          }
+          #receipt-area .invoice-general-note {
+            font-size: 12px !important;
+          }
+          #receipt-area .invoice-status-chip {
+            font-size: 11px !important;
+          }
+          #receipt-area .invoice-total-box {
+            font-size: 14px !important;
+          }
+          #receipt-area .invoice-total-value {
+            font-size: 16px !important;
+          }
+          #receipt-area .invoice-footer {
+            font-size: 10px !important;
+          }
+        `;
+        clone.prepend(style);
+      }
 
       if (isStats) {
         const style = document.createElement('style');
@@ -8471,16 +8618,23 @@
         const { jsPDF } = window.jspdf;
         const isReceipt = invoiceElementId === 'receipt-area';
 
-        // الفاتورة العادية تُصدر بعرض 80mm مثل نموذج الفاتورة الضيق،
-        // أما التقارير الإدارية فتبقى على A4.
+        // الفاتورة العادية تُصدر الآن على ورق A4 عمودي،
+        // مع تقسيم الصفحات عند نهاية صف المنتج حتى لا ينقطع الصف.
         if (isReceipt) {
-          let pdfState = null;
-          const paperWidth = 80;
-          const margin = 3;
-          const usableWidth = paperWidth - (margin * 2);
+          const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4',
+            compress: true
+          });
+
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          const margin = 8;
+          const usableWidth = pageWidth - margin * 2;
+          const usableHeight = pageHeight - margin * 2;
           const pxPerMm = canvas.width / usableWidth;
-          const maxPageHeightMm = 297;
-          const maxSlicePx = Math.max(1, Math.floor((maxPageHeightMm - margin * 2) * pxPerMm));
+          const pageHeightPx = Math.max(1, Math.floor(usableHeight * pxPerMm));
 
           const naturalBreaks = Array.isArray(canvas.__exportRowBreaks)
             ? canvas.__exportRowBreaks
@@ -8495,7 +8649,7 @@
 
             for (let i = breakIndex; i < naturalBreaks.length; i++) {
               const candidate = naturalBreaks[i];
-              if (candidate - startY <= maxSlicePx) {
+              if (candidate - startY <= pageHeightPx) {
                 endY = candidate;
                 breakIndex = i + 1;
               } else {
@@ -8504,35 +8658,28 @@
             }
 
             if (endY === null || endY <= startY) {
-              endY = Math.min(startY + maxSlicePx, canvas.height);
+              endY = Math.min(startY + pageHeightPx, canvas.height);
             }
 
-            const sliceHeightPx = Math.max(1, endY - startY);
-            const sliceHeightMm = Math.min(
-              maxPageHeightMm - (margin * 2),
-              sliceHeightPx / pxPerMm
-            );
+            if (pageNumber > 0) pdf.addPage();
 
-            const pageFormat = [paperWidth, Math.max(40, sliceHeightMm + margin * 2)];
-            const pdf = pageNumber === 0
-              ? new jsPDF({ orientation:'portrait', unit:'mm', format:pageFormat, compress:true })
-              : pdfState;
-
-            if (pageNumber > 0) {
-              pdfState.addPage([paperWidth, Math.max(40, sliceHeightMm + margin * 2)], 'portrait');
-            }
-
+            const sliceHeight = Math.max(1, endY - startY);
             const slice = document.createElement('canvas');
             slice.width = canvas.width;
-            slice.height = Math.ceil(sliceHeightPx);
+            slice.height = Math.ceil(sliceHeight);
 
             const ctx = slice.getContext('2d');
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, slice.width, slice.height);
             ctx.drawImage(
               canvas,
-              0, startY, canvas.width, sliceHeightPx,
-              0, 0, canvas.width, sliceHeightPx
+              0, startY, canvas.width, sliceHeight,
+              0, 0, canvas.width, sliceHeight
+            );
+
+            const sliceHeightMm = Math.min(
+              usableHeight,
+              slice.height / pxPerMm
             );
 
             pdf.addImage(
@@ -8546,15 +8693,15 @@
               'FAST'
             );
 
-            if (pageNumber === 0) pdfState = pdf;
-
             startY = endY;
             pageNumber++;
 
-            if (pageNumber > 200) throw new Error('تعذر تقسيم الفاتورة إلى صفحات.');
+            if (pageNumber > 200) {
+              throw new Error('تعذر تقسيم الفاتورة إلى صفحات A4.');
+            }
           }
 
-          pdfState.save(getExportFileName(invoiceElementId, fallbackName) + '.pdf');
+          pdf.save(getExportFileName(invoiceElementId, fallbackName) + '.pdf');
           return;
         }
 
