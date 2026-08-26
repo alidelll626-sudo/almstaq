@@ -1722,41 +1722,52 @@
 
 
 <style id="ui-readability-improvements">
-  /* ===== تحسين عرض المنتجات والملاحظات داخل الفاتورة ===== */
+  /* ===== تنسيق جدول الفاتورة: بدون عمود تسلسل ===== */
   .receipt-table {
     table-layout: fixed !important;
     width: 100% !important;
+    border-collapse: collapse !important;
   }
 
+  /* توزيع العرض: المنتج والملاحظات هو العمود الأكبر */
   .receipt-table th:nth-child(1),
   .receipt-table td:nth-child(1) {
-    width: 40px !important;
+    width: 55% !important;
   }
 
   .receipt-table th:nth-child(2),
   .receipt-table td:nth-child(2) {
-    width: 52% !important;
+    width: 12% !important;
   }
 
   .receipt-table th:nth-child(3),
   .receipt-table td:nth-child(3) {
-    width: 11% !important;
+    width: 16.5% !important;
   }
 
   .receipt-table th:nth-child(4),
   .receipt-table td:nth-child(4) {
-    width: 17% !important;
+    width: 16.5% !important;
   }
 
-  .receipt-table th:nth-child(5),
-  .receipt-table td:nth-child(5) {
-    width: 20% !important;
+  .receipt-table th,
+  .receipt-table td {
+    vertical-align: middle !important;
+    line-height: 1.45 !important;
+  }
+
+  .receipt-table th:not(:first-child),
+  .receipt-table td:not(:first-child) {
+    text-align: center !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums !important;
   }
 
   .receipt-table .receipt-product-cell {
     text-align: right !important;
-    vertical-align: middle !important;
+    vertical-align: top !important;
     padding: 10px 9px !important;
+    overflow: hidden !important;
   }
 
   .receipt-table .receipt-product-name {
@@ -1764,13 +1775,13 @@
     width: 100% !important;
     margin: 0 !important;
     font-size: .94rem !important;
-    line-height: 1.45 !important;
+    line-height: 1.5 !important;
     font-weight: 900 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    overflow-wrap: normal !important;
-    word-break: normal !important;
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
   }
 
   .receipt-table .receipt-product-note {
@@ -1789,6 +1800,79 @@
     overflow-wrap: anywhere !important;
     word-break: break-word !important;
   }
+
+  .receipt-table td:nth-child(2) {
+    font-size: .86rem !important;
+    font-weight: 800 !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+
+  .receipt-table td:nth-child(3),
+  .receipt-table td:nth-child(4) {
+    font-size: .78rem !important;
+    font-weight: 800 !important;
+    padding-left: 4px !important;
+    padding-right: 4px !important;
+  }
+
+  .receipt-table th:nth-child(2),
+  .receipt-table th:nth-child(3),
+  .receipt-table th:nth-child(4) {
+    font-size: .75rem !important;
+    font-weight: 900 !important;
+    text-align: center !important;
+    padding-left: 3px !important;
+    padding-right: 3px !important;
+  }
+
+  /* على الشاشات الصغيرة نعطي المنتج مساحة أكبر ونحافظ على الأرقام منفصلة */
+  @media (max-width: 520px) {
+    .receipt-table {
+      font-size: .80rem !important;
+    }
+
+    .receipt-table th,
+    .receipt-table td {
+      padding: 8px 4px !important;
+    }
+
+    .receipt-table th:nth-child(1),
+    .receipt-table td:nth-child(1) {
+      width: 55% !important;
+    }
+
+    .receipt-table th:nth-child(2),
+    .receipt-table td:nth-child(2) {
+      width: 12% !important;
+    }
+
+    .receipt-table th:nth-child(3),
+    .receipt-table td:nth-child(3) {
+      width: 16.5% !important;
+    }
+
+    .receipt-table th:nth-child(4),
+    .receipt-table td:nth-child(4) {
+      width: 16.5% !important;
+    }
+
+    .receipt-table .receipt-product-name {
+      font-size: .88rem !important;
+      line-height: 1.5 !important;
+    }
+
+    .receipt-table .receipt-product-note {
+      font-size: .72rem !important;
+      padding: 5px 7px !important;
+    }
+
+    .receipt-table td:nth-child(3),
+    .receipt-table td:nth-child(4) {
+      font-size: .74rem !important;
+    }
+  }
+
 
   /* ===== تكبير وإراحة قسم حسابات زبائن المندوبين ===== */
   .delegate-customer-accounts-modal .modal-content {
@@ -7628,28 +7712,26 @@
           ? '🆕 زبون جديد'
           : 'غير محدد';
 
-      let itemsRows = items.map((item, index) => {
+      let itemsRows = items.map((item) => {
         item = item || {};
         const qty = Number(item.qty) || 0;
         const price = Number(item.price) || 0;
-        const sequence = index + 1;
 
         return `
           <tr>
-            <td style="text-align:center;font-weight:900;color:var(--primary-dark);width:48px;">${sequence}</td>
             <td class="receipt-product-cell">
               <strong class="receipt-product-name">${item.name || 'منتج غير معروف'}</strong>
               ${item.note ? `<div class="receipt-product-note">📝 ${item.note}</div>` : ''}
             </td>
             <td style="text-align:center;">${qty}</td>
-            <td style="text-align:left;">${formatPrice(price)}</td>
-            <td style="text-align:left;">${formatPrice(price * qty)}</td>
+            <td style="text-align:center;">${formatPrice(price)}</td>
+            <td style="text-align:center;">${formatPrice(price * qty)}</td>
           </tr>
         `;
       }).join('');
 
       if (!itemsRows) {
-        itemsRows = `<tr><td colspan="5" style="text-align:center;padding:15px;color:var(--text-muted);">لا توجد منتجات في هذه الفاتورة</td></tr>`;
+        itemsRows = `<tr><td colspan="4" style="text-align:center;padding:15px;color:var(--text-muted);">لا توجد منتجات في هذه الفاتورة</td></tr>`;
       }
 
       area.innerHTML = `
@@ -7669,11 +7751,10 @@
         <table class="receipt-table">
           <thead>
             <tr>
-              <th style="text-align:center;width:48px;">ت</th>
               <th>المنتج والملاحظات</th>
-              <th style="text-align:center;">كمية</th>
-              <th style="text-align:left;">السعر</th>
-              <th style="text-align:left;">المجموع</th>
+              <th style="text-align:center;">الكمية</th>
+              <th style="text-align:center;">السعر</th>
+              <th style="text-align:center;">المجموع</th>
             </tr>
           </thead>
           <tbody>${itemsRows}</tbody>
