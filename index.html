@@ -1989,6 +1989,338 @@
   }
 </style>
 
+
+<style id="invoice-reference-design">
+  /* ============================================================
+     الفاتورة الجديدة — تصميم ضيق ومنظم مطابق للنموذج المرجعي
+     يحافظ على نفس البيانات والوظائف الحالية، ويغيّر شكل العرض والتصدير فقط.
+     ============================================================ */
+  #receipt-modal {
+    align-items: center !important;
+    padding: 10px !important;
+  }
+
+  #receipt-modal .modal-content {
+    width: min(430px, calc(100% - 8px)) !important;
+    max-width: 430px !important;
+    max-height: 94vh !important;
+    border-radius: 18px !important;
+    overflow: hidden !important;
+    background: #f8fafc !important;
+  }
+
+  #receipt-modal .modal-header {
+    min-height: 52px;
+    padding: 10px 13px !important;
+  }
+
+  #receipt-modal .modal-body {
+    padding: 10px !important;
+    gap: 9px !important;
+    background: #f8fafc;
+  }
+
+  #receipt-area {
+    width: 100% !important;
+    max-width: 390px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    border: 1px solid #dbe3ea !important;
+    border-radius: 8px !important;
+    background: #fff !important;
+    overflow: visible !important;
+    box-shadow: 0 5px 16px rgba(15,23,42,.07) !important;
+    direction: rtl !important;
+  }
+
+  .invoice-paper {
+    width: 100%;
+    background: #fff;
+    color: #172033;
+    padding: 9px 8px 10px;
+    direction: rtl;
+    box-sizing: border-box;
+  }
+
+  .invoice-brand {
+    text-align: center;
+    padding: 2px 0 8px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .invoice-brand h2 {
+    margin: 0;
+    color: #0369a1;
+    font-size: 16px;
+    line-height: 1.35;
+    font-weight: 950;
+  }
+
+  .invoice-number-date {
+    margin-top: 3px;
+    color: #64748b;
+    font-size: 9px;
+    line-height: 1.5;
+    font-weight: 700;
+  }
+
+  .invoice-customer-box {
+    margin: 8px 0;
+    padding: 7px 8px;
+    border: 1px solid #dbe3ea;
+    border-radius: 6px;
+    background: #fff;
+  }
+
+  .invoice-info-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 2px 0;
+    font-size: 9.5px;
+    line-height: 1.55;
+  }
+
+  .invoice-info-label {
+    flex: 0 0 auto;
+    color: #475569;
+    font-weight: 900;
+  }
+
+  .invoice-info-value {
+    min-width: 0;
+    color: #111827;
+    font-weight: 750;
+    overflow-wrap: anywhere;
+  }
+
+  .invoice-general-note {
+    margin-top: 6px;
+    padding: 5px 7px;
+    border-radius: 5px;
+    background: #fff7d6;
+    border: 1px solid #f5df8a;
+    color: #8a5a00;
+    font-size: 8.5px;
+    line-height: 1.55;
+    font-weight: 750;
+  }
+
+  .invoice-status-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: 0 0 8px;
+  }
+
+  .invoice-status-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 3px 6px;
+    border: 1px solid #dbe3ea;
+    border-radius: 999px;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 7.8px;
+    line-height: 1.35;
+    font-weight: 850;
+  }
+
+  .invoice-status-chip.primary {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+  }
+
+  .invoice-status-chip.success {
+    background: #ecfdf5;
+    border-color: #bbf7d0;
+    color: #166534;
+  }
+
+  .invoice-table-wrap {
+    width: 100%;
+    overflow: visible !important;
+  }
+
+  #receipt-area .receipt-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    background: #fff;
+    font-size: 9px !important;
+  }
+
+  #receipt-area .receipt-table th,
+  #receipt-area .receipt-table td {
+    border: 1px solid #d6dde4 !important;
+    box-sizing: border-box !important;
+  }
+
+  #receipt-area .receipt-table thead th {
+    padding: 6px 3px !important;
+    background: #f1f5f9 !important;
+    color: #334155 !important;
+    font-size: 8px !important;
+    line-height: 1.35 !important;
+    font-weight: 950 !important;
+    text-align: center !important;
+    white-space: normal !important;
+  }
+
+  #receipt-area .receipt-table th:nth-child(1),
+  #receipt-area .receipt-table td:nth-child(1) {
+    width: 55% !important;
+  }
+
+  #receipt-area .receipt-table th:nth-child(2),
+  #receipt-area .receipt-table td:nth-child(2) {
+    width: 12% !important;
+  }
+
+  #receipt-area .receipt-table th:nth-child(3),
+  #receipt-area .receipt-table td:nth-child(3) {
+    width: 16.5% !important;
+  }
+
+  #receipt-area .receipt-table th:nth-child(4),
+  #receipt-area .receipt-table td:nth-child(4) {
+    width: 16.5% !important;
+  }
+
+  #receipt-area .receipt-table td {
+    padding: 5px 3px !important;
+    color: #1f2937 !important;
+    line-height: 1.45 !important;
+    vertical-align: top !important;
+  }
+
+  #receipt-area .receipt-table td:not(:first-child) {
+    text-align: center !important;
+    vertical-align: middle !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums !important;
+    font-weight: 800 !important;
+  }
+
+  #receipt-area .receipt-product-cell {
+    text-align: right !important;
+    padding: 5px 5px !important;
+    overflow: visible !important;
+  }
+
+  #receipt-area .receipt-product-name {
+    display: block !important;
+    margin: 0 !important;
+    width: 100% !important;
+    color: #111827 !important;
+    font-size: 9.2px !important;
+    line-height: 1.45 !important;
+    font-weight: 950 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+  }
+
+  #receipt-area .receipt-product-note {
+    display: block !important;
+    width: 100% !important;
+    margin-top: 4px !important;
+    padding: 3px 5px !important;
+    box-sizing: border-box !important;
+    border: 0 !important;
+    border-radius: 4px !important;
+    background: #fff4c7 !important;
+    color: #a16207 !important;
+    font-size: 7.5px !important;
+    line-height: 1.45 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    font-weight: 750 !important;
+  }
+
+  .invoice-total-box {
+    margin-top: 8px;
+    padding: 7px 9px;
+    border-radius: 7px;
+    background: #e0f2fe;
+    border: 1px solid #bae6fd;
+    color: #0369a1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 10px;
+    line-height: 1.45;
+    font-weight: 950;
+  }
+
+  .invoice-total-value {
+    font-size: 11px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .invoice-footer {
+    margin-top: 7px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 7px;
+    line-height: 1.5;
+  }
+
+  /* عند التصدير نريد ورقة الفاتورة وحدها بلا ظل أو حواف التطبيق */
+  .invoice-paper.invoice-exporting {
+    box-shadow: none !important;
+    border: 0 !important;
+  }
+
+  @media (max-width: 520px) {
+    #receipt-modal {
+      padding: 5px !important;
+    }
+
+    #receipt-modal .modal-content {
+      width: min(414px, calc(100% - 4px)) !important;
+      max-width: 414px !important;
+    }
+
+    #receipt-area {
+      max-width: 390px !important;
+    }
+
+    .invoice-paper {
+      padding-left: 7px;
+      padding-right: 7px;
+    }
+
+    #receipt-area .receipt-table th,
+    #receipt-area .receipt-table td {
+      padding-left: 2px !important;
+      padding-right: 2px !important;
+    }
+  }
+
+  @media print {
+    #receipt-area {
+      width: 80mm !important;
+      max-width: 80mm !important;
+      margin: 0 auto !important;
+      box-shadow: none !important;
+      border: 0 !important;
+    }
+
+    .invoice-paper {
+      width: 80mm !important;
+      max-width: 80mm !important;
+    }
+  }
+</style>
+
 </head>
 <body>
 
@@ -7703,14 +8035,19 @@
 
       const customer = invoice.customer || {};
       const items = Array.isArray(invoice.items) ? invoice.items : [];
-      // عند وجود خصم على حساب الزبون، تظهر طريقة الدفع في فاتورته "نقدي" فقط.
+
       const invoiceCustomerDiscount = Number(customer.discount ?? invoice.customerDiscount ?? 0) || 0;
-      const displayedPaymentMethod = invoiceCustomerDiscount > 0 ? 'cash' : (invoice.paymentMethod || 'cash');
+      const displayedPaymentMethod = invoiceCustomerDiscount > 0
+        ? 'cash'
+        : (invoice.paymentMethod || 'cash');
+
       const customerTypeLabel = invoice.customerType === 'old_customer'
-        ? '👤 زبون قديم'
+        ? 'زبون قديم'
         : invoice.customerType === 'new_customer'
-          ? '🆕 زبون جديد'
+          ? 'زبون جديد'
           : 'غير محدد';
+
+      const safe = value => escapeHtml(value == null ? '' : value);
 
       let itemsRows = items.map((item) => {
         item = item || {};
@@ -7720,53 +8057,98 @@
         return `
           <tr>
             <td class="receipt-product-cell">
-              <strong class="receipt-product-name">${item.name || 'منتج غير معروف'}</strong>
-              ${item.note ? `<div class="receipt-product-note">📝 ${item.note}</div>` : ''}
+              <strong class="receipt-product-name">${safe(item.name || 'منتج غير معروف')}</strong>
+              ${item.note ? `<div class="receipt-product-note">ملاحظة المنتج: ${safe(item.note)}</div>` : ''}
             </td>
-            <td style="text-align:center;">${qty}</td>
-            <td style="text-align:center;">${formatPrice(price)}</td>
-            <td style="text-align:center;">${formatPrice(price * qty)}</td>
+            <td>${formatPrice(qty)}</td>
+            <td>${formatPrice(price)}</td>
+            <td>${formatPrice(price * qty)}</td>
           </tr>
         `;
       }).join('');
 
       if (!itemsRows) {
-        itemsRows = `<tr><td colspan="4" style="text-align:center;padding:15px;color:var(--text-muted);">لا توجد منتجات في هذه الفاتورة</td></tr>`;
+        itemsRows = `
+          <tr>
+            <td colspan="4" style="text-align:center;padding:14px;color:#64748b;">
+              لا توجد منتجات في هذه الفاتورة
+            </td>
+          </tr>
+        `;
       }
 
+      const isAdminViewer = !!(isAdmin || loggedAdmin);
+
       area.innerHTML = `
-        <div class="receipt-header">
-          <h2 style="font-size:1.1rem; color:var(--primary-dark);">متجر المستقبل للجملة</h2>
-          <p style="font-size:0.7rem; color:var(--text-muted); margin-top:2px;">
-            رقم: ${invoice.id || 'بدون رقم'} | التاريخ: ${invoice.date || invoice.rawDate || 'بدون تاريخ'}
-          </p>
+        <div class="invoice-paper">
+          <div class="invoice-brand">
+            <h2>متجر المستقبل للجملة</h2>
+            <div class="invoice-number-date">
+              رقم: ${safe(invoice.id || 'بدون رقم')}
+              &nbsp; | &nbsp;
+              التاريخ: ${safe(invoice.date || invoice.rawDate || 'بدون تاريخ')}
+            </div>
+          </div>
+
+          <div class="invoice-customer-box">
+            <div class="invoice-info-row">
+              <span class="invoice-info-label">الحساب/الجهة:</span>
+              <span class="invoice-info-value">${safe(customer.username || 'غير محدد')}</span>
+            </div>
+            <div class="invoice-info-row">
+              <span class="invoice-info-label">الزبون:</span>
+              <span class="invoice-info-value">${safe(customer.name || 'غير محدد')}</span>
+            </div>
+            <div class="invoice-info-row">
+              <span class="invoice-info-label">الهاتف:</span>
+              <span class="invoice-info-value">${safe(customer.phone || 'غير محدد')}</span>
+            </div>
+            <div class="invoice-info-row">
+              <span class="invoice-info-label">العنوان:</span>
+              <span class="invoice-info-value">${safe(customer.address || 'غير محدد')}</span>
+            </div>
+            ${invoice.generalNote ? `
+              <div class="invoice-general-note">
+                ملاحظات عامة: ${safe(invoice.generalNote)}
+              </div>
+            ` : ''}
+          </div>
+
+          <div class="invoice-status-row">
+            ${isAdminViewer ? `
+              <span class="invoice-status-chip primary">
+                حالة الطلب: ${safe(getOrderStatusLabel(invoice.orderStatus))}
+              </span>
+            ` : `
+              <span class="invoice-status-chip success">تم إرسال طلبك بنجاح</span>
+            `}
+            <span class="invoice-status-chip">نوع الزبون: ${safe(customerTypeLabel)}</span>
+            <span class="invoice-status-chip">الدفع: ${safe(getPaymentMethodLabel(displayedPaymentMethod))}</span>
+          </div>
+
+          <div class="invoice-table-wrap">
+            <table class="receipt-table">
+              <thead>
+                <tr>
+                  <th>المنتج والملاحظات</th>
+                  <th>كمية</th>
+                  <th>السعر</th>
+                  <th>المجموع</th>
+                </tr>
+              </thead>
+              <tbody>${itemsRows}</tbody>
+            </table>
+          </div>
+
+          <div class="invoice-total-box">
+            <span>المجموع الكلي:</span>
+            <span class="invoice-total-value">${formatPrice(Number(invoice.total) || 0)} د.ع</span>
+          </div>
+
+          <div class="invoice-footer">
+            شكراً لتعاملكم مع متجر المستقبل للجملة
+          </div>
         </div>
-        <div style="font-size:0.8rem; margin-bottom:12px; line-height:1.6;">
-          <strong>الحساب/الجهة:</strong> ${customer.username || 'غير محدد'}<br>
-          <strong>الزبون:</strong> ${customer.name || 'غير محدد'}<br>
-          <strong>الهاتف:</strong> ${customer.phone || 'غير محدد'}<br>
-          <strong>العنوان:</strong> ${customer.address || 'غير محدد'}
-          ${invoice.generalNote ? `<div style="margin-top:6px; background:#fef3c7; padding:6px; border-radius:6px; color:#92400e;"><strong>ملاحظات عامة حول الفاتورة:</strong> ${invoice.generalNote}</div>` : ''}
-        </div>
-        <table class="receipt-table">
-          <thead>
-            <tr>
-              <th>المنتج والملاحظات</th>
-              <th style="text-align:center;">الكمية</th>
-              <th style="text-align:center;">السعر</th>
-              <th style="text-align:center;">المجموع</th>
-            </tr>
-          </thead>
-          <tbody>${itemsRows}</tbody>
-        </table>
-        <div style="display:grid;gap:6px;margin-top:10px;font-size:.78rem;">
-          ${(isAdmin || loggedAdmin)
-            ? `<div><strong>حالة الطلب:</strong> <span class="order-status-chip">${getOrderStatusLabel(invoice.orderStatus)}</span></div>`
-            : `<div style="background:#ecfdf5;border:1px solid #bbf7d0;color:#166534;padding:9px 10px;border-radius:10px;text-align:center;font-weight:700;">📩 تم إرسال طلبك بنجاح</div>`}
-          <div><strong>نوع الزبون:</strong> ${customerTypeLabel}</div>
-          <div><strong>طريقة الدفع:</strong> ${getPaymentMethodLabel(displayedPaymentMethod)}</div>
-        </div>
-        <div class="receipt-total-box">المجموع الكلي: ${formatPrice(Number(invoice.total) || 0)} د.ع</div>
       `;
     }
 
@@ -7805,13 +8187,14 @@
       await waitForNextPaint();
 
       const isStats = invoiceElementId === 'product-stats-receipt-area';
+      const isReceipt = invoiceElementId === 'receipt-area';
       const sourceRect = invoiceElement.getBoundingClientRect();
-      const exportWidth = isStats ? 794 : Math.max(
+      const exportWidth = isStats ? 794 : (isReceipt ? 390 : Math.max(
         invoiceElement.scrollWidth || 0,
         invoiceElement.clientWidth || 0,
         sourceRect.width || 0,
         480
-      );
+      ));
 
       const wrapper = document.createElement('div');
       wrapper.style.cssText = [
@@ -7879,7 +8262,9 @@
 
         // نحتفظ بنهايات الصفوف من نسخة التصدير نفسها، وليس من جدول الشاشة.
         // هذا مهم لأن نسخة A4 تستخدم عرضاً وخطوطاً مختلفين عن العرض القابل للتمرير.
-        const exportRows = Array.from(clone.querySelectorAll('.product-stats-table tbody tr'));
+        const exportRows = Array.from(clone.querySelectorAll(
+          '.product-stats-table tbody tr, .receipt-table tbody tr'
+        ));
         const cloneRect = clone.getBoundingClientRect();
         const cloneScrollHeight = Math.max(clone.scrollHeight || 0, cloneRect.height || 1);
         const rowBreaks = exportRows.map(row => {
@@ -7931,7 +8316,102 @@
           return;
         }
 
+        const canvas = await renderExportCanvas(invoiceElementId);
+        if (!canvas || !canvas.width || !canvas.height) {
+          throw new Error('تعذر إنشاء صورة الفاتورة.');
+        }
+
         const { jsPDF } = window.jspdf;
+        const isReceipt = invoiceElementId === 'receipt-area';
+
+        // الفاتورة العادية تُصدر بعرض 80mm مثل نموذج الفاتورة الضيق،
+        // أما التقارير الإدارية فتبقى على A4.
+        if (isReceipt) {
+          let pdfState = null;
+          const paperWidth = 80;
+          const margin = 3;
+          const usableWidth = paperWidth - (margin * 2);
+          const pxPerMm = canvas.width / usableWidth;
+          const maxPageHeightMm = 297;
+          const maxSlicePx = Math.max(1, Math.floor((maxPageHeightMm - margin * 2) * pxPerMm));
+
+          const naturalBreaks = Array.isArray(canvas.__exportRowBreaks)
+            ? canvas.__exportRowBreaks
+            : [];
+
+          let startY = 0;
+          let breakIndex = 0;
+          let pageNumber = 0;
+
+          while (startY < canvas.height - 1) {
+            let endY = null;
+
+            for (let i = breakIndex; i < naturalBreaks.length; i++) {
+              const candidate = naturalBreaks[i];
+              if (candidate - startY <= maxSlicePx) {
+                endY = candidate;
+                breakIndex = i + 1;
+              } else {
+                break;
+              }
+            }
+
+            if (endY === null || endY <= startY) {
+              endY = Math.min(startY + maxSlicePx, canvas.height);
+            }
+
+            const sliceHeightPx = Math.max(1, endY - startY);
+            const sliceHeightMm = Math.min(
+              maxPageHeightMm - (margin * 2),
+              sliceHeightPx / pxPerMm
+            );
+
+            const pageFormat = [paperWidth, Math.max(40, sliceHeightMm + margin * 2)];
+            const pdf = pageNumber === 0
+              ? new jsPDF({ orientation:'portrait', unit:'mm', format:pageFormat, compress:true })
+              : pdfState;
+
+            if (pageNumber > 0) {
+              pdfState.addPage([paperWidth, Math.max(40, sliceHeightMm + margin * 2)], 'portrait');
+            }
+
+            const slice = document.createElement('canvas');
+            slice.width = canvas.width;
+            slice.height = Math.ceil(sliceHeightPx);
+
+            const ctx = slice.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, slice.width, slice.height);
+            ctx.drawImage(
+              canvas,
+              0, startY, canvas.width, sliceHeightPx,
+              0, 0, canvas.width, sliceHeightPx
+            );
+
+            pdf.addImage(
+              slice.toDataURL('image/jpeg', 0.95),
+              'JPEG',
+              margin,
+              margin,
+              usableWidth,
+              sliceHeightMm,
+              undefined,
+              'FAST'
+            );
+
+            if (pageNumber === 0) pdfState = pdf;
+
+            startY = endY;
+            pageNumber++;
+
+            if (pageNumber > 200) throw new Error('تعذر تقسيم الفاتورة إلى صفحات.');
+          }
+
+          pdfState.save(getExportFileName(invoiceElementId, fallbackName) + '.pdf');
+          return;
+        }
+
+        // التقارير الإدارية تبقى بتنسيق A4 كما كانت.
         const pdf = new jsPDF({
           orientation: 'portrait',
           unit: 'mm',
@@ -7944,13 +8424,6 @@
         const margin = 8;
         const usableWidth = pageWidth - margin * 2;
         const usableHeight = pageHeight - margin * 2;
-
-        // نستخدم نفس نسخة A4 التي تُستخدم للصورة، وليس نسخة الجدول القابلة للتمرير.
-        const canvas = await renderExportCanvas(invoiceElementId);
-        if (!canvas || !canvas.width || !canvas.height) {
-          throw new Error('تعذر إنشاء صورة الفاتورة.');
-        }
-
         const pxPerMm = canvas.width / usableWidth;
         const pageHeightPx = Math.max(1, Math.floor(usableHeight * pxPerMm));
         const naturalBreaks = Array.isArray(canvas.__exportRowBreaks)
@@ -7964,7 +8437,6 @@
         while (startY < canvas.height - 1) {
           let endY = null;
 
-          // نختار آخر نهاية صف كاملة يمكن وضعها في الصفحة الحالية.
           for (let i = breakIndex; i < naturalBreaks.length; i++) {
             const candidate = naturalBreaks[i];
             if (candidate - startY <= pageHeightPx) {
@@ -7975,7 +8447,6 @@
             }
           }
 
-          // إذا لم يتسع حتى صف واحد، نقسم الصفحة عند حد A4 حتى لا تتوقف العملية.
           if (endY === null || endY <= startY) {
             endY = Math.min(startY + pageHeightPx, canvas.height);
           }
@@ -7986,10 +8457,15 @@
           const slice = document.createElement('canvas');
           slice.width = canvas.width;
           slice.height = Math.ceil(sliceHeight);
+
           const ctx = slice.getContext('2d');
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, slice.width, slice.height);
-          ctx.drawImage(canvas, 0, startY, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+          ctx.drawImage(
+            canvas,
+            0, startY, canvas.width, sliceHeight,
+            0, 0, canvas.width, sliceHeight
+          );
 
           const sliceHeightMm = Math.min(usableHeight, slice.height / pxPerMm);
           pdf.addImage(
@@ -8005,7 +8481,8 @@
 
           startY = endY;
           pageNumber++;
-          if (pageNumber > 200) throw new Error('تعذر تقسيم الفاتورة إلى صفحات.');
+
+          if (pageNumber > 200) throw new Error('تعذر تقسيم التقرير إلى صفحات.');
         }
 
         pdf.save(getExportFileName(invoiceElementId, fallbackName) + '.pdf');
