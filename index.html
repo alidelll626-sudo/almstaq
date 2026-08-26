@@ -1720,6 +1720,191 @@
   }
 </style>
 
+
+<style id="ui-readability-improvements">
+  /* ===== تحسين عرض المنتجات والملاحظات داخل الفاتورة ===== */
+  .receipt-table {
+    table-layout: fixed !important;
+    width: 100% !important;
+  }
+
+  .receipt-table th:nth-child(1),
+  .receipt-table td:nth-child(1) {
+    width: 40px !important;
+  }
+
+  .receipt-table th:nth-child(2),
+  .receipt-table td:nth-child(2) {
+    width: 52% !important;
+  }
+
+  .receipt-table th:nth-child(3),
+  .receipt-table td:nth-child(3) {
+    width: 11% !important;
+  }
+
+  .receipt-table th:nth-child(4),
+  .receipt-table td:nth-child(4) {
+    width: 17% !important;
+  }
+
+  .receipt-table th:nth-child(5),
+  .receipt-table td:nth-child(5) {
+    width: 20% !important;
+  }
+
+  .receipt-table .receipt-product-cell {
+    text-align: right !important;
+    vertical-align: middle !important;
+    padding: 10px 9px !important;
+  }
+
+  .receipt-table .receipt-product-name {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    font-size: .94rem !important;
+    line-height: 1.45 !important;
+    font-weight: 900 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+  }
+
+  .receipt-table .receipt-product-note {
+    display: block !important;
+    width: 100% !important;
+    margin-top: 7px !important;
+    padding: 6px 8px !important;
+    box-sizing: border-box !important;
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    color: #475569 !important;
+    font-size: .76rem !important;
+    line-height: 1.55 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+  }
+
+  /* ===== تكبير وإراحة قسم حسابات زبائن المندوبين ===== */
+  .delegate-customer-accounts-modal .modal-content {
+    width: min(920px, 97vw) !important;
+    max-height: 94vh !important;
+  }
+
+  .delegate-customer-accounts-modal .modal-body {
+    min-height: 0 !important;
+    padding: 18px !important;
+  }
+
+  .delegate-customer-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    max-height: 66vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 3px !important;
+  }
+
+  .delegate-customer-item {
+    padding: 16px !important;
+    border-radius: 17px !important;
+    min-height: 118px !important;
+  }
+
+  .delegate-customer-item-head {
+    gap: 11px !important;
+  }
+
+  .delegate-customer-avatar {
+    width: 44px !important;
+    height: 44px !important;
+    flex-basis: 44px !important;
+    border-radius: 13px !important;
+    font-size: 20px !important;
+  }
+
+  .delegate-customer-name {
+    font-size: .95rem !important;
+  }
+
+  .delegate-customer-meta {
+    margin-top: 11px !important;
+    gap: 7px !important;
+    font-size: .76rem !important;
+    line-height: 1.6 !important;
+  }
+
+  @media (max-width: 640px) {
+    .delegate-customer-accounts-modal .modal-content {
+      width: calc(100% - 12px) !important;
+      max-height: 94vh !important;
+    }
+
+    .delegate-customer-accounts-modal .modal-body {
+      padding: 14px !important;
+    }
+
+    .delegate-customer-list {
+      grid-template-columns: 1fr !important;
+      max-height: 68vh !important;
+      gap: 11px !important;
+    }
+
+    .delegate-customer-item {
+      min-height: 112px !important;
+      padding: 15px !important;
+    }
+
+    .receipt-table {
+      font-size: .80rem !important;
+    }
+
+    .receipt-table th,
+    .receipt-table td {
+      padding: 8px 5px !important;
+    }
+
+    .receipt-table th:nth-child(1),
+    .receipt-table td:nth-child(1) {
+      width: 36px !important;
+    }
+
+    .receipt-table th:nth-child(2),
+    .receipt-table td:nth-child(2) {
+      width: 51% !important;
+    }
+
+    .receipt-table th:nth-child(3),
+    .receipt-table td:nth-child(3) {
+      width: 12% !important;
+    }
+
+    .receipt-table th:nth-child(4),
+    .receipt-table td:nth-child(4) {
+      width: 17% !important;
+    }
+
+    .receipt-table th:nth-child(5),
+    .receipt-table td:nth-child(5) {
+      width: 20% !important;
+    }
+
+    .receipt-table .receipt-product-name {
+      font-size: .88rem !important;
+    }
+
+    .receipt-table .receipt-product-note {
+      font-size: .72rem !important;
+      padding: 5px 7px !important;
+    }
+  }
+</style>
+
 </head>
 <body>
 
@@ -7452,9 +7637,9 @@
         return `
           <tr>
             <td style="text-align:center;font-weight:900;color:var(--primary-dark);width:48px;">${sequence}</td>
-            <td>
-              <strong>${item.name || 'منتج غير معروف'}</strong>
-              ${item.note ? `<div style="font-size:0.72rem; color:#475569; margin-top:5px; background:#f8fafc; border:1px solid #e2e8f0; padding:5px 8px; border-radius:8px; line-height:1.5;">📝 ${item.note}</div>` : ''}
+            <td class="receipt-product-cell">
+              <strong class="receipt-product-name">${item.name || 'منتج غير معروف'}</strong>
+              ${item.note ? `<div class="receipt-product-note">📝 ${item.note}</div>` : ''}
             </td>
             <td style="text-align:center;">${qty}</td>
             <td style="text-align:left;">${formatPrice(price)}</td>
