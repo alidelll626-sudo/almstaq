@@ -5138,13 +5138,18 @@
       const ok = confirm(`هل أنت متأكد من حذف الإشعار «${String(item.subject || '').replace(/\n/g, ' ')}»؟\n\nسيختفي الإشعار أيضاً من حساب المستلم.`);
       if (!ok) return;
       try {
+        // حذف المستند من Firestore هو الحذف الفعلي المشترك بين جميع الأجهزة؛
+        // لذلك يختفي الإشعار من حساب الزبون/المندوب عند إعادة تحميل إشعاراته.
         await db.collection('notifications').doc(id).delete();
+
+        // تنظيف الذاكرة المؤقتة على جهاز المدير فوراً.
+        // وإذا كان المستلم نفسه يستخدم هذا الجهاز أيضاً، فلن يبقى الإشعار محلياً.
         notifications = (notifications || []).filter(n => String(n.id) !== id);
         localStorage.setItem('mustaqbal_notifications_cache', JSON.stringify(notifications));
         updateNotificationsBadge();
         renderAdminSentNotifications();
         renderNotificationsList();
-        alert('تم حذف الإشعار بنجاح.');
+        alert('تم حذف الإشعار من النظام بنجاح، وسيختفي من حساب الزبون أو المندوب أيضاً.');
       } catch (err) {
         console.error('خطأ في حذف الإشعار:', err);
         const code = err && err.code ? err.code : '';
@@ -7386,13 +7391,15 @@
           ? '🆕 زبون جديد'
           : 'غير محدد';
 
-      let itemsRows = items.map(item => {
+      let itemsRows = items.map((item, index) => {
         item = item || {};
         const qty = Number(item.qty) || 0;
         const price = Number(item.price) || 0;
+        const sequence = index + 1;
 
         return `
           <tr>
+            <td style="text-align:center;font-weight:900;color:var(--primary-dark);">${sequence}</td>
             <td>
               <strong>${item.name || 'منتج غير معروف'}</strong>
               ${item.note ? `<div style="font-size:0.72rem; color:#475569; margin-top:5px; background:#f8fafc; border:1px solid #e2e8f0; padding:5px 8px; border-radius:8px; line-height:1.5;">📝 ${item.note}</div>` : ''}
@@ -7405,7 +7412,7 @@
       }).join('');
 
       if (!itemsRows) {
-        itemsRows = `<tr><td colspan="4" style="text-align:center;padding:15px;color:var(--text-muted);">لا توجد منتجات في هذه الفاتورة</td></tr>`;
+        itemsRows = `<tr><td colspan="5" style="text-align:center;padding:15px;color:var(--text-muted);">لا توجد منتجات في هذه الفاتورة</td></tr>`;
       }
 
       area.innerHTML = `
@@ -7425,6 +7432,7 @@
         <table class="receipt-table">
           <thead>
             <tr>
+              <th style="text-align:center;width:48px;">التسلسل</th>
               <th>المنتج والملاحظات</th>
               <th style="text-align:center;">كمية</th>
               <th style="text-align:left;">السعر</th>
