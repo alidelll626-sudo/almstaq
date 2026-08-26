@@ -2340,6 +2340,12 @@
                     <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegates"> مشاهدة حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="createDelegates"> إنشاء حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editDelegates"> تعديل حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="toggleDelegates"> تعطيل / تفعيل حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="deleteDelegates"> حذف حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegateOrders"> مشاهدة طلبات المندوبين</label>
                   </div>
                 </div>
+                <div class="admin-permission-group" data-permission-group="delegateCustomers">
+                  <div class="admin-permission-group-head"><div><b>👥 حسابات زبائن المندوبين</b><small>التحكم في مشاهدة زبائن المندوبين وبيانات الاتصال</small></div><button type="button" class="permission-group-toggle" onclick="togglePermissionGroup('delegateCustomers')">تحديد القسم</button></div>
+                  <div class="admin-permissions-grid">
+                    <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegateCustomers"> مشاهدة حسابات زبائن المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegateCustomerContacts"> مشاهدة بيانات الاتصال لزبائن المندوبين</label>
+                  </div>
+                </div>
                 <div class="admin-permission-group" data-permission-group="reports">
                   <div class="admin-permission-group-head"><div><b>📊 التقارير والإحصائيات</b><small>عرض المؤشرات والتقارير وتحليل المخزون</small></div><button type="button" class="permission-group-toggle" onclick="togglePermissionGroup('reports')">تحديد القسم</button></div>
                   <div class="admin-permissions-grid">
@@ -3704,6 +3710,10 @@
         ['viewDelegates','مشاهدة حسابات المندوبين'], ['createDelegates','إنشاء حسابات المندوبين'], ['editDelegates','تعديل حسابات المندوبين'],
         ['toggleDelegates','تعطيل / تفعيل حسابات المندوبين'], ['deleteDelegates','حذف حسابات المندوبين'], ['viewDelegateOrders','مشاهدة طلبات المندوبين']
       ]},
+      { key:'delegateCustomers', icon:'👥', title:'حسابات زبائن المندوبين', items:[
+        ['viewDelegateCustomers','مشاهدة حسابات زبائن المندوبين'],
+        ['viewDelegateCustomerContacts','مشاهدة بيانات الاتصال لزبائن المندوبين']
+      ]},
       { key:'reports', icon:'📊', title:'التقارير والإحصائيات', items:[
         ['viewDashboard','مشاهدة لوحة المؤشرات'], ['viewSalesStats','مشاهدة إحصائيات المبيعات'], ['viewProductStats','مشاهدة إحصائيات المنتجات'],
         ['viewInventoryStats','مشاهدة إحصائيات المخزون'], ['viewDelegateStats','مشاهدة تقارير المندوبين'], ['exportReports','تصدير التقارير PDF']
@@ -3963,9 +3973,7 @@
        لا ينشئ مجموعة Firestore جديدة ولا يغيّر بنية البيانات.
        ============================================================ */
     async function openDelegateCustomerAccountsModal() {
-      if (!isAdmin) {
-        if (!requireAdminPermission('viewDelegates') && !requireAdminPermission('viewCustomers')) return;
-      }
+      if (!requireAdminPermission('viewDelegateCustomers')) return;
 
       const modal = document.getElementById('delegate-customer-accounts-modal');
       if (!modal) return;
@@ -4107,10 +4115,15 @@
         div.className = 'delegate-customer-item';
 
         const name = escapeHtml(client.name || 'زبون بدون اسم');
+        const canViewContacts = hasAdminPermission('viewDelegateCustomerContacts');
         const phone = escapeHtml(client.phone || 'غير مسجل');
         const address = escapeHtml(client.address || 'غير مسجل');
         const delegateName = escapeHtml(client.__delegateName || 'مندوب');
         const delegateUsername = escapeHtml(client.__delegateUsername || '');
+
+        const contactHtml = canViewContacts
+          ? `<span>📞 ${phone}</span><span>📍 ${address}</span>`
+          : `<span style="color:#94a3b8;">🔒 بيانات الاتصال مخفية حسب الصلاحية</span>`;
 
         div.innerHTML = `
           <div class="delegate-customer-item-head">
@@ -4121,8 +4134,7 @@
             </div>
           </div>
           <div class="delegate-customer-meta">
-            <span>📞 ${phone}</span>
-            <span>📍 ${address}</span>
+            ${contactHtml}
             <span>🛵 حساب المندوب: ${delegateUsername || '—'}</span>
           </div>
         `;
@@ -4568,6 +4580,7 @@
         const fn=card.getAttribute('onclick')||'';
         if(fn.includes('openAdminCustomersModal')) card.classList.toggle('hidden', !any('viewCustomers','createCustomers'));
         else if(fn.includes('openAdminDelegatesModal')) card.classList.toggle('hidden', !any('viewDelegates','createDelegates'));
+        else if(fn.includes('openDelegateCustomerAccountsModal')) card.classList.toggle('hidden', !any('viewDelegateCustomers'));
         else if(fn.includes('openInvoicesModal')) card.classList.toggle('hidden', !any('viewInvoices','editInvoices','deleteInvoices'));
         else if(fn.includes('openProductStatsModal')) card.classList.toggle('hidden', !any('viewProductStats'));
         else if(fn.includes('openAdminNotificationsModal')) card.classList.toggle('hidden', !any('sendNotifications'));
