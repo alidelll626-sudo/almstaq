@@ -4,7 +4,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- BUILD: business-v16-invoice-a4-pdf-20260827 -->
+  <!-- BUILD: business-v17-invoice-a4-pagination-total-20260827 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>متجر المستقبل للجملة - النظام التجاري</title>
@@ -1305,6 +1305,21 @@
       .product-stats-summary-value { font-size:.78rem; }
       .product-stats-body { padding:10px; }
     }
+
+  /* ===== الفاتورة: بيانات الحساب والزبون والبيانات المرافقة وعناوين الجداول = 12px ===== */
+  #receipt-area .invoice-info-row,
+  #receipt-area .invoice-info-label,
+  #receipt-area .invoice-info-value,
+  #receipt-area .invoice-general-note,
+  #receipt-area .invoice-status-chip,
+  #receipt-area .receipt-table thead th {
+    font-size: 12px !important;
+  }
+
+  /* تبقى ملاحظة المنتج 9px حسب التنسيق المطلوب */
+  #receipt-area .receipt-table .receipt-product-note {
+    font-size: 9px !important;
+  }
 
   </style>
 
@@ -8463,27 +8478,27 @@
             max-width: 100% !important;
           }
           #receipt-area .receipt-table .receipt-product-name {
-            font-size: 16px !important;
-            line-height: 1.5 !important;
+            font-size: 15px !important;
+            line-height: 1.42 !important;
           }
           #receipt-area .receipt-table .receipt-product-note {
-            font-size: 12px !important;
-            line-height: 1.5 !important;
-            padding: 5px 7px !important;
+            font-size: 11px !important;
+            line-height: 1.42 !important;
+            padding: 4px 6px !important;
           }
           #receipt-area .receipt-table .receipt-sequence-cell,
           #receipt-area .receipt-table td:nth-child(3),
           #receipt-area .receipt-table td:nth-child(4),
           #receipt-area .receipt-table td:nth-child(5) {
-            font-size: 15px !important;
-            line-height: 1.45 !important;
+            font-size: 14px !important;
+            line-height: 1.35 !important;
           }
           #receipt-area .receipt-table thead th {
-            font-size: 12px !important;
-            padding: 8px 5px !important;
+            font-size: 11px !important;
+            padding: 6px 4px !important;
           }
           #receipt-area .receipt-table td {
-            padding: 9px 5px !important;
+            padding: 6px 4px !important;
           }
           #receipt-area .invoice-brand h2 {
             font-size: 25px !important;
@@ -8491,14 +8506,22 @@
           #receipt-area .invoice-number-date {
             font-size: 12px !important;
           }
-          #receipt-area .invoice-info-row {
-            font-size: 13px !important;
+          #receipt-area .invoice-info-row,
+          #receipt-area .invoice-info-label,
+          #receipt-area .invoice-info-value {
+            font-size: 12px !important;
           }
           #receipt-area .invoice-general-note {
             font-size: 12px !important;
           }
           #receipt-area .invoice-status-chip {
-            font-size: 11px !important;
+            font-size: 12px !important;
+          }
+          #receipt-area .receipt-table thead th {
+            font-size: 12px !important;
+          }
+          #receipt-area .receipt-table .receipt-product-note {
+            font-size: 9px !important;
           }
           #receipt-area .invoice-total-box {
             font-size: 14px !important;
@@ -8561,11 +8584,29 @@
         ));
         const cloneRect = clone.getBoundingClientRect();
         const cloneScrollHeight = Math.max(clone.scrollHeight || 0, cloneRect.height || 1);
+        const scaleY = canvas.height / cloneScrollHeight;
         const rowBreaks = exportRows.map(row => {
           const r = row.getBoundingClientRect();
-          return Math.round((r.bottom - cloneRect.top) * (canvas.height / cloneScrollHeight));
+          return Math.round((r.bottom - cloneRect.top) * scaleY);
         }).filter(v => v > 0 && v < canvas.height);
+
+        const contentParts = Array.from(clone.querySelectorAll(
+          '.invoice-footer, .invoice-total-box, .invoice-table-wrap, .invoice-customer-box, .invoice-status-row'
+        ));
+        let contentBottom = cloneRect.height;
+        if (contentParts.length) {
+          contentBottom = Math.max(...contentParts.map(el => {
+            const r = el.getBoundingClientRect();
+            return (r.bottom - cloneRect.top);
+          }));
+        }
+        contentBottom = Math.min(
+          canvas.height,
+          Math.max(1, Math.ceil(contentBottom * scaleY))
+        );
+
         canvas.__exportRowBreaks = [...new Set(rowBreaks)].sort((a,b) => a-b);
+        canvas.__exportContentBottom = contentBottom;
         canvas.__exportScrollHeight = cloneScrollHeight;
         return canvas;
       } finally {
@@ -8639,26 +8680,37 @@
           const naturalBreaks = Array.isArray(canvas.__exportRowBreaks)
             ? canvas.__exportRowBreaks
             : [];
+          const contentBottom = Math.min(
+            canvas.height,
+            Math.max(1, Number(canvas.__exportContentBottom) || canvas.height)
+          );
 
           let startY = 0;
           let breakIndex = 0;
           let pageNumber = 0;
 
-          while (startY < canvas.height - 1) {
+          while (startY < contentBottom - 1) {
             let endY = null;
 
-            for (let i = breakIndex; i < naturalBreaks.length; i++) {
-              const candidate = naturalBreaks[i];
-              if (candidate - startY <= pageHeightPx) {
-                endY = candidate;
-                breakIndex = i + 1;
-              } else {
-                break;
+            /* إذا كانت بقية الفاتورة، بما فيها المجموع الكلي، تتسع في الصفحة
+               الحالية، نأخذها كلها حتى لا ينتقل المجموع إلى صفحة فارغة. */
+            if (contentBottom - startY <= pageHeightPx) {
+              endY = contentBottom;
+              breakIndex = naturalBreaks.length;
+            } else {
+              for (let i = breakIndex; i < naturalBreaks.length; i++) {
+                const candidate = naturalBreaks[i];
+                if (candidate - startY <= pageHeightPx) {
+                  endY = candidate;
+                  breakIndex = i + 1;
+                } else {
+                  break;
+                }
               }
-            }
 
-            if (endY === null || endY <= startY) {
-              endY = Math.min(startY + pageHeightPx, canvas.height);
+              if (endY === null || endY <= startY) {
+                endY = Math.min(startY + pageHeightPx, contentBottom);
+              }
             }
 
             if (pageNumber > 0) pdf.addPage();
