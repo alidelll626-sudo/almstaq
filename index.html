@@ -3467,6 +3467,101 @@
       return archivedCount;
     }
 
+    // إصلاح ملكية الفواتير القديمة التي أُنشئت قبل اعتماد ownerUid.
+    // يتم تنفيذ الإصلاح من حساب المدير فقط، ثم يستطيع الزبون/المندوب
+    // تحميل كامل سجله بواسطة ownerUid دون فتح أي مسار قراءة غير آمن.
+    async function repairLegacyInvoiceOwners(loadedInvoices) {
+      if (!(isAdmin || loggedAdmin) || !Array.isArray(loadedInvoices) || !loadedInvoices.length) return 0;
+
+      try {
+        const [customersSnap, delegatesSnap] = await Promise.all([
+          db.collection('customers').get(),
+          db.collection('delegates').get()
+        ]);
+
+        const customerUidByUsername = new Map();
+        const delegateUidByUsername = new Map();
+
+        customersSnap.forEach(doc => {
+          const d = doc.data() || {};
+          const username = String(d.username || doc.id || '').trim();
+          const uid = String(d.authUid || '').trim();
+          if (username && uid) customerUidByUsername.set(username, uid);
+        });
+
+        delegatesSnap.forEach(doc => {
+          const d = doc.data() || {};
+          const username = String(d.username || doc.id || '').trim();
+          const uid = String(d.authUid || '').trim();
+          if (username && uid) delegateUidByUsername.set(username, uid);
+        });
+
+        const pending = [];
+
+        for (const inv of loadedInvoices) {
+          if (!inv || inv.ownerUid) continue;
+
+          const role = String(inv.ownerRole || '').trim().toLowerCase();
+          let username = '';
+
+          if (role === 'delegate') {
+            username = String(inv.delegateUsername || '').trim();
+            const uid = delegateUidByUsername.get(username);
+            if (uid) pending.push({ inv, uid });
+            continue;
+          }
+
+          if (role === 'customer') {
+            const raw = String(inv.customer?.username || '').trim();
+            username = raw.replace(/^زبون:\s*/i, '').trim();
+            const uid = customerUidByUsername.get(username);
+            if (uid) pending.push({ inv, uid });
+            continue;
+          }
+
+          // توافق إضافي للفواتير القديمة التي لا تحتوي ownerRole.
+          const delegateName = String(inv.delegateUsername || '').trim();
+          if (delegateName) {
+            const uid = delegateUidByUsername.get(delegateName);
+            if (uid) {
+              pending.push({ inv, uid });
+              continue;
+            }
+          }
+
+          const rawCustomer = String(inv.customer?.username || '').trim();
+          const customerName = rawCustomer.replace(/^زبون:\s*/i, '').trim();
+          const customerUid = customerUidByUsername.get(customerName);
+          if (customerUid) pending.push({ inv, uid: customerUid });
+        }
+
+        if (!pending.length) return 0;
+
+        let repaired = 0;
+        for (let i = 0; i < pending.length; i += 400) {
+          const batch = db.batch();
+          const chunk = pending.slice(i, i + 400);
+
+          chunk.forEach(({ inv, uid }) => {
+            const id = String(inv.id || '').trim();
+            if (!id) return;
+            batch.set(db.collection('invoices').doc(id), {
+              ownerUid: uid
+            }, { merge: true });
+            inv.ownerUid = uid;
+            repaired++;
+          });
+
+          await batch.commit();
+        }
+
+        return repaired;
+      } catch (err) {
+        console.warn('تعذر إصلاح ملكية بعض الفواتير القديمة:', err);
+        return 0;
+      }
+    }
+
     async function loadInvoicesFromFirestore() {
       try {
         let snapshots = [];
@@ -3476,8 +3571,9 @@
         }
 
         if (loggedCustomer || loggedDelegate) {
-          // نحمّل فقط الفواتير التي يملكها المستخدم الحالي فعلياً.
-          // هذا يتطابق مع ownerUid في Rules ويمنع استعلام مستخدم عن فواتير الآخرين.
+          // للمستخدم: القراءة تكون حصراً بواسطة ownerUid.
+          // بعد إصلاح الفواتير القديمة من حساب المدير ستظهر جميع الفواتير،
+          // بما فيها الفواتير القديمة والمؤرشفة الخاصة بنفس الحساب.
           snapshots = [await db.collection('invoices')
             .where('ownerUid', '==', firebaseUser.uid).get()];
         } else if (isAdmin || loggedAdmin) {
@@ -3491,11 +3587,24 @@
           const data = doc.data();
           if (data && data.id) byId.set(String(data.id), data);
         }));
+
         invoices = Array.from(byId.values());
-        invoices.sort((a, b) => String(b.id).localeCompare(String(a.id)));
+
+        // إصلاح تلقائي لمرة واحدة للفواتير القديمة التي لا تحتوي ownerUid.
+        // يتم ذلك قبل حفظ القائمة حتى لا تبقى الفواتير القديمة مخفية عن أصحابها.
         if (isAdmin || loggedAdmin) {
+          const repaired = await repairLegacyInvoiceOwners(invoices);
+          if (repaired) {
+            console.info(`تم إصلاح ملكية ${repaired} فاتورة قديمة.`);
+          }
           await autoArchiveOldInvoices();
         }
+
+        invoices.sort((a, b) =>
+          getInvoiceCreatedTime(b) - getInvoiceCreatedTime(a) ||
+          String(b.id).localeCompare(String(a.id))
+        );
+
         localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
         updateUnreadInvoicesBadge();
         return true;
