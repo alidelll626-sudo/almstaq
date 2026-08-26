@@ -1277,8 +1277,359 @@
     }
 
   </style>
+
+<style>
+  /* ============================================================
+     قسم حسابات زبائن المندوبين — تصميم عصري
+     ============================================================ */
+  .delegate-customer-accounts-card {
+    position: relative;
+    overflow: hidden;
+  }
+  .delegate-customer-accounts-card::after {
+    content: '';
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    left: -28px;
+    bottom: -35px;
+    background: rgba(37, 99, 235, .08);
+    pointer-events: none;
+  }
+
+  .delegate-customer-accounts-modal .modal-content {
+    width: min(760px, 96vw);
+    max-height: 92vh;
+  }
+
+  .delegate-customer-accounts-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, .75fr);
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .delegate-customer-filter-card,
+  .delegate-customer-search-card {
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 11px;
+    box-shadow: 0 5px 18px rgba(15, 23, 42, .045);
+  }
+
+  .delegate-customer-filter-label {
+    display: block;
+    font-size: .72rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+
+  .delegate-customer-filter-card select,
+  .delegate-customer-search-card input {
+    width: 100%;
+    min-height: 42px;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: #fff;
+    color: var(--text-color, #172033);
+    padding: 9px 12px;
+    outline: none;
+    font: inherit;
+    box-sizing: border-box;
+  }
+
+  .delegate-customer-filter-card select:focus,
+  .delegate-customer-search-card input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .10);
+  }
+
+  .delegate-customer-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .delegate-customer-stat {
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 10px;
+    background: #fff;
+    text-align: center;
+  }
+
+  .delegate-customer-stat .num {
+    display: block;
+    font-size: 1.15rem;
+    font-weight: 900;
+    color: #172033;
+    line-height: 1.2;
+  }
+
+  .delegate-customer-stat .label {
+    display: block;
+    margin-top: 3px;
+    color: var(--text-muted);
+    font-size: .7rem;
+    font-weight: 700;
+  }
+
+  .delegate-customer-selected {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    border-radius: 15px;
+    background: linear-gradient(135deg, #eff6ff, #f8fbff);
+    border: 1px solid #dbeafe;
+  }
+
+  .delegate-customer-selected strong {
+    display: block;
+    color: #1e3a8a;
+    font-size: .92rem;
+  }
+
+  .delegate-customer-selected small {
+    display: block;
+    margin-top: 3px;
+    color: #64748b;
+    font-size: .7rem;
+  }
+
+  .delegate-customer-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+    max-height: 48vh;
+    overflow-y: auto;
+    padding: 2px;
+  }
+
+  .delegate-customer-item {
+    position: relative;
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 15px;
+    padding: 12px;
+    min-width: 0;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .035);
+  }
+
+  .delegate-customer-item-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+  }
+
+  .delegate-customer-avatar {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    background: #eef2ff;
+    color: #4338ca;
+    font-size: 18px;
+  }
+
+  .delegate-customer-name {
+    min-width: 0;
+    font-weight: 900;
+    color: #172033;
+    font-size: .82rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .delegate-customer-meta {
+    margin-top: 9px;
+    display: grid;
+    gap: 5px;
+    color: #64748b;
+    font-size: .69rem;
+    line-height: 1.5;
+  }
+
+  .delegate-customer-meta span {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+
+  .delegate-customer-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 30px 16px;
+    border: 1px dashed var(--border-color);
+    border-radius: 15px;
+    color: var(--text-muted);
+    background: #fafafa;
+  }
+
+  @media (max-width: 640px) {
+    .delegate-customer-accounts-toolbar {
+      grid-template-columns: 1fr;
+    }
+    .delegate-customer-stats {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .delegate-customer-list {
+      grid-template-columns: 1fr;
+      max-height: 50vh;
+    }
+  }
+</style>
+
 </head>
 <body>
+
+<!-- ============================================================
+     Mustaqbal custom in-app alert
+     Prevents the browser native alert from showing the GitHub
+     Pages domain above application messages.
+     ============================================================ -->
+<style>
+  #mustaqbal-app-alert {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, .58);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    direction: rtl;
+    font-family: inherit;
+  }
+  #mustaqbal-app-alert.show { display: flex; }
+  #mustaqbal-app-alert-box {
+    width: min(430px, 94vw);
+    background: #fff;
+    border-radius: 22px;
+    box-shadow: 0 24px 70px rgba(0,0,0,.28);
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,.06);
+    animation: mustaqbalAlertIn .18s ease-out;
+  }
+  #mustaqbal-app-alert-head {
+    padding: 20px 22px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  #mustaqbal-app-alert-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    background: #eef4ff;
+    color: #2563eb;
+    font-size: 22px;
+    flex: 0 0 44px;
+  }
+  #mustaqbal-app-alert-title {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 800;
+    color: #172033;
+  }
+  #mustaqbal-app-alert-message {
+    padding: 4px 22px 20px;
+    color: #4b5563;
+    font-size: 15px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  #mustaqbal-app-alert-ok {
+    display: block;
+    width: calc(100% - 44px);
+    margin: 0 22px 20px;
+    border: 0;
+    border-radius: 13px;
+    padding: 12px 16px;
+    background: #2563eb;
+    color: #fff;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+  }
+  #mustaqbal-app-alert-ok:active { transform: scale(.99); }
+  @keyframes mustaqbalAlertIn {
+    from { opacity: 0; transform: translateY(8px) scale(.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+</style>
+
+<div id="mustaqbal-app-alert" aria-hidden="true">
+  <div id="mustaqbal-app-alert-box" role="alertdialog"
+       aria-modal="true" aria-labelledby="mustaqbal-app-alert-title">
+    <div id="mustaqbal-app-alert-head">
+      <div id="mustaqbal-app-alert-icon">!</div>
+      <h3 id="mustaqbal-app-alert-title">تنبيه</h3>
+    </div>
+    <div id="mustaqbal-app-alert-message"></div>
+    <button type="button" id="mustaqbal-app-alert-ok">موافق</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  function initMustaqbalAlert() {
+    var overlay = document.getElementById('mustaqbal-app-alert');
+    var messageEl = document.getElementById('mustaqbal-app-alert-message');
+    var okBtn = document.getElementById('mustaqbal-app-alert-ok');
+    if (!overlay || !messageEl || !okBtn) return;
+
+    var oldAlert = window.alert;
+    window.alert = function (message) {
+      messageEl.textContent = String(message == null ? '' : message);
+      overlay.classList.add('show');
+      overlay.setAttribute('aria-hidden', 'false');
+      setTimeout(function () { okBtn.focus(); }, 0);
+      return undefined;
+    };
+
+    function closeAlert() {
+      overlay.classList.remove('show');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+
+    okBtn.addEventListener('click', closeAlert);
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) closeAlert();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && overlay.classList.contains('show')) {
+        closeAlert();
+      }
+    });
+
+    // Keep a safe fallback reference available for debugging if ever needed.
+    window.__mustaqbalNativeAlert = oldAlert;
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMustaqbalAlert);
+  } else {
+    initMustaqbalAlert();
+  }
+})();
+</script>
+
+
 
   <div class="app-viewport">
 
@@ -1386,6 +1737,10 @@
           <div class="admin-card-btn" onclick="openAdminDelegatesModal()">
             <span>🛵</span>
             <span>حسابات المندوبين</span>
+          </div>
+          <div class="admin-card-btn delegate-customer-accounts-card" onclick="openDelegateCustomerAccountsModal()">
+            <span>👥</span>
+            <span>حسابات زبائن المندوبين</span>
           </div>
           <div class="admin-card-btn" id="admin-invoices-card" onclick="openInvoicesModal()" style="position:relative;">
             <span>📄</span>
@@ -1545,6 +1900,66 @@
           </form>
           <hr style="border: 0; border-top: 1px solid var(--border-color);">
           <div id="delegates-list-admin" style="display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto;"></div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- قسم حسابات زبائن المندوبين للمدير -->
+    <div id="delegate-customer-accounts-modal" class="modal hidden delegate-customer-accounts-modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h3 style="margin-bottom:3px;">حسابات زبائن المندوبين</h3>
+            <small style="color:var(--text-muted);">اختر المندوب لعرض زبائنه فقط، أو استخدم البحث للوصول السريع.</small>
+          </div>
+          <button class="close-modal" onclick="closeDelegateCustomerAccountsModal()">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="delegate-customer-accounts-toolbar">
+            <div class="delegate-customer-filter-card">
+              <label class="delegate-customer-filter-label">🛵 اختيار حساب المندوب</label>
+              <select id="delegate-customer-delegate-select" onchange="renderDelegateCustomerAccounts()">
+                <option value="">جميع المندوبين</option>
+              </select>
+            </div>
+
+            <div class="delegate-customer-search-card">
+              <label class="delegate-customer-filter-label">🔎 البحث عن زبون</label>
+              <input
+                type="search"
+                id="delegate-customer-account-search"
+                placeholder="اسم الزبون أو الهاتف أو العنوان..."
+                oninput="renderDelegateCustomerAccounts()"
+                autocomplete="off">
+            </div>
+          </div>
+
+          <div class="delegate-customer-stats">
+            <div class="delegate-customer-stat">
+              <span class="num" id="delegate-customer-stat-delegates">0</span>
+              <span class="label">المندوبون</span>
+            </div>
+            <div class="delegate-customer-stat">
+              <span class="num" id="delegate-customer-stat-total">0</span>
+              <span class="label">إجمالي الزبائن</span>
+            </div>
+            <div class="delegate-customer-stat">
+              <span class="num" id="delegate-customer-stat-visible">0</span>
+              <span class="label">المعروض الآن</span>
+            </div>
+          </div>
+
+          <div class="delegate-customer-selected">
+            <div>
+              <strong id="delegate-customer-selected-name">جميع المندوبين</strong>
+              <small id="delegate-customer-selected-info">يتم عرض زبائن جميع حسابات المندوبين.</small>
+            </div>
+            <span style="font-size:24px;">👥</span>
+          </div>
+
+          <div id="delegate-customer-accounts-list" class="delegate-customer-list"></div>
         </div>
       </div>
     </div>
@@ -1923,6 +2338,12 @@
                   <div class="admin-permission-group-head"><div><b>🛵 المندوبون</b><small>إدارة حسابات المندوبين وطلباتهم</small></div><button type="button" class="permission-group-toggle" onclick="togglePermissionGroup('delegates')">تحديد القسم</button></div>
                   <div class="admin-permissions-grid">
                     <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegates"> مشاهدة حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="createDelegates"> إنشاء حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="editDelegates"> تعديل حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="toggleDelegates"> تعطيل / تفعيل حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="deleteDelegates"> حذف حسابات المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegateOrders"> مشاهدة طلبات المندوبين</label>
+                  </div>
+                </div>
+                <div class="admin-permission-group" data-permission-group="delegateCustomers">
+                  <div class="admin-permission-group-head"><div><b>👥 حسابات زبائن المندوبين</b><small>التحكم في مشاهدة زبائن المندوبين وبيانات الاتصال</small></div><button type="button" class="permission-group-toggle" onclick="togglePermissionGroup('delegateCustomers')">تحديد القسم</button></div>
+                  <div class="admin-permissions-grid">
+                    <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegateCustomers"> مشاهدة حسابات زبائن المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegateCustomerContacts"> مشاهدة بيانات الاتصال لزبائن المندوبين</label>
                   </div>
                 </div>
                 <div class="admin-permission-group" data-permission-group="reports">
@@ -3208,6 +3629,8 @@
         renderAdminCustomersList();
         renderAdminDelegatesList();
         renderDelegateClientsList();
+        if (typeof populateDelegateCustomerDelegateSelect === 'function') populateDelegateCustomerDelegateSelect();
+        if (typeof renderDelegateCustomerAccounts === 'function') renderDelegateCustomerAccounts();
         renderBusinessDashboard();
 
         if (btn) {
@@ -3286,6 +3709,16 @@
       { key:'delegates', icon:'🛵', title:'المندوبون', items:[
         ['viewDelegates','مشاهدة حسابات المندوبين'], ['createDelegates','إنشاء حسابات المندوبين'], ['editDelegates','تعديل حسابات المندوبين'],
         ['toggleDelegates','تعطيل / تفعيل حسابات المندوبين'], ['deleteDelegates','حذف حسابات المندوبين'], ['viewDelegateOrders','مشاهدة طلبات المندوبين']
+      ]},
+      { key:'delegateCustomers', icon:'👥', title:'حسابات زبائن المندوبين', items:[
+        ['viewDelegateCustomers','مشاهدة حسابات زبائن المندوبين'],
+        ['viewDelegateCustomerContact','مشاهدة أرقام هواتف وعناوين زبائن المندوبين'],
+        ['editDelegateCustomers','تعديل زبائن المندوبين'],
+        ['deleteDelegateCustomers','حذف زبائن المندوبين']
+      ]},
+      { key:'delegateCustomers', icon:'👥', title:'حسابات زبائن المندوبين', items:[
+        ['viewDelegateCustomers','مشاهدة حسابات زبائن المندوبين'],
+        ['viewDelegateCustomerContacts','مشاهدة بيانات الاتصال لزبائن المندوبين']
       ]},
       { key:'reports', icon:'📊', title:'التقارير والإحصائيات', items:[
         ['viewDashboard','مشاهدة لوحة المؤشرات'], ['viewSalesStats','مشاهدة إحصائيات المبيعات'], ['viewProductStats','مشاهدة إحصائيات المنتجات'],
@@ -3539,6 +3972,261 @@
     function closeAdminCustomersModal() { document.getElementById('admin-customers-modal').classList.add('hidden'); }
     async function openAdminDelegatesModal() { if (!requireAdminPermission('viewDelegates') && !requireAdminPermission('createDelegates')) return; document.getElementById('admin-delegates-modal').classList.remove('hidden'); await loadDelegatesFromFirestore(); }
     function closeAdminDelegatesModal() { document.getElementById('admin-delegates-modal').classList.add('hidden'); }
+
+    /* ============================================================
+       حسابات زبائن المندوبين — للمدير
+       يعتمد على delegates[].clients الموجود أصلاً في النظام.
+       لا ينشئ مجموعة Firestore جديدة ولا يغيّر بنية البيانات.
+       ============================================================ */
+    async function openDelegateCustomerAccountsModal() {
+      if (!requireAdminPermission('viewDelegateCustomers')) return;
+
+      const modal = document.getElementById('delegate-customer-accounts-modal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+
+      const search = document.getElementById('delegate-customer-account-search');
+      if (search) search.value = '';
+
+      try {
+        await loadDelegatesFromFirestore();
+      } catch (err) {
+        console.warn('تعذر تحديث حسابات المندوبين قبل عرض زبائنهم:', err);
+      }
+
+      populateDelegateCustomerDelegateSelect();
+      renderDelegateCustomerAccounts();
+    }
+
+    function closeDelegateCustomerAccountsModal() {
+      const modal = document.getElementById('delegate-customer-accounts-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function populateDelegateCustomerDelegateSelect() {
+      const select = document.getElementById('delegate-customer-delegate-select');
+      if (!select) return;
+
+      const previous = select.value;
+      const sortedDelegates = [...(delegates || [])].sort((a, b) => {
+        const an = String(a.fullname || a.username || '');
+        const bn = String(b.fullname || b.username || '');
+        return an.localeCompare(bn, 'ar');
+      });
+
+      select.innerHTML = '<option value="">جميع المندوبين</option>';
+
+      sortedDelegates.forEach(del => {
+        const option = document.createElement('option');
+        option.value = String(del.username || '');
+        option.textContent =
+          `${String(del.fullname || del.username || 'مندوب')} — ${String(del.username || '')}`;
+        select.appendChild(option);
+      });
+
+      if (sortedDelegates.some(d => String(d.username || '') === String(previous))) {
+        select.value = previous;
+      }
+    }
+
+
+    async function editDelegateCustomerFromAdmin(encodedDelegateUsername, encodedClientId) {
+      if (isAdmin && !requireAdminPermission('editDelegateCustomers')) return;
+      const delegateUsername = decodeURIComponent(encodedDelegateUsername || '');
+      const clientId = decodeURIComponent(encodedClientId || '');
+      const del = (delegates || []).find(d => String(d.username || '') === delegateUsername);
+      const client = del && Array.isArray(del.clients) ? del.clients.find(c => String(c.id || '') === clientId) : null;
+      if (!client) return alert('تعذر العثور على الزبون.');
+
+      const name = prompt('اسم الزبون / المحل:', client.name || '');
+      if (name === null) return;
+      const phone = prompt('رقم الهاتف:', client.phone || '');
+      if (phone === null) return;
+      const address = prompt('العنوان:', client.address || '');
+      if (address === null) return;
+      if (!name.trim()) return alert('اسم الزبون مطلوب.');
+
+      client.name = name.trim();
+      client.phone = phone.trim();
+      client.address = address.trim();
+
+      try {
+        await db.collection('delegates').doc(delegateUsername).set({clients: del.clients}, {merge:true});
+        const idx = delegates.findIndex(d => String(d.username || '') === delegateUsername);
+        if (idx !== -1) delegates[idx] = del;
+        saveData();
+        if (loggedDelegate && String(loggedDelegate.username || '') === delegateUsername) {
+          loggedDelegate = del;
+          localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
+        }
+        renderDelegateCustomerAccounts();
+        alert('تم تعديل بيانات الزبون بنجاح.');
+      } catch (err) {
+        console.error(err);
+        alert('تعذر حفظ تعديل الزبون.');
+      }
+    }
+
+    async function deleteDelegateCustomerFromAdmin(encodedDelegateUsername, encodedClientId) {
+      if (isAdmin && !requireAdminPermission('deleteDelegateCustomers')) return;
+      const delegateUsername = decodeURIComponent(encodedDelegateUsername || '');
+      const clientId = decodeURIComponent(encodedClientId || '');
+      const del = (delegates || []).find(d => String(d.username || '') === delegateUsername);
+      if (!del || !Array.isArray(del.clients)) return alert('تعذر العثور على الزبون.');
+      const client = del.clients.find(c => String(c.id || '') === clientId);
+      if (!client) return alert('تعذر العثور على الزبون.');
+      if (!confirm(`تأكيد حذف الزبون "${client.name || ''}" من حساب المندوب؟`)) return;
+
+      del.clients = del.clients.filter(c => String(c.id || '') !== clientId);
+      try {
+        await db.collection('delegates').doc(delegateUsername).set({clients: del.clients}, {merge:true});
+        const idx = delegates.findIndex(d => String(d.username || '') === delegateUsername);
+        if (idx !== -1) delegates[idx] = del;
+        saveData();
+        if (loggedDelegate && String(loggedDelegate.username || '') === delegateUsername) {
+          loggedDelegate = del;
+          localStorage.setItem('loggedDelegate', JSON.stringify(loggedDelegate));
+        }
+        renderDelegateCustomerAccounts();
+        alert('تم حذف الزبون بنجاح.');
+      } catch (err) {
+        console.error(err);
+        alert('تعذر حذف الزبون من السحابة.');
+      }
+    }
+
+    function renderDelegateCustomerAccounts() {
+      const listContainer = document.getElementById('delegate-customer-accounts-list');
+      const select = document.getElementById('delegate-customer-delegate-select');
+      const searchInput = document.getElementById('delegate-customer-account-search');
+      if (!listContainer || !select) return;
+
+      const selectedUsername = String(select.value || '');
+      const query = String(searchInput ? searchInput.value || '' : '').trim().toLowerCase();
+
+      const allDelegates = [...(delegates || [])];
+      const selectedDelegate = selectedUsername
+        ? allDelegates.find(d => String(d.username || '') === selectedUsername)
+        : null;
+
+      let sourceDelegates = selectedDelegate ? [selectedDelegate] : allDelegates;
+
+      let allClients = [];
+      sourceDelegates.forEach(del => {
+        const clients = Array.isArray(del.clients) ? del.clients : [];
+        clients.forEach(client => {
+          allClients.push({
+            ...client,
+            __delegateUsername: String(del.username || ''),
+            __delegateName: String(del.fullname || del.username || 'مندوب')
+          });
+        });
+      });
+
+      const totalClients = allClients.length;
+
+      if (query) {
+        allClients = allClients.filter(client => {
+          const haystack = [
+            client.name,
+            client.phone,
+            client.address,
+            client.__delegateName,
+            client.__delegateUsername
+          ].map(v => String(v || '').toLowerCase()).join(' ');
+          return haystack.includes(query);
+        });
+      }
+
+      const delegateStat = document.getElementById('delegate-customer-stat-delegates');
+      const totalStat = document.getElementById('delegate-customer-stat-total');
+      const visibleStat = document.getElementById('delegate-customer-stat-visible');
+      if (delegateStat) delegateStat.textContent = String(sourceDelegates.length);
+      if (totalStat) totalStat.textContent = String(totalClients);
+      if (visibleStat) visibleStat.textContent = String(allClients.length);
+
+      const selectedName = document.getElementById('delegate-customer-selected-name');
+      const selectedInfo = document.getElementById('delegate-customer-selected-info');
+
+      if (selectedDelegate) {
+        const count = Array.isArray(selectedDelegate.clients) ? selectedDelegate.clients.length : 0;
+        if (selectedName) selectedName.textContent = selectedDelegate.fullname || selectedDelegate.username || 'المندوب';
+        if (selectedInfo) {
+          selectedInfo.textContent =
+            `الحساب: ${selectedDelegate.username || '—'} • عدد الزبائن: ${count}`;
+        }
+      } else {
+        if (selectedName) selectedName.textContent = 'جميع المندوبين';
+        if (selectedInfo) selectedInfo.textContent = 'يتم عرض زبائن جميع حسابات المندوبين.';
+      }
+
+      listContainer.innerHTML = '';
+
+      if (allDelegates.length === 0) {
+        listContainer.innerHTML = `
+          <div class="delegate-customer-empty">
+            <div style="font-size:34px;margin-bottom:8px;">🛵</div>
+            <strong style="display:block;color:#334155;margin-bottom:5px;">لا توجد حسابات مندوبين</strong>
+            <span>أنشئ حساب مندوب أولاً ثم ستظهر حسابات زبائنه هنا.</span>
+          </div>`;
+        return;
+      }
+
+      if (allClients.length === 0) {
+        listContainer.innerHTML = `
+          <div class="delegate-customer-empty">
+            <div style="font-size:34px;margin-bottom:8px;">👤</div>
+            <strong style="display:block;color:#334155;margin-bottom:5px;">لا توجد نتائج</strong>
+            <span>${query ? 'لا يوجد زبون يطابق البحث الحالي.' : 'لا يوجد زبائن محفوظون لهذا الاختيار حالياً.'}</span>
+          </div>`;
+        return;
+      }
+
+      allClients.forEach(client => {
+        const div = document.createElement('div');
+        div.className = 'delegate-customer-item';
+
+        const name = escapeHtml(client.name || 'زبون بدون اسم');
+        const canViewContacts = hasAdminPermission('viewDelegateCustomerContacts');
+        const phone = escapeHtml(client.phone || 'غير مسجل');
+        const address = escapeHtml(client.address || 'غير مسجل');
+        const delegateName = escapeHtml(client.__delegateName || 'مندوب');
+        const delegateUsername = escapeHtml(client.__delegateUsername || '');
+
+        const contactHtml = canViewContacts
+          ? `<span>📞 ${phone}</span><span>📍 ${address}</span>`
+          : `<span style="color:#94a3b8;">🔒 بيانات الاتصال مخفية حسب الصلاحية</span>`;
+
+        const canViewContact = !isAdmin || requireAdminPermission('viewDelegateCustomerContact', false);
+        const canEdit = !isAdmin || requireAdminPermission('editDelegateCustomers', false);
+        const canDelete = !isAdmin || requireAdminPermission('deleteDelegateCustomers', false);
+        const contactHtml = canViewContact
+          ? `<span>📞 ${phone}</span><span>📍 ${address}</span>`
+          : `<span style="color:#94a3b8;">🔒 بيانات الاتصال مخفية حسب الصلاحية</span>`;
+        const actionHtml = (canEdit || canDelete) ? `
+          <div style="display:flex;gap:6px;margin-top:10px;">
+            ${canEdit ? `<button type="button" onclick="editDelegateCustomerFromAdmin('${encodeURIComponent(client.__delegateUsername)}','${encodeURIComponent(client.id || '')}')" style="flex:1;background:#eff6ff;color:#2563eb;border:1px solid #dbeafe;padding:7px 8px;border-radius:9px;cursor:pointer;font-weight:800;">تعديل</button>` : ''}
+            ${canDelete ? `<button type="button" onclick="deleteDelegateCustomerFromAdmin('${encodeURIComponent(client.__delegateUsername)}','${encodeURIComponent(client.id || '')}')" style="flex:1;background:#fef2f2;color:#dc2626;border:1px solid #fee2e2;padding:7px 8px;border-radius:9px;cursor:pointer;font-weight:800;">حذف</button>` : ''}
+          </div>` : '';
+
+        div.innerHTML = `
+          <div class="delegate-customer-item-head">
+            <div class="delegate-customer-avatar">👤</div>
+            <div style="min-width:0;flex:1;">
+              <div class="delegate-customer-name" title="${name}">${name}</div>
+              <div style="margin-top:2px;color:#64748b;font-size:.66rem;">المندوب: ${delegateName}</div>
+            </div>
+          </div>
+          <div class="delegate-customer-meta">
+            ${contactHtml}
+            <span>🛵 حساب المندوب: ${delegateUsername || '—'}</span>
+          </div>
+          ${actionHtml}
+        `;
+        listContainer.appendChild(div);
+      });
+    }
+
 
     async function handleUnifiedLogin(e) {
       e.preventDefault();
@@ -3976,6 +4664,7 @@
         const fn=card.getAttribute('onclick')||'';
         if(fn.includes('openAdminCustomersModal')) card.classList.toggle('hidden', !any('viewCustomers','createCustomers'));
         else if(fn.includes('openAdminDelegatesModal')) card.classList.toggle('hidden', !any('viewDelegates','createDelegates'));
+        else if(fn.includes('openDelegateCustomerAccountsModal')) card.classList.toggle('hidden', !any('viewDelegateCustomers'));
         else if(fn.includes('openInvoicesModal')) card.classList.toggle('hidden', !any('viewInvoices','editInvoices','deleteInvoices'));
         else if(fn.includes('openProductStatsModal')) card.classList.toggle('hidden', !any('viewProductStats'));
         else if(fn.includes('openAdminNotificationsModal')) card.classList.toggle('hidden', !any('sendNotifications'));
@@ -7793,5 +8482,25 @@
         </div>`;
     }
   </script>
+
+<style id="mustaqbal-no-copy">
+html,body,#app,.app-container{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}
+input,textarea,select,[contenteditable="true"]{-webkit-user-select:text!important;user-select:text!important;-webkit-touch-callout:default!important}
+img{-webkit-user-drag:none!important;user-drag:none!important}
+</style>
+<script id="mustaqbal-no-copy-script">
+(function(){
+  function editable(t){return t&&t.matches&&t.matches('input,textarea,select,[contenteditable="true"]')}
+  document.addEventListener('copy',function(e){if(!editable(e.target))e.preventDefault()},true);
+  document.addEventListener('cut',function(e){if(!editable(e.target))e.preventDefault()},true);
+  document.addEventListener('contextmenu',function(e){e.preventDefault()},true);
+  document.addEventListener('dragstart',function(e){e.preventDefault()},true);
+  document.addEventListener('keydown',function(e){
+    const k=(e.key||'').toLowerCase();
+    if((e.ctrlKey||e.metaKey)&&['c','x','p'].includes(k)&&!editable(e.target))e.preventDefault();
+  },true);
+})();
+</script>
+
 </body>
 </html>
