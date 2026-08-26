@@ -2691,7 +2691,10 @@
     <div id="notifications-modal" class="modal hidden">
       <div class="modal-content">
         <div class="modal-header">
-          <h3 id="notifications-modal-title">🔔 الإشعارات</h3>
+          <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
+            <h3 id="notifications-modal-title" style="margin:0;">🔔 الإشعارات</h3>
+            <button type="button" id="mark-all-notifications-read-btn" onclick="markAllNotificationsAsRead()" title="اعتبار جميع الإشعارات كمقروءة" style="border:1px solid #bae6fd;background:#f0f9ff;color:#0369a1;border-radius:10px;padding:6px 9px;cursor:pointer;font-size:.68rem;font-weight:900;white-space:nowrap;">✓ مشاهدة الكل</button>
+          </div>
           <button class="close-modal" onclick="closeNotificationsModal()">✕</button>
         </div>
         <div class="modal-body">
@@ -5201,6 +5204,25 @@
       updateNotificationsBadge();
     }
 
+    // زر «مشاهدة الكل» للزبون والمندوب: يعتبر جميع إشعارات الحساب الحالية مقروءة
+    // ويزيل رقم الإشعارات الجديد من أيقونة الجرس دون حذف الإشعارات نفسها.
+    function markAllNotificationsAsRead() {
+      const visible = getVisibleNotifications();
+      if (!visible.length) {
+        updateNotificationsBadge();
+        renderNotificationsList();
+        return;
+      }
+      const ids = getReadNotificationIds();
+      const merged = new Set(ids.map(String));
+      visible.forEach(n => {
+        if (n && n.id != null) merged.add(String(n.id));
+      });
+      setReadNotificationIds(Array.from(merged));
+      updateNotificationsBadge();
+      renderNotificationsList();
+    }
+
     function openNotificationDetails(notificationId) {
       const id = String(notificationId || '');
       const item = (notifications || []).find(n => String(n.id) === id);
@@ -7399,7 +7421,7 @@
 
         return `
           <tr>
-            <td style="text-align:center;font-weight:900;color:var(--primary-dark);">${sequence}</td>
+            <td style="text-align:center;font-weight:900;color:var(--primary-dark);width:48px;">${sequence}</td>
             <td>
               <strong>${item.name || 'منتج غير معروف'}</strong>
               ${item.note ? `<div style="font-size:0.72rem; color:#475569; margin-top:5px; background:#f8fafc; border:1px solid #e2e8f0; padding:5px 8px; border-radius:8px; line-height:1.5;">📝 ${item.note}</div>` : ''}
@@ -7432,7 +7454,7 @@
         <table class="receipt-table">
           <thead>
             <tr>
-              <th style="text-align:center;width:48px;">التسلسل</th>
+              <th style="text-align:center;width:48px;">ت</th>
               <th>المنتج والملاحظات</th>
               <th style="text-align:center;">كمية</th>
               <th style="text-align:left;">السعر</th>
