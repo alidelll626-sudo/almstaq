@@ -3470,69 +3470,100 @@
     // إصلاح ملكية الفواتير القديمة التي أُنشئت قبل اعتماد ownerUid.
     // يتم تنفيذ الإصلاح من حساب المدير فقط، ثم يستطيع الزبون/المندوب
     // تحميل كامل سجله بواسطة ownerUid دون فتح أي مسار قراءة غير آمن.
-    async function repairLegacyInvoiceOwners(loadedInvoices) {
-      if (!(isAdmin || loggedAdmin) || !Array.isArray(loadedInvoices) || !loadedInvoices.length) return 0;
+    async function repairLegacyInvoiceOwners(loadedInvoices, invoiceRefById = new Map()) {
+      // ترحيل آمن للفواتير القديمة: المدير الرئيسي فقط هو من ينفذ العملية.
+      if (!isAdmin || !Array.isArray(loadedInvoices) || !loadedInvoices.length) return 0;
 
       try {
-        const [customersSnap, delegatesSnap] = await Promise.all([
+        // userProfiles هو المصدر الأكثر موثوقية لربط username بـ Firebase UID،
+        // مع الرجوع إلى customers/delegates للحسابات القديمة التي لا تزال تحتوي authUid.
+        const [profilesSnap, customersSnap, delegatesSnap] = await Promise.all([
+          db.collection('userProfiles').get(),
           db.collection('customers').get(),
           db.collection('delegates').get()
         ]);
 
-        const customerUidByUsername = new Map();
-        const delegateUidByUsername = new Map();
+        const uidByRoleUsername = new Map();
+        const putMapping = (role, username, uid) => {
+          const u = String(username || '').trim();
+          const id = String(uid || '').trim();
+          if (!u || !id) return;
+          uidByRoleUsername.set(`${role}:${u}`, id);
+          uidByRoleUsername.set(`${role}:${u.toLowerCase()}`, id);
+        };
+
+        profilesSnap.forEach(doc => {
+          const d = doc.data() || {};
+          const role = String(d.role || '').trim().toLowerCase();
+          const username = String(d.username || '').trim();
+          const uid = String(d.authUid || doc.id || '').trim();
+          if ((role === 'customer' || role === 'delegate') && username && uid) {
+            putMapping(role, username, uid);
+          }
+        });
 
         customersSnap.forEach(doc => {
           const d = doc.data() || {};
-          const username = String(d.username || doc.id || '').trim();
-          const uid = String(d.authUid || '').trim();
-          if (username && uid) customerUidByUsername.set(username, uid);
+          putMapping('customer', d.username || doc.id, d.authUid);
         });
 
         delegatesSnap.forEach(doc => {
           const d = doc.data() || {};
-          const username = String(d.username || doc.id || '').trim();
-          const uid = String(d.authUid || '').trim();
-          if (username && uid) delegateUidByUsername.set(username, uid);
+          putMapping('delegate', d.username || doc.id, d.authUid);
         });
 
+        const getUid = (role, username) => {
+          const u = String(username || '').trim();
+          return uidByRoleUsername.get(`${role}:${u}`) || uidByRoleUsername.get(`${role}:${u.toLowerCase()}`) || '';
+        };
+
         const pending = [];
+        const queuedRefs = new Set();
 
         for (const inv of loadedInvoices) {
           if (!inv || inv.ownerUid) continue;
 
           const role = String(inv.ownerRole || '').trim().toLowerCase();
-          let username = '';
+          const customerRaw = String(inv.customer?.username || '').trim();
+          const customerUsername = customerRaw.replace(/^زبون:\s*/i, '').trim();
+          const delegateFromCustomer = customerRaw.replace(/^مندوب:\s*/i, '').trim();
+          const delegateUsername = String(inv.delegateUsername || '').trim();
+
+          let ownerRole = '';
+          let ownerUsername = '';
 
           if (role === 'delegate') {
-            username = String(inv.delegateUsername || '').trim();
-            const uid = delegateUidByUsername.get(username);
-            if (uid) pending.push({ inv, uid });
-            continue;
+            ownerRole = 'delegate';
+            ownerUsername = delegateUsername || delegateFromCustomer;
+          } else if (role === 'customer') {
+            ownerRole = 'customer';
+            ownerUsername = customerUsername;
+          } else if (delegateUsername) {
+            ownerRole = 'delegate';
+            ownerUsername = delegateUsername;
+          } else if (/^مندوب:\s*/i.test(customerRaw)) {
+            ownerRole = 'delegate';
+            ownerUsername = delegateFromCustomer;
+          } else if (customerUsername) {
+            ownerRole = 'customer';
+            ownerUsername = customerUsername;
           }
 
-          if (role === 'customer') {
-            const raw = String(inv.customer?.username || '').trim();
-            username = raw.replace(/^زبون:\s*/i, '').trim();
-            const uid = customerUidByUsername.get(username);
-            if (uid) pending.push({ inv, uid });
-            continue;
-          }
+          const uid = getUid(ownerRole, ownerUsername);
+          if (!uid) continue;
 
-          // توافق إضافي للفواتير القديمة التي لا تحتوي ownerRole.
-          const delegateName = String(inv.delegateUsername || '').trim();
-          if (delegateName) {
-            const uid = delegateUidByUsername.get(delegateName);
-            if (uid) {
-              pending.push({ inv, uid });
-              continue;
-            }
-          }
+          const invoiceId = String(inv.id || '').trim();
+          if (!invoiceId) continue;
 
-          const rawCustomer = String(inv.customer?.username || '').trim();
-          const customerName = rawCustomer.replace(/^زبون:\s*/i, '').trim();
-          const customerUid = customerUidByUsername.get(customerName);
-          if (customerUid) pending.push({ inv, uid: customerUid });
+          // استخدم مرجع المستند الحقيقي من snapshot المدير، لأن document ID
+          // لبعض الفواتير القديمة قد لا يساوي الحقل id داخل الفاتورة.
+          let ref = invoiceRefById.get(invoiceId);
+          if (!ref && /^\d+$/.test(invoiceId)) ref = invoiceRefById.get(String(Number(invoiceId)));
+
+          if (ref && !queuedRefs.has(ref.path)) {
+            pending.push({ inv, uid, ref });
+            queuedRefs.add(ref.path);
+          }
         }
 
         if (!pending.length) return 0;
@@ -3542,12 +3573,8 @@
           const batch = db.batch();
           const chunk = pending.slice(i, i + 400);
 
-          chunk.forEach(({ inv, uid }) => {
-            const id = String(inv.id || '').trim();
-            if (!id) return;
-            batch.set(db.collection('invoices').doc(id), {
-              ownerUid: uid
-            }, { merge: true });
+          chunk.forEach(({ inv, uid, ref }) => {
+            batch.update(ref, { ownerUid: uid });
             inv.ownerUid = uid;
             repaired++;
           });
@@ -3557,7 +3584,7 @@
 
         return repaired;
       } catch (err) {
-        console.warn('تعذر إصلاح ملكية بعض الفواتير القديمة:', err);
+        console.error('تعذر إصلاح ملكية الفواتير القديمة:', err);
         return 0;
       }
     }
@@ -3571,9 +3598,6 @@
         }
 
         if (loggedCustomer || loggedDelegate) {
-          // للمستخدم: القراءة تكون حصراً بواسطة ownerUid.
-          // بعد إصلاح الفواتير القديمة من حساب المدير ستظهر جميع الفواتير،
-          // بما فيها الفواتير القديمة والمؤرشفة الخاصة بنفس الحساب.
           snapshots = [await db.collection('invoices')
             .where('ownerUid', '==', firebaseUser.uid).get()];
         } else if (isAdmin || loggedAdmin) {
@@ -3583,19 +3607,24 @@
         }
 
         const byId = new Map();
+        const invoiceRefById = new Map();
         snapshots.forEach(snapshot => snapshot.forEach(doc => {
           const data = doc.data();
-          if (data && data.id) byId.set(String(data.id), data);
+          if (!data || !data.id) return;
+          const key = String(data.id);
+          byId.set(key, data);
+          invoiceRefById.set(key, doc.ref);
+          if (/^\d+$/.test(key)) invoiceRefById.set(String(Number(key)), doc.ref);
         }));
 
         invoices = Array.from(byId.values());
 
-        // إصلاح تلقائي لمرة واحدة للفواتير القديمة التي لا تحتوي ownerUid.
-        // يتم ذلك قبل حفظ القائمة حتى لا تبقى الفواتير القديمة مخفية عن أصحابها.
         if (isAdmin || loggedAdmin) {
-          const repaired = await repairLegacyInvoiceOwners(invoices);
+          const repaired = await repairLegacyInvoiceOwners(invoices, invoiceRefById);
           if (repaired) {
             console.info(`تم إصلاح ملكية ${repaired} فاتورة قديمة.`);
+            // تحديث البيانات المحلية بعد نجاح الترحيل.
+            localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
           }
           await autoArchiveOldInvoices();
         }
@@ -3617,38 +3646,6 @@
         updateUnreadInvoicesBadge();
         return false;
       }
-    }
-
-    function normalizeWhatsAppLink(value) {
-      const raw = String(value || '').trim();
-      if (!raw) return '';
-      try {
-        const url = new URL(raw);
-        if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
-        if (!/wa\.me$|whatsapp\.com$/i.test(url.hostname)) return '';
-        return url.toString();
-      } catch (_) {
-        return '';
-      }
-    }
-
-    function buildWhatsAppUrl() {
-      const baseLink = normalizeWhatsAppLink(whatsappSettings && whatsappSettings.link);
-      if (!baseLink) return '';
-      const message = String((whatsappSettings && whatsappSettings.message) || '').trim();
-      if (!message) return baseLink;
-      return baseLink + (baseLink.includes('?') ? '&' : '?') + 'text=' + encodeURIComponent(message);
-    }
-
-    function updateWhatsAppNavUI() {
-      const btn = document.getElementById('nav-whatsapp-btn');
-      if (!btn) return;
-      // زر واتساب عام: يظهر قبل تسجيل الدخول وبعده لجميع المستخدمين.
-      btn.classList.remove('hidden');
-      btn.classList.toggle('configured', !!(whatsappSettings && whatsappSettings.enabled && normalizeWhatsAppLink(whatsappSettings.link)));
-      btn.title = (whatsappSettings && whatsappSettings.enabled && normalizeWhatsAppLink(whatsappSettings.link))
-        ? 'تواصل معنا عبر واتساب'
-        : 'واتساب المتجر غير مفعّل حالياً';
     }
 
     async function loadWhatsAppSettings() {
