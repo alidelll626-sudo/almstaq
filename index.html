@@ -1489,6 +1489,195 @@
   }
 </style>
 
+
+<style>
+  /* ===== القسم العاشر: مركز التنبيهات الذكية ===== */
+  .smart-alerts-admin-card {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(145deg,#fff7ed,#fffbeb) !important;
+    border-color: #fed7aa !important;
+  }
+  .smart-alerts-admin-card > span:nth-child(2) {
+    color: #b45309 !important;
+  }
+  .smart-alerts-admin-card::after {
+    content:'';
+    position:absolute;
+    width:78px;height:78px;
+    left:-30px;bottom:-38px;
+    border-radius:50%;
+    background:rgba(245,158,11,.10);
+    pointer-events:none;
+  }
+  .smart-alerts-count-badge {
+    position:absolute;
+    top:7px;
+    right:7px;
+    min-width:22px;
+    height:22px;
+    padding:0 6px;
+    border-radius:999px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    background:#dc2626;
+    color:#fff !important;
+    border:2px solid #fff;
+    font-size:.64rem;
+    font-weight:950;
+    box-shadow:0 4px 12px rgba(220,38,38,.22);
+    z-index:3;
+  }
+  .smart-alerts-count-badge.hidden { display:none !important; }
+
+  .smart-alerts-hero {
+    background:linear-gradient(135deg,#fff7ed,#fffbeb);
+    border:1px solid #fed7aa;
+    border-radius:20px;
+    padding:15px;
+  }
+  .smart-alerts-hero-top {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .smart-alerts-hero-title {
+    font-size:1rem;
+    font-weight:950;
+    color:#92400e;
+  }
+  .smart-alerts-hero-sub {
+    margin-top:4px;
+    font-size:.7rem;
+    line-height:1.65;
+    color:#64748b;
+  }
+  .smart-alerts-total {
+    min-width:58px;
+    padding:8px 9px;
+    border-radius:15px;
+    background:#fff;
+    border:1px solid #fed7aa;
+    text-align:center;
+  }
+  .smart-alerts-total strong {
+    display:block;
+    font-size:1.15rem;
+    font-weight:950;
+    color:#dc2626;
+  }
+  .smart-alerts-total small {
+    display:block;
+    margin-top:2px;
+    font-size:.58rem;
+    color:#92400e;
+    font-weight:800;
+  }
+  .smart-alerts-summary {
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:7px;
+    margin-top:11px;
+  }
+  .smart-alerts-summary-card {
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:13px;
+    padding:8px 6px;
+    text-align:center;
+  }
+  .smart-alerts-summary-card strong {
+    display:block;
+    font-size:.95rem;
+    font-weight:950;
+    color:#0f172a;
+  }
+  .smart-alerts-summary-card small {
+    display:block;
+    margin-top:2px;
+    font-size:.56rem;
+    color:#64748b;
+    font-weight:800;
+  }
+  .smart-alerts-list {
+    display:grid;
+    gap:9px;
+  }
+  .smart-alert-item {
+    background:#fff;
+    border:1px solid var(--border-color);
+    border-radius:17px;
+    padding:12px;
+    box-shadow:0 5px 15px rgba(15,23,42,.045);
+  }
+  .smart-alert-item.critical { border-right:4px solid #dc2626; }
+  .smart-alert-item.warning { border-right:4px solid #f59e0b; }
+  .smart-alert-item.info { border-right:4px solid #0284c7; }
+  .smart-alert-item-head {
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:8px;
+  }
+  .smart-alert-item-title {
+    font-size:.82rem;
+    font-weight:900;
+    color:#0f172a;
+    line-height:1.5;
+  }
+  .smart-alert-item-detail {
+    margin-top:5px;
+    font-size:.7rem;
+    color:#64748b;
+    line-height:1.7;
+  }
+  .smart-alert-priority {
+    flex:none;
+    padding:4px 7px;
+    border-radius:999px;
+    font-size:.57rem;
+    font-weight:900;
+  }
+  .smart-alert-priority.critical { background:#fee2e2;color:#991b1b; }
+  .smart-alert-priority.warning { background:#fef3c7;color:#92400e; }
+  .smart-alert-priority.info { background:#e0f2fe;color:#0369a1; }
+  .smart-alert-item-actions {
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    margin-top:9px;
+  }
+  .smart-alert-item-actions button {
+    border:1px solid var(--border-color);
+    background:#f8fafc;
+    color:#334155;
+    border-radius:10px;
+    padding:7px 9px;
+    font-size:.65rem;
+    font-weight:850;
+    cursor:pointer;
+  }
+  .smart-alert-item-actions button:active { transform:scale(.97); }
+  .smart-alert-empty {
+    text-align:center;
+    padding:30px 14px;
+    border:1px dashed #86efac;
+    background:#f0fdf4;
+    color:#166534;
+    border-radius:18px;
+    font-size:.82rem;
+    font-weight:850;
+    line-height:1.8;
+  }
+  @media (max-width:520px) {
+    .smart-alerts-summary { grid-template-columns:repeat(3,1fr); }
+    .smart-alerts-summary-card { padding:7px 3px; }
+    .smart-alerts-summary-card small { font-size:.5rem; }
+  }
+</style>
+
 </head>
 <body>
 
@@ -1766,6 +1955,11 @@
           <div class="admin-card-btn" id="admin-accounts-card" onclick="openAdminAccountsModal()">
             <span>👨‍💼</span>
             <span>حسابات المدراء</span>
+          </div>
+          <div class="admin-card-btn smart-alerts-admin-card" id="admin-smart-alerts-card" onclick="openSmartAlertsModal()">
+            <span>🚨</span>
+            <span>مركز التنبيهات الذكية</span>
+            <span id="smart-alerts-count-badge" class="smart-alerts-count-badge hidden">0</span>
           </div>
         </div>
 
@@ -2349,7 +2543,7 @@
                 <div class="admin-permission-group" data-permission-group="reports">
                   <div class="admin-permission-group-head"><div><b>📊 التقارير والإحصائيات</b><small>عرض المؤشرات والتقارير وتحليل المخزون</small></div><button type="button" class="permission-group-toggle" onclick="togglePermissionGroup('reports')">تحديد القسم</button></div>
                   <div class="admin-permissions-grid">
-                    <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDashboard"> مشاهدة لوحة المؤشرات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewSalesStats"> مشاهدة إحصائيات المبيعات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewProductStats"> مشاهدة إحصائيات المنتجات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewInventoryStats"> مشاهدة إحصائيات المخزون</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegateStats"> مشاهدة تقارير المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="exportReports"> تصدير التقارير PDF</label>
+                    <label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDashboard"> مشاهدة لوحة المؤشرات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewSalesStats"> مشاهدة إحصائيات المبيعات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewProductStats"> مشاهدة إحصائيات المنتجات</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewInventoryStats"> مشاهدة إحصائيات المخزون</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewDelegateStats"> مشاهدة تقارير المندوبين</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="viewSmartAlerts"> مشاهدة مركز التنبيهات الذكية</label><label class="admin-permission-item"><input type="checkbox" data-admin-permission="exportReports"> تصدير التقارير PDF</label>
                   </div>
                 </div>
                 <div class="admin-permission-group" data-permission-group="notifications">
@@ -3716,7 +3910,7 @@
       ]},
       { key:'reports', icon:'📊', title:'التقارير والإحصائيات', items:[
         ['viewDashboard','مشاهدة لوحة المؤشرات'], ['viewSalesStats','مشاهدة إحصائيات المبيعات'], ['viewProductStats','مشاهدة إحصائيات المنتجات'],
-        ['viewInventoryStats','مشاهدة إحصائيات المخزون'], ['viewDelegateStats','مشاهدة تقارير المندوبين'], ['exportReports','تصدير التقارير PDF']
+        ['viewInventoryStats','مشاهدة إحصائيات المخزون'], ['viewDelegateStats','مشاهدة تقارير المندوبين'], ['viewSmartAlerts','مشاهدة مركز التنبيهات الذكية'], ['exportReports','تصدير التقارير PDF']
       ]},
       { key:'notifications', icon:'🔔', title:'الإشعارات', items:[
         ['sendNotifications','إرسال الإشعارات'], ['notifyCustomers','إرسال إشعارات للزبائن'], ['notifyDelegates','إرسال إشعارات للمندوبين'], ['notifySpecific','إرسال إشعار لشخص محدد']
@@ -4584,6 +4778,7 @@
         else if(fn.includes('openInvoicesModal')) card.classList.toggle('hidden', !any('viewInvoices','editInvoices','deleteInvoices'));
         else if(fn.includes('openProductStatsModal')) card.classList.toggle('hidden', !any('viewProductStats'));
         else if(fn.includes('openAdminNotificationsModal')) card.classList.toggle('hidden', !any('sendNotifications'));
+        else if(fn.includes('openSmartAlertsModal')) card.classList.toggle('hidden', !any('viewSmartAlerts'));
       });
       document.querySelectorAll('.admin-tools-grid .admin-tool-btn').forEach(btn => {
         const fn=btn.getAttribute('onclick')||'';
@@ -8398,5 +8593,292 @@
         </div>`;
     }
   </script>
+
+<!-- ===== القسم العاشر: مركز التنبيهات الذكية ===== -->
+<div id="smart-alerts-modal" class="modal hidden" style="align-items:center;">
+  <div class="modal-content" style="width:calc(100% - 20px);max-width:720px;max-height:92vh;border-radius:24px;">
+    <div class="modal-header">
+      <div>
+        <h3>🚨 مركز التنبيهات الذكية</h3>
+        <div id="smart-alerts-updated-at" style="font-size:.62rem;color:var(--text-muted);margin-top:3px;">تحليل آخر البيانات المتاحة</div>
+      </div>
+      <button class="close-modal" type="button" onclick="closeSmartAlertsModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="smart-alerts-hero" class="smart-alerts-hero"></div>
+      <div id="smart-alerts-list" class="smart-alerts-list">
+        <div class="notification-empty">⏳ جارٍ تحليل بيانات المتجر...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+(function(){
+  const SMART_ALERTS = {
+    critical: 'حرج',
+    warning: 'تنبيه',
+    info: 'متابعة'
+  };
+
+  function smartEscape(value) {
+    if (typeof escapeNotificationHtml === 'function') return escapeNotificationHtml(value);
+    return String(value ?? '').replace(/[&<>'"]/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
+    }[c]));
+  }
+
+  function smartDate(ts) {
+    const d = new Date(Number(ts) || ts);
+    if (Number.isNaN(d.getTime())) return 'تاريخ غير معروف';
+    return d.toLocaleString('ar-IQ', {
+      year:'numeric', month:'2-digit', day:'2-digit',
+      hour:'2-digit', minute:'2-digit'
+    });
+  }
+
+  function smartInvoiceTime(inv) {
+    if (typeof getInvoiceCreatedTime === 'function') return Number(getInvoiceCreatedTime(inv) || 0);
+    return Number(inv?.createdAt || 0);
+  }
+
+  function smartInvoiceIsActive(inv) {
+    try {
+      if (typeof isInvoiceArchived === 'function' && isInvoiceArchived(inv)) return false;
+    } catch (_) {}
+    return String(inv?.orderStatus || '') !== 'cancelled';
+  }
+
+  function buildSmartAlerts() {
+    const alerts = [];
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+
+    const allProducts = Array.isArray(window.products) ? window.products : (typeof products !== 'undefined' ? products : []);
+    const allInvoices = Array.isArray(window.invoices) ? window.invoices : (typeof invoices !== 'undefined' ? invoices : []);
+    const activeInvoices = allInvoices.filter(smartInvoiceIsActive);
+
+    const outProducts = [];
+    const lowProducts = [];
+    allProducts.forEach(p => {
+      const stock = Number(p?.stock ?? 0);
+      const minStock = Number(p?.minStock ?? 5);
+      if (stock <= 0) outProducts.push(p);
+      else if (stock <= minStock) lowProducts.push(p);
+    });
+
+    if (outProducts.length) {
+      alerts.push({
+        type:'critical',
+        icon:'🛑',
+        title:`${outProducts.length} منتج نفد مخزونه`,
+        detail:`هناك منتجات لا تحتوي على كمية متاحة حالياً. هذه المنتجات قد تسبب طلبات مؤجلة أو نقصاً عند تجهيز الطلبات.`,
+        actionLabel:'عرض المخزون',
+        action:'stock'
+      });
+    }
+
+    if (lowProducts.length) {
+      alerts.push({
+        type:'warning',
+        icon:'📦',
+        title:`${lowProducts.length} منتج قريب من النفاد`,
+        detail:`المخزون وصل إلى حد التنبيه أو أقل. يفضّل مراجعة هذه المنتجات قبل زيادة الطلبات.`,
+        actionLabel:'عرض المنتجات',
+        action:'stock'
+      });
+    }
+
+    const backorders = activeInvoices.filter(inv => String(inv?.orderStatus || '') === 'backorder');
+    if (backorders.length) {
+      alerts.push({
+        type:'critical',
+        icon:'🟣',
+        title:`${backorders.length} طلب مؤجل بسبب المخزون`,
+        detail:`هذه الطلبات تحتاج متابعة حتى تتوفر الكميات المطلوبة وإكمال التجهيز.`,
+        actionLabel:'تتبع الطلبات',
+        action:'orders'
+      });
+    }
+
+    const pendingOld = activeInvoices.filter(inv => {
+      const status = String(inv?.orderStatus || 'new');
+      const created = smartInvoiceTime(inv);
+      return ['new','preparing'].includes(status) && created > 0 && (now - created) >= day;
+    });
+    if (pendingOld.length) {
+      alerts.push({
+        type:'warning',
+        icon:'⏱️',
+        title:`${pendingOld.length} طلب قيد المتابعة منذ أكثر من 24 ساعة`,
+        detail:`يوجد طلبات ما زالت بحالة استلام أو تجهيز لفترة طويلة نسبياً. راجع حالتها لتجنب تأخير الزبائن.`,
+        actionLabel:'مراجعة الطلبات',
+        action:'orders'
+      });
+    }
+
+    const unpaid = activeInvoices.filter(inv => {
+      const status = String(inv?.paymentStatus || '').toLowerCase();
+      return status === 'unpaid' || status === 'partial';
+    });
+    const unpaidTotal = unpaid.reduce((sum, inv) => sum + (Number(inv?.total) || 0), 0);
+    if (unpaid.length) {
+      alerts.push({
+        type:'warning',
+        icon:'💰',
+        title:`${unpaid.length} فاتورة غير مكتملة الدفع`,
+        detail:`إجمالي المبالغ غير المسددة أو المسددة جزئياً حسب حالة الفواتير الحالية: ${typeof formatPrice === 'function' ? formatPrice(unpaidTotal) : unpaidTotal.toLocaleString('en-US')} د.ع.`,
+        actionLabel:'مراجعة الفواتير',
+        action:'invoices'
+      });
+    }
+
+    const todayStart = new Date();
+    todayStart.setHours(0,0,0,0);
+    const todayInvoices = activeInvoices.filter(inv => smartInvoiceTime(inv) >= todayStart.getTime());
+    if (todayInvoices.length === 0 && allProducts.length > 0) {
+      alerts.push({
+        type:'info',
+        icon:'📊',
+        title:'لا توجد فواتير نشطة مسجلة اليوم',
+        detail:'هذه ملاحظة تشغيلية وليست خطأ. يمكنك متابعة المؤشرات والمبيعات للتأكد من أن البيانات محدثة.',
+        actionLabel:'لوحة المؤشرات',
+        action:'dashboard'
+      });
+    }
+
+    alerts.sort((a,b) => {
+      const rank = {critical:0, warning:1, info:2};
+      return (rank[a.type] ?? 9) - (rank[b.type] ?? 9);
+    });
+
+    return {
+      alerts,
+      counts: {
+        critical: alerts.filter(x => x.type === 'critical').length,
+        warning: alerts.filter(x => x.type === 'warning').length,
+        info: alerts.filter(x => x.type === 'info').length
+      },
+      raw: {
+        out: outProducts.length,
+        low: lowProducts.length,
+        backorders: backorders.length,
+        pendingOld: pendingOld.length,
+        unpaid: unpaid.length
+      }
+    };
+  }
+
+  function updateSmartAlertsBadge() {
+    if (!(typeof isAdmin !== 'undefined' && (isAdmin || loggedAdmin))) return;
+    const result = buildSmartAlerts();
+    const badge = document.getElementById('smart-alerts-count-badge');
+    if (!badge) return;
+    const total = result.alerts.filter(x => x.type !== 'info').length;
+    badge.textContent = total > 99 ? '99+' : String(total);
+    badge.classList.toggle('hidden', total === 0);
+  }
+
+  function renderSmartAlerts() {
+    const hero = document.getElementById('smart-alerts-hero');
+    const list = document.getElementById('smart-alerts-list');
+    const updated = document.getElementById('smart-alerts-updated-at');
+    if (!hero || !list) return;
+
+    const result = buildSmartAlerts();
+    const total = result.alerts.length;
+
+    hero.innerHTML = `
+      <div class="smart-alerts-hero-top">
+        <div>
+          <div class="smart-alerts-hero-title">🧠 قراءة سريعة لحالة المتجر</div>
+          <div class="smart-alerts-hero-sub">يجمع القسم إشارات من المخزون والطلبات وحالات الدفع ليعرض للمدير ما يحتاج إلى متابعة أولاً.</div>
+        </div>
+        <div class="smart-alerts-total">
+          <strong>${total}</strong>
+          <small>تنبيه حالياً</small>
+        </div>
+      </div>
+      <div class="smart-alerts-summary">
+        <div class="smart-alerts-summary-card"><strong>${result.counts.critical}</strong><small>حرج</small></div>
+        <div class="smart-alerts-summary-card"><strong>${result.counts.warning}</strong><small>يحتاج متابعة</small></div>
+        <div class="smart-alerts-summary-card"><strong>${result.counts.info}</strong><small>معلومة</small></div>
+      </div>
+    `;
+
+    if (updated) updated.textContent = 'آخر تحليل: ' + smartDate(Date.now());
+
+    if (!total) {
+      list.innerHTML = `<div class="smart-alert-empty">✅ ممتاز، لا توجد تنبيهات تشغيلية حالية تحتاج تدخلاً.<br><small>سيظهر هنا أي نقص مخزون أو طلب متأخر أو حالة دفع تحتاج متابعة.</small></div>`;
+      updateSmartAlertsBadge();
+      return;
+    }
+
+    list.innerHTML = result.alerts.map((item, index) => `
+      <div class="smart-alert-item ${item.type}">
+        <div class="smart-alert-item-head">
+          <div>
+            <div class="smart-alert-item-title">${smartEscape(item.icon)} ${smartEscape(item.title)}</div>
+            <div class="smart-alert-item-detail">${smartEscape(item.detail)}</div>
+          </div>
+          <span class="smart-alert-priority ${item.type}">${SMART_ALERTS[item.type]}</span>
+        </div>
+        <div class="smart-alert-item-actions">
+          <button type="button" onclick="handleSmartAlertAction('${item.action}')">${smartEscape(item.actionLabel)}</button>
+          <button type="button" onclick="renderSmartAlerts()">🔄 تحديث التحليل</button>
+        </div>
+      </div>
+    `).join('');
+
+    updateSmartAlertsBadge();
+  }
+
+  window.handleSmartAlertAction = function(action) {
+    const modal = document.getElementById('smart-alerts-modal');
+    if (action === 'stock') {
+      modal?.classList.add('hidden');
+      if (typeof openLowStockReport === 'function') openLowStockReport();
+    } else if (action === 'orders') {
+      modal?.classList.add('hidden');
+      if (typeof openOrderTrackingModal === 'function') openOrderTrackingModal();
+    } else if (action === 'invoices') {
+      modal?.classList.add('hidden');
+      if (typeof openInvoicesModal === 'function') openInvoicesModal();
+    } else if (action === 'dashboard') {
+      modal?.classList.add('hidden');
+      if (typeof renderBusinessDashboard === 'function') renderBusinessDashboard();
+    }
+  };
+
+  window.openSmartAlertsModal = async function() {
+    if (typeof requireAdminPermission === 'function' && !requireAdminPermission('viewSmartAlerts')) return;
+    const modal = document.getElementById('smart-alerts-modal');
+    const list = document.getElementById('smart-alerts-list');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    if (list) list.innerHTML = '<div class="notification-empty">⏳ جارٍ تحديث الفواتير وتحليل حالة المتجر...</div>';
+    try {
+      if (typeof loadInvoicesFromFirestore === 'function') await loadInvoicesFromFirestore();
+    } catch (err) {
+      console.warn('تعذر تحديث الفواتير لمركز التنبيهات الذكية:', err);
+    }
+    renderSmartAlerts();
+  };
+
+  window.closeSmartAlertsModal = function() {
+    document.getElementById('smart-alerts-modal')?.classList.add('hidden');
+  };
+
+  window.refreshSmartAlerts = function() {
+    renderSmartAlerts();
+  };
+
+  document.addEventListener('DOMContentLoaded', function(){
+    setTimeout(updateSmartAlertsBadge, 700);
+  });
+})();
+</script>
+
 </body>
 </html>
