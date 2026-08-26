@@ -1575,6 +1575,18 @@
     color:#92400e;
     font-weight:800;
   }
+  .smart-alerts-view-all-btn {
+    border:1px solid #bae6fd;
+    background:#eff6ff;
+    color:#0369a1;
+    border-radius:12px;
+    padding:8px 11px;
+    font-size:.66rem;
+    font-weight:900;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .smart-alerts-view-all-btn:active { transform:scale(.97); }
   .smart-alerts-summary {
     display:grid;
     grid-template-columns:repeat(3,1fr);
@@ -7096,7 +7108,7 @@
       }).join('') : '<div class="notification-empty">لا توجد منتجات منخفضة المخزون حالياً.</div>';
       document.getElementById('low-stock-modal').classList.remove('hidden');
     }
-    function closeLowStockReport() { document.getElementById('low-stock-modal')?.classList.add('hidden'); }
+    function closeLowStockReport() { document.getElementById('low-stock-modal')?.classList.add('hidden'); if (window.smartAlertsReturnAfterChildClose) { window.smartAlertsReturnAfterChildClose = false; if (typeof returnToSmartAlerts === 'function') returnToSmartAlerts(); } }
 
     async function openAuditLogModal() {
       if (!requireAdminPermission('viewAuditLog')) return;
@@ -7193,7 +7205,7 @@
       const box=document.getElementById('order-tracking-list'); if(box) box.innerHTML='<div class="notification-empty">⏳ جارٍ تحميل الطلبات...</div>';
       await loadInvoicesFromFirestore(); renderOrderTrackingList();
     }
-    function closeOrderTrackingModal(){ document.getElementById('order-tracking-modal')?.classList.add('hidden'); }
+    function closeOrderTrackingModal(){ document.getElementById('order-tracking-modal')?.classList.add('hidden'); if (window.smartAlertsReturnAfterChildClose) { window.smartAlertsReturnAfterChildClose = false; if (typeof returnToSmartAlerts === 'function') returnToSmartAlerts(); } }
     function renderOrderTrackingList(){
       const box=document.getElementById('order-tracking-list'); if(!box)return;
       const q=String(document.getElementById('order-tracking-search')?.value||'').trim().toLowerCase();
@@ -8313,7 +8325,7 @@
       return deleteInvoice(invoiceId, true);
     }
 
-    function closeInvoicesModal() { document.getElementById('invoices-modal').classList.add('hidden'); }
+    function closeInvoicesModal() { document.getElementById('invoices-modal').classList.add('hidden'); if (window.smartAlertsReturnAfterChildClose) { window.smartAlertsReturnAfterChildClose = false; if (typeof returnToSmartAlerts === 'function') returnToSmartAlerts(); } }
 
     function openTopCustomersModal() {
       renderTopCustomersList();
@@ -8770,14 +8782,33 @@
     };
   }
 
+  function getSmartAlertsSeenKeys() {
+    try {
+      const value = JSON.parse(localStorage.getItem('mustaqbal_smart_alerts_seen') || '[]');
+      return Array.isArray(value) ? value.map(String) : [];
+    } catch (e) { return []; }
+  }
+
+  function smartAlertSeenKey(item) {
+    return [item?.type || '', item?.title || '', item?.detail || '', item?.action || ''].join('|');
+  }
+
+  function markSmartAlertsAsSeen(alerts) {
+    const keys = getSmartAlertsSeenKeys();
+    const all = [...new Set(keys.concat((alerts || []).map(smartAlertSeenKey)))];
+    // الاحتفاظ بآخر 500 حالة مشاهدة فقط حتى لا يكبر localStorage بلا داعٍ.
+    localStorage.setItem('mustaqbal_smart_alerts_seen', JSON.stringify(all.slice(-500)));
+  }
+
   function updateSmartAlertsBadge() {
     if (!(typeof isAdmin !== 'undefined' && (isAdmin || loggedAdmin))) return;
     const result = buildSmartAlerts();
+    const seen = getSmartAlertsSeenKeys();
+    const unread = result.alerts.filter(x => x.type !== 'info' && !seen.includes(smartAlertSeenKey(x))).length;
     const badge = document.getElementById('smart-alerts-count-badge');
     if (!badge) return;
-    const total = result.alerts.filter(x => x.type !== 'info').length;
-    badge.textContent = total > 99 ? '99+' : String(total);
-    badge.classList.toggle('hidden', total === 0);
+    badge.textContent = unread > 99 ? '99+' : String(unread);
+    badge.classList.toggle('hidden', unread === 0);
   }
 
   function renderSmartAlerts() {
@@ -8795,9 +8826,12 @@
           <div class="smart-alerts-hero-title">🧠 قراءة سريعة لحالة المتجر</div>
           <div class="smart-alerts-hero-sub">يجمع القسم إشارات من المخزون والطلبات وحالات الدفع ليعرض للمدير ما يحتاج إلى متابعة أولاً.</div>
         </div>
-        <div class="smart-alerts-total">
-          <strong>${total}</strong>
-          <small>تنبيه حالياً</small>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex:none;">
+          <button type="button" class="smart-alerts-view-all-btn" onclick="showAllSmartAlerts()">👁️ مشاهدة الكل</button>
+          <div class="smart-alerts-total">
+            <strong>${total}</strong>
+            <small>تنبيه حالياً</small>
+          </div>
         </div>
       </div>
       <div class="smart-alerts-summary">
@@ -8834,19 +8868,36 @@
     updateSmartAlertsBadge();
   }
 
+  window.showAllSmartAlerts = function() {
+    const result = buildSmartAlerts();
+    // هذا الزر يعني للمدير: تمت مشاهدة جميع التنبيهات الحالية.
+    // لا نحذف التنبيهات من المركز؛ فقط نعتبرها مقروءة حتى لا يظهر عدادها كتنبيهات جديدة.
+    markSmartAlertsAsSeen(result.alerts);
+    renderSmartAlerts();
+    updateSmartAlertsBadge();
+    const list = document.getElementById('smart-alerts-list');
+    if (list) list.scrollIntoView({behavior:'smooth', block:'start'});
+  };
+
   window.handleSmartAlertAction = function(action) {
     const modal = document.getElementById('smart-alerts-modal');
     if (action === 'stock') {
+      if (typeof hasAdminPermission === 'function' && !hasAdminPermission('viewLowStock')) return;
+      window.smartAlertsReturnAfterChildClose = true;
       modal?.classList.add('hidden');
       if (typeof openLowStockReport === 'function') openLowStockReport();
     } else if (action === 'orders') {
+      window.smartAlertsReturnAfterChildClose = true;
       modal?.classList.add('hidden');
       if (typeof openOrderTrackingModal === 'function') openOrderTrackingModal();
     } else if (action === 'invoices') {
+      if (typeof hasAdminPermission === 'function' && !(hasAdminPermission('viewInvoices') || hasAdminPermission('editInvoices') || hasAdminPermission('deleteInvoices'))) return;
+      window.smartAlertsReturnAfterChildClose = true;
       modal?.classList.add('hidden');
       if (typeof openInvoicesModal === 'function') openInvoicesModal();
     } else if (action === 'dashboard') {
-      modal?.classList.add('hidden');
+      // لا نغلق مركز التنبيهات هنا؛ لوحة المؤشرات ليست نافذة فرعية،
+      // فيبقى المركز أمام المدير ويمكنه الاستمرار في استخدامه.
       if (typeof renderBusinessDashboard === 'function') renderBusinessDashboard();
     }
   };
@@ -8868,6 +8919,13 @@
 
   window.closeSmartAlertsModal = function() {
     document.getElementById('smart-alerts-modal')?.classList.add('hidden');
+  };
+
+  window.returnToSmartAlerts = function() {
+    const modal = document.getElementById('smart-alerts-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    renderSmartAlerts();
   };
 
   window.refreshSmartAlerts = function() {
