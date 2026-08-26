@@ -2308,7 +2308,7 @@
               onclick="markAllInvoicesAsReadByCurrentAdmin()"
               title="اعتبار جميع الفواتير الحالية كمقروءة"
               aria-label="اعتبار جميع الفواتير كمقروءة"
-              style="border:1px solid #bae6fd;background:#f0f9ff;color:#0369a1;border-radius:9px;padding:4px 7px;font-size:.64rem;font-weight:900;cursor:pointer;white-space:nowrap;line-height:1.2;">
+              style="display:none;border:1px solid #bae6fd;background:#f0f9ff;color:#0369a1;border-radius:9px;padding:4px 7px;font-size:.64rem;font-weight:900;cursor:pointer;white-space:nowrap;line-height:1.2;">
               ✓ مشاهدة الكل
             </button>
           </div>
@@ -3252,7 +3252,7 @@
               invoices.unshift(data);
             }
 
-            invoices.sort((a, b) => String(b.id).localeCompare(String(a.id)));
+            invoices.sort((a, b) => getInvoiceCreatedTime(b) - getInvoiceCreatedTime(a) || String(b.id).localeCompare(String(a.id)));
             localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
             updateUnreadInvoicesBadge();
 
@@ -7765,6 +7765,13 @@
         return requireAdminPermission('viewInvoices');
       }
       document.getElementById('invoices-modal').classList.remove('hidden');
+
+      // زر "مشاهدة الكل" خاص بالمدير فقط، ولا يظهر للزبون أو المندوب.
+      const markAllBtn = document.getElementById('mark-all-invoices-read-btn');
+      if (markAllBtn) {
+        markAllBtn.style.display = (isAdmin || loggedAdmin) ? 'inline-flex' : 'none';
+      }
+
       await loadInvoicesFromFirestore();
       renderInvoicesList();
       updateUnreadInvoicesBadge();
@@ -7778,16 +7785,21 @@
 
       let visibleInvoices = [];
       const activeInvoices = getActiveInvoices();
+
       if (loggedCustomer) {
-        visibleInvoices = activeInvoices.filter(inv => inv.customer && inv.customer.username === 'زبون: ' + loggedCustomer.username);
+        // ownerUid هو مصدر الملكية الموثوق في Firestore؛ لا نعتمد على
+        // customer.username حتى لا تختفي الفواتير القديمة بسبب اختلاف صيغة الاسم.
+        // نعرض أيضاً الفواتير المؤرشفة التي تخص الحساب، لأنها جزء من سجل المستخدم الكامل.
+        visibleInvoices = (invoices || []).slice();
         if (titleContainer) titleContainer.innerText = 'سجل فواتيري السابقة';
       } else if (loggedDelegate) {
-        visibleInvoices = activeInvoices.filter(inv =>
-          inv.delegateUsername === loggedDelegate.username ||
-          (inv.customer && inv.customer.username === 'مندوب: ' + loggedDelegate.username)
-        );
+        // جميع الفواتير التي تم تحميلها هنا تخص ownerUid للمندوب الحالي.
+        // لا نعيد ترشيحها بواسطة delegateUsername/customer.username حتى لا تختفي
+        // الفواتير القديمة التي تختلف فيها صيغة هذه الحقول.
+        visibleInvoices = (invoices || []).slice();
         if (titleContainer) titleContainer.innerText = 'سجل فواتير الزبائن الخاصة بي';
       } else if (isAdmin || loggedAdmin) {
+        // المدير يرى الفواتير النشطة هنا، والمؤرشفة لها قسم مستقل.
         visibleInvoices = activeInvoices;
         if (titleContainer) titleContainer.innerText = 'سجل جميع الفواتير السابقة للزبائن والمندوبين';
       }
@@ -7807,7 +7819,7 @@
         const customer = inv.customer || {};
         div.innerHTML = `
           <div style="min-width:0;">
-            <div style="font-weight:700; color:var(--primary-dark);">فاتورة: ${escapeHtml(inv.id)} ${isUnreadForAdmin ? '<span style="display:inline-flex;align-items:center;justify-content:center;background:#ef4444;color:#fff;border-radius:999px;padding:2px 7px;font-size:.62rem;margin-right:5px;">جديدة</span>' : ''}</div>
+            <div style="font-weight:700; color:var(--primary-dark);">فاتورة: ${escapeHtml(inv.id)} ${isInvoiceArchived(inv) ? '<span style="display:inline-flex;align-items:center;justify-content:center;background:#e2e8f0;color:#475569;border-radius:999px;padding:2px 7px;font-size:.62rem;margin-right:5px;">مؤرشفة</span>' : ''} ${isUnreadForAdmin ? '<span style="display:inline-flex;align-items:center;justify-content:center;background:#ef4444;color:#fff;border-radius:999px;padding:2px 7px;font-size:.62rem;margin-right:5px;">جديدة</span>' : ''}</div>
             <div style="color:var(--text-muted); font-size:0.75rem;">الزبون: ${escapeHtml(customer.name || 'غير محدد')} | التاريخ: ${escapeHtml(inv.date || '')}</div>
             <div style="font-weight:bold; margin-top:2px;">المجموع: ${formatPrice(inv.total)} د.ع</div>
           </div>
