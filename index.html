@@ -5302,6 +5302,11 @@
     let currentImageData = "";
 
     document.addEventListener('DOMContentLoaded', async () => {
+      // قبل استعادة أي جلسة محفوظة، نتحقق من أن حساب المدير ما زال موجوداً في Firestore.
+      // إذا كان الحساب (مثل adm) قد حُذف من لوحة المدير، ننظف الجلسة القديمة
+      // من الجهاز وFirebase Authentication حتى لا تظهر رسالة "تعذر العثور على حساب المدير".
+      await validateStoredAdminSession();
+
       // نحدد الجلسة أولاً حتى لا نبدأ أي مستمع Firestore إذا لم يوجد مستخدم مسجل.
       checkInitialSessionState();
       await refreshOnLoginData();
@@ -5337,12 +5342,88 @@
       updateUnreadInvoicesBadge();
     });
 
+    async function validateStoredAdminSession() {
+      // جلسة مدير محفوظة محلياً قد تكون لحساب حُذف لاحقاً من adminAccounts.
+      // لا نثق بها قبل التحقق من Firestore.
+      if (!loggedAdmin || !loggedAdmin.username) {
+        // إذا بقيت راية المدير الرئيسية فقط بدون جلسة صالحة، لا نعتبر المستخدم مسجلاً.
+        if (localStorage.getItem('isAdmin') === 'true' && !auth.currentUser) {
+          localStorage.setItem('isAdmin', 'false');
+          isAdmin = false;
+        }
+        return false;
+      }
+
+      const username = String(loggedAdmin.username || '').trim();
+      if (!username) {
+        clearStaleAdminSession();
+        return false;
+      }
+
+      try {
+        const snap = await db.collection('adminAccounts').doc(username).get({ source: 'server' });
+
+        if (!snap.exists) {
+          // الحساب حُذف فعلاً من قاعدة البيانات. ننظف كل آثار الجلسة القديمة.
+          clearStaleAdminSession();
+          return false;
+        }
+
+        const serverData = snap.data() || {};
+
+        // إذا كان الحساب موجوداً لكن تم تغيير اسم المستخدم، نعتبر الجلسة القديمة منتهية.
+        if (String(serverData.username || username) !== username) {
+          clearStaleAdminSession();
+          return false;
+        }
+
+        // نحدّث بيانات الجلسة من الخادم حتى لا نبقى على نسخة قديمة في localStorage.
+        const normalized = normalizeAdminAccount(Object.assign({}, serverData, {
+          authUid: loggedAdmin.authUid || serverData.authUid || '',
+          authEmail: loggedAdmin.authEmail || serverData.authEmail || ''
+        }));
+        normalized.authUid = loggedAdmin.authUid || serverData.authUid || '';
+        normalized.authEmail = loggedAdmin.authEmail || serverData.authEmail || '';
+        loggedAdmin = normalized;
+        localStorage.setItem('loggedAdmin', JSON.stringify(loggedAdmin));
+        adminSessionToken = String(loggedAdmin.sessionToken || adminSessionToken || '');
+        if (adminSessionToken) {
+          localStorage.setItem('mustaqbal_admin_session_token', adminSessionToken);
+        }
+        return true;
+      } catch (err) {
+        // عند تعذر الاتصال لا نحذف الجلسة مباشرة، حتى لا يتم تسجيل المستخدم
+        // خارج النظام بسبب انقطاع مؤقت في الشبكة.
+        console.error('تعذر التحقق من جلسة المدير المحفوظة:', err);
+        return true;
+      }
+    }
+
+    function clearStaleAdminSession() {
+      stopAdminSessionMonitor();
+      loggedAdmin = null;
+      adminSessionToken = '';
+      isAdmin = false;
+      localStorage.removeItem('loggedAdmin');
+      localStorage.removeItem('mustaqbal_admin_session_token');
+      localStorage.setItem('isAdmin', 'false');
+
+      // Firebase Authentication قد يحتفظ بجلسة الحساب المحذوف، لذلك يجب إنهاؤها أيضاً.
+      try {
+        if (auth.currentUser) {
+          auth.signOut().catch(() => {});
+        }
+      } catch (_) {}
+    }
+
     function checkInitialSessionState() {
       if (loggedAdmin) {
-        isAdmin = String(loggedAdmin.username || '') === 'admin';
+        isAdmin = String(loggedAdmin.username || '').toLowerCase() === 'admin';
         startAdminSessionMonitor();
       } else {
-        isAdmin = localStorage.getItem('isAdmin') === 'true';
+        // لا نسمح لبقايا isAdmin القديمة بإظهار لوحة المدير بدون جلسة مدير فعلية.
+        isAdmin = false;
+        localStorage.setItem('isAdmin', 'false');
       }
       const displaySpan = document.getElementById('logged-user-display');
       const logoutBtn = document.getElementById('logout-btn');
@@ -5742,8 +5823,17 @@
 
         let sessionData;
         if (signedInRole === 'admin') {
-          const adminDoc = await db.collection('adminAccounts').doc(u).get();
-          if (!adminDoc.exists) { await auth.signOut(); alert('تعذر العثور على حساب المدير.'); return; }
+          const adminDoc = await db.collection('adminAccounts').doc(u).get({ source: 'server' });
+          if (!adminDoc.exists) {
+            // الحساب موجود في Firebase Authentication/userProfiles لكنه حُذف من adminAccounts.
+            // ننهي الجلسة القديمة وننظف بياناتها بدلاً من إبقاء المستخدم عالقاً في الخطأ.
+            try { await auth.signOut(); } catch (_) {}
+            if (loggedAdmin && String(loggedAdmin.username || '') === String(u)) {
+              clearStaleAdminSession();
+            }
+            alert('هذا الحساب الإداري لم يعد موجوداً في النظام. يرجى تسجيل الدخول بحساب صالح.');
+            return;
+          }
           sessionData = Object.assign({}, adminDoc.data() || {}, {authUid:firebaseUser.uid, authEmail:firebaseUser.email || legacyAuthEmail(u,'admin'), deviceId});
           if (String(u).toLowerCase() !== 'admin') {
             adminSessionToken=createExclusiveSessionToken('adm');
@@ -5985,9 +6075,11 @@
       adminForceLogoutUnsubscribe = ref.onSnapshot((doc) => {
         if (!loggedAdmin) return;
         if (!doc.exists) {
+          // تم حذف الحساب من adminAccounts. لا نترك الجلسة القديمة فعالة.
           if (String(username).toLowerCase() !== 'admin') {
-            alert('تم تعديل اسم مستخدم حساب المدير الفرعي من قبل المدير الرئيسي، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول بالمعلومات الجديدة.');
             forceLogoutAdminLocal();
+          } else {
+            clearStaleAdminSession();
           }
           return;
         }
