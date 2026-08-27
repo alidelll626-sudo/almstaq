@@ -2933,86 +2933,26 @@
   </div>
 </div>
 
-
 <script>
-/* =====================================================
-   حماية التطبيق عند انقطاع الإنترنت
-   - تراقب انقطاع/عودة الاتصال
-   - تمنع الضغطات على عناصر التطبيق أثناء عدم الاتصال
-   - تسمح بزر "موافق" الخاص بتنبيه التطبيق بالإغلاق
-   ===================================================== */
 (function () {
-  var offlineMessage =
-    '📡 أنت غير متصل بالإنترنت\n\n' +
-    'يرجى التحقق من اتصالك بالإنترنت ثم المحاولة مرة أخرى.';
-
-  var isOffline = !navigator.onLine;
-  var lastOfflineAlertAt = 0;
-
-  function showOfflineAlert() {
+  var lastOfflineNotice = 0;
+  function showOffline() {
     var now = Date.now();
-    if (now - lastOfflineAlertAt < 900) return;
-    lastOfflineAlertAt = now;
-    window.alert(offlineMessage);
+    if (now - lastOfflineNotice < 1000) return;
+    lastOfflineNotice = now;
+    window.alert('📡 أنت غير متصل بالإنترنت\n\nيرجى التحقق من اتصالك بالإنترنت ثم المحاولة مرة أخرى.');
   }
-
-  function refreshConnectionState() {
-    isOffline = !navigator.onLine;
-  }
-
-  window.addEventListener('offline', function () {
-    isOffline = true;
-  });
-
-  window.addEventListener('online', function () {
-    isOffline = false;
-  });
-
-  document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) refreshConnectionState();
-  });
-
-  window.addEventListener('focus', refreshConnectionState);
-  window.addEventListener('pageshow', refreshConnectionState);
-
-  document.addEventListener('click', function (event) {
-    refreshConnectionState();
-
-    if (!isOffline) return;
-
-    var target = event.target;
-    if (!target || !target.closest) return;
-
-    // السماح بالتفاعل مع نافذة التنبيه نفسها.
-    if (target.closest('#mustaqbal-app-alert')) return;
-
-    // اعتراض العناصر التفاعلية فقط حتى لا يتأثر التمرير أو اختيار النص.
-    var interactive = target.closest(
-      'button, a, input[type="button"], input[type="submit"], input[type="reset"], ' +
-      '[role="button"], [onclick]'
-    );
-
-    if (!interactive) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation();
-
-    showOfflineAlert();
+  document.addEventListener('click', function (e) {
+    if (navigator.onLine !== false) return;
+    var t = e.target;
+    if (!t || !t.closest || t.closest('#mustaqbal-app-alert')) return;
+    if (!t.closest('button,a,input[type="button"],input[type="submit"],input[type="reset"],[role="button"],[onclick]')) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    showOffline();
   }, true);
-
-  // متاح للدوال التي تريد فحص الاتصال يدويًا قبل تنفيذ عمليات حساسة.
-  window.requireInternetConnection = function () {
-    refreshConnectionState();
-    if (isOffline) {
-      showOfflineAlert();
-      return false;
-    }
-    return true;
-  };
 })();
 </script>
-
 <script>
 (function () {
   function initMustaqbalAlert() {
@@ -6858,7 +6798,8 @@
         }
 
         const usernameChanged = !!old && String(old.username) !== username;
-        const passwordChanged = !!old && String(old.password) !== password;
+        const oldPasswordForAuth = String(old?.password || password);
+        const passwordChanged = !!old && String(oldPasswordForAuth) !== password;
         const now = Date.now();
 
         const account = normalizeAdminAccount({
@@ -6880,7 +6821,7 @@
           const uid = await migrateLegacyAccountToAuth(username, password, 'admin', account);
           authInfo = { uid, email: legacyAuthEmail(username, 'admin') };
         } else if (usernameChanged || passwordChanged) {
-          authInfo = await syncLegacyAuthCredentials(old.username, old.password, username, password, 'admin', account);
+          authInfo = await syncLegacyAuthCredentials(old.username, oldPasswordForAuth, username, password, 'admin', account);
         } else {
           authInfo = { uid: old.authUid || null, email: old.authEmail || null };
         }
@@ -7021,7 +6962,8 @@
         }
 
         const usernameChanged = !!oldDel && String(oldDel.username) !== username;
-        const passwordChanged = !!oldDel && String(oldDel.password) !== password;
+        const oldPasswordForAuth = String(oldDel?.password || password);
+        const passwordChanged = !!oldDel && String(oldPasswordForAuth) !== password;
         const now = Date.now();
 
         const delData = {
@@ -7042,7 +6984,7 @@
           const uid = await migrateLegacyAccountToAuth(username, password, 'delegate', delData);
           authInfo = { uid, email: legacyAuthEmail(username, 'delegate') };
         } else if (usernameChanged || passwordChanged) {
-          authInfo = await syncLegacyAuthCredentials(oldDel.username, oldDel.password, username, password, 'delegate', delData);
+          authInfo = await syncLegacyAuthCredentials(oldDel.username, oldPasswordForAuth, username, password, 'delegate', delData);
         } else {
           authInfo = { uid: oldDel.authUid || null, email: oldDel.authEmail || null };
         }
@@ -7080,7 +7022,7 @@
       if (!del) return;
       document.getElementById('edit-del-username-flag').value = del.username;
       document.getElementById('new-del-username').value = del.username;
-      document.getElementById('new-del-password').value = del.password;
+      document.getElementById('new-del-password').value = del.password || '';
       document.getElementById('new-del-fullname').value = del.fullname || '';
       document.getElementById('save-delegate-btn').innerText = 'تحديث المندوب';
     }
@@ -7382,7 +7324,8 @@
         }
 
         const usernameChanged = !!oldCust && String(oldCust.username) !== username;
-        const passwordChanged = !!oldCust && String(oldCust.password) !== password;
+        const oldPasswordForAuth = String(oldCust?.password || password);
+        const passwordChanged = !!oldCust && String(oldPasswordForAuth) !== password;
         const now = Date.now();
 
         const custData = {
@@ -7402,7 +7345,7 @@
           const uid = await migrateLegacyAccountToAuth(username, password, 'customer', custData);
           authInfo = { uid, email: legacyAuthEmail(username, 'customer') };
         } else if (usernameChanged || passwordChanged) {
-          authInfo = await syncLegacyAuthCredentials(oldCust.username, oldCust.password, username, password, 'customer', custData);
+          authInfo = await syncLegacyAuthCredentials(oldCust.username, oldPasswordForAuth, username, password, 'customer', custData);
         } else {
           authInfo = { uid: oldCust.authUid || null, email: oldCust.authEmail || null };
         }
@@ -7439,7 +7382,7 @@
       if (!cust) return;
       document.getElementById('edit-cust-username-flag').value = cust.username;
       document.getElementById('new-cust-username').value = cust.username;
-      document.getElementById('new-cust-password').value = cust.password;
+      document.getElementById('new-cust-password').value = cust.password || '';
       document.getElementById('new-cust-fullname').value = cust.fullname || '';
       document.getElementById('new-cust-discount').value = cust.discount || 0;
       document.getElementById('save-customer-btn').innerText = 'تحديث الزبون';
