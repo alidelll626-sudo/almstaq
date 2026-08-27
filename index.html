@@ -4998,82 +4998,134 @@
 
     function monitorActiveSession() {
       if (activeSessionUnsubscribe) {
-        activeSessionUnsubscribe();
+        try { activeSessionUnsubscribe(); } catch (_) {}
         activeSessionUnsubscribe = null;
       }
 
+      // مهم: عند انقطاع الإنترنت قد يعيد Firestore نتيجة من الكاش،
+      // وقد تكون الوثيقة غير موجودة في الكاش حتى لو كانت موجودة على الخادم.
+      // لذلك لا يجوز اعتبار !doc.exists دليلاً على حذف الحساب إلا بعد
+      // الحصول على نتيجة من الخادم (fromCache === false) ومع وجود اتصال فعلي.
+      const isAuthoritativeSnapshot = (snapshot) => {
+        try {
+          return navigator.onLine !== false && snapshot && snapshot.metadata && snapshot.metadata.fromCache === false;
+        } catch (_) {
+          return false;
+        }
+      };
+
+      const handleMissingAccount = (role) => {
+        // لا نخرج المستخدم أثناء عدم الاتصال أو عند نتيجة Cache غير مؤكدة.
+        console.warn(`تعذر التحقق من وجود حساب ${role} حالياً؛ لن يتم تسجيل الخروج دون نتيجة مؤكدة من الخادم.`);
+      };
+
       if (loggedCustomer) {
         activeSessionUnsubscribe = db.collection('customers').doc(String(loggedCustomer.username)).onSnapshot(doc => {
-          if (doc.exists) {
-            const data = doc.data();
-            if (data.sessionToken && String(data.sessionToken) !== String(loggedCustomer.sessionToken || '')) {
-              // لا نعتمد على deviceId القديم. نظام الجلسة الموحد يعتمد على
-              // sessionDeviceId مع sessionToken فقط.
-              if (String(data.sessionDeviceId || '') !== String(deviceId)) {
-                alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو تطبيق آخر!');
-                handleLogout();
-                return;
-              }
-            }
-            if (data.sessionDeviceId && String(data.sessionDeviceId) !== String(deviceId)) {
-              alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر!');
-              handleLogout();
+          if (!loggedCustomer) return;
+
+          if (!doc.exists) {
+            if (!isAuthoritativeSnapshot(doc)) {
+              handleMissingAccount('الزبون');
               return;
             }
-            // أي تعديل من المدير الرئيسي على حساب الزبون (الاسم، كلمة السر،
-            // الخصم أو اسم المستخدم) يلغي الجلسة الحالية فوراً.
-            if (
-              Number(data.forceLogoutAt || 0) > Number(loggedCustomer.forceLogoutAt || 0) ||
-              data.password !== loggedCustomer.password || 
-              data.discount !== loggedCustomer.discount || 
-              data.fullname !== loggedCustomer.fullname ||
-              data.username !== loggedCustomer.username
-            ) {
-              alert('تم تعديل معلومات حسابك من قبل المدير الرئيسي، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول مرة أخرى بالمعلومات الجديدة.');
-              handleLogout();
-              return;
-            }
-          } else {
+
             alert('تم حذف هذا الحساب من قبل إدارة المتجر.');
             handleLogout();
+            return;
           }
+
+          const data = doc.data() || {};
+          if (data.sessionToken && String(data.sessionToken) !== String(loggedCustomer.sessionToken || '')) {
+            // لا نعتمد على deviceId القديم. نظام الجلسة الموحد يعتمد على
+            // sessionDeviceId مع sessionToken فقط.
+            if (String(data.sessionDeviceId || '') !== String(deviceId)) {
+              alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو تطبيق آخر!');
+              handleLogout();
+              return;
+            }
+          }
+          if (data.sessionDeviceId && String(data.sessionDeviceId) !== String(deviceId)) {
+            alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر!');
+            handleLogout();
+            return;
+          }
+
+          // لا نطبق تغييرات الحساب إلا من Snapshot موثوق من الخادم.
+          // أثناء انقطاع الإنترنت يجب إبقاء الجلسة الحالية كما هي.
+          if (!isAuthoritativeSnapshot(doc)) return;
+
+          if (
+            Number(data.forceLogoutAt || 0) > Number(loggedCustomer.forceLogoutAt || 0) ||
+            data.password !== loggedCustomer.password ||
+            data.discount !== loggedCustomer.discount ||
+            data.fullname !== loggedCustomer.fullname ||
+            data.username !== loggedCustomer.username
+          ) {
+            alert('تم تعديل معلومات حسابك من قبل المدير الرئيسي، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول بالمعلومات الجديدة.');
+            handleLogout();
+            return;
+          }
+        }, (err) => {
+          // أخطاء الشبكة لا تعني حذف الحساب ولا يجب أن تنهي الجلسة.
+          console.warn('تعذر التحقق من جلسة الزبون حالياً؛ تم الإبقاء على الجلسة بسبب خطأ اتصال:', err);
         });
       } else if (loggedDelegate) {
         activeSessionUnsubscribe = db.collection('delegates').doc(String(loggedDelegate.username)).onSnapshot(doc => {
-          if (doc.exists) {
-            const data = doc.data();
-            if (data.sessionToken && String(data.sessionToken) !== String(loggedDelegate.sessionToken || '')) {
-              // لا نعتمد على deviceId القديم. نظام الجلسة الموحد يعتمد على
-              // sessionDeviceId مع sessionToken فقط.
-              if (String(data.sessionDeviceId || '') !== String(deviceId)) {
-                alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو تطبيق آخر!');
-                handleLogout();
-                return;
-              }
-            }
-            if (data.sessionDeviceId && String(data.sessionDeviceId) !== String(deviceId)) {
-              alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر!');
-              handleLogout();
+          if (!loggedDelegate) return;
+
+          if (!doc.exists) {
+            if (!isAuthoritativeSnapshot(doc)) {
+              handleMissingAccount('المندوب');
               return;
             }
-            // أي تعديل من المدير الرئيسي على حساب المندوب يلغي الجلسة الحالية فوراً.
-            if (
-              Number(data.forceLogoutAt || 0) > Number(loggedDelegate.forceLogoutAt || 0) ||
-              data.password !== loggedDelegate.password || 
-              data.fullname !== loggedDelegate.fullname ||
-              data.username !== loggedDelegate.username
-            ) {
-              alert('تم تعديل معلومات حسابك من قبل المدير الرئيسي، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول مرة أخرى بالمعلومات الجديدة.');
-              handleLogout();
-              return;
-            }
-          } else {
+
             alert('تم حذف هذا الحساب من قبل إدارة المتجر.');
             handleLogout();
+            return;
           }
+
+          const data = doc.data() || {};
+          if (data.sessionToken && String(data.sessionToken) !== String(loggedDelegate.sessionToken || '')) {
+            // لا نعتمد على deviceId القديم. نظام الجلسة الموحد يعتمد على
+            // sessionDeviceId مع sessionToken فقط.
+            if (String(data.sessionDeviceId || '') !== String(deviceId)) {
+              alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو تطبيق آخر!');
+              handleLogout();
+              return;
+            }
+          }
+          if (data.sessionDeviceId && String(data.sessionDeviceId) !== String(deviceId)) {
+            alert('تم تسجيل الدخول إلى هذا الحساب من جهاز أو متصفح آخر!');
+            handleLogout();
+            return;
+          }
+
+          // لا نطبق تغييرات الحساب إلا من Snapshot موثوق من الخادم.
+          if (!isAuthoritativeSnapshot(doc)) return;
+
+          if (
+            Number(data.forceLogoutAt || 0) > Number(loggedDelegate.forceLogoutAt || 0) ||
+            data.password !== loggedDelegate.password ||
+            data.fullname !== loggedDelegate.fullname ||
+            data.username !== loggedDelegate.username
+          ) {
+            alert('تم تعديل معلومات حسابك من قبل المدير الرئيسي، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول مرة أخرى بالمعلومات الجديدة.');
+            handleLogout();
+            return;
+          }
+        }, (err) => {
+          // أخطاء الشبكة لا تعني حذف الحساب ولا يجب أن تنهي الجلسة.
+          console.warn('تعذر التحقق من جلسة المندوب حالياً؛ تم الإبقاء على الجلسة بسبب خطأ اتصال:', err);
         });
       }
     }
+
+    // عند عودة الإنترنت، نعيد تشغيل مراقبة الجلسة حتى يتم التحقق من الخادم
+    // فوراً دون إجبار المستخدم على تسجيل الدخول من جديد.
+    window.addEventListener('online', () => {
+      console.log('تمت استعادة الاتصال بالإنترنت؛ إعادة التحقق من جلسة الحساب.');
+      if (loggedCustomer || loggedDelegate) monitorActiveSession();
+    });
 
     async function refreshAppData() {
       try {
@@ -6992,11 +7044,60 @@
 
     async function deleteDelegate(username) {
       if (!requireAdminPermission('deleteDelegates')) return;
-      if (confirm('تأكيد حذف حساب المندوب؟')) {
-        delegates = delegates.filter(d => d.username !== username);
-        try { await db.collection('delegates').doc(String(username)).delete(); } catch(err){}
+      if (!confirm('تأكيد حذف حساب المندوب نهائياً؟\nسيتم حذف حساب تسجيل الدخول وملف المستخدم وبيانات الحساب من السحابة.')) return;
+
+      const key = String(username || '').trim();
+      if (!key) return alert('اسم المستخدم غير صالح.');
+
+      try {
+        const ref = db.collection('delegates').doc(key);
+        const snap = await ref.get({ source: 'server' });
+        if (!snap.exists) {
+          alert('حساب المندوب غير موجود في السحابة.');
+          return;
+        }
+
+        const data = snap.data() || {};
+        const authUid = String(data.authUid || '').trim();
+        const authEmail = String(data.authEmail || '').trim() || legacyAuthEmail(key, 'delegate');
+        const password = String(data.password || '');
+
+        if (!authUid || !password) {
+          alert('لا يمكن حذف حساب Authentication لهذا المندوب بأمان لأن بيانات الربط أو كلمة المرور غير موجودة. لم يتم حذف سجل المندوب.');
+          console.error('Delegate deletion blocked: missing authUid/password', { username: key, authUid: !!authUid, password: !!password });
+          return;
+        }
+
+        const authPassword = await legacyAuthPassword(password);
+        const secondaryName = 'deleteDelegate_' + key.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
+        let secondaryApp;
+        try { secondaryApp = firebase.app(secondaryName); }
+        catch (_) { secondaryApp = firebase.initializeApp(firebaseConfig, secondaryName); }
+        const secondaryAuth = secondaryApp.auth();
+
+        try {
+          const credential = await secondaryAuth.signInWithEmailAndPassword(authEmail, authPassword);
+          if (credential.user.uid !== authUid) {
+            throw new Error('auth-uid-mismatch');
+          }
+          await credential.user.delete();
+        } finally {
+          try { await secondaryAuth.signOut(); } catch (_) {}
+          try { await secondaryApp.delete(); } catch (_) {}
+        }
+
+        try { await db.collection('userProfiles').doc(authUid).delete(); }
+        catch (profileErr) { console.warn('تعذر حذف userProfiles للمندوب:', profileErr); }
+
+        await ref.delete();
+
+        delegates = delegates.filter(d => String(d.username) !== key);
         saveData();
         renderAdminDelegatesList();
+        alert('تم حذف حساب المندوب من Authentication وFirestore بنجاح.');
+      } catch (err) {
+        console.error('تعذر حذف حساب المندوب بالكامل:', err);
+        alert('تعذر حذف حساب المندوب بالكامل. لم يتم حذف سجل Firestore حتى لا يبقى الحساب غير متناسق.');
       }
     }
 
@@ -7303,11 +7404,66 @@
 
     async function deleteCustomer(username) {
       if (!requireAdminPermission('deleteCustomers')) return;
-      if (confirm('تأكيد حذف حساب الزبون؟')) {
-        customers = customers.filter(c => c.username !== username);
-        try { await db.collection('customers').doc(String(username)).delete(); } catch(err){}
+      if (!confirm('تأكيد حذف حساب الزبون نهائياً؟\nسيتم حذف حساب تسجيل الدخول وملف المستخدم وبيانات الحساب من السحابة.')) return;
+
+      const key = String(username || '').trim();
+      if (!key) return alert('اسم المستخدم غير صالح.');
+
+      try {
+        // نقرأ السجل من Firestore أولاً للحصول على UID والبريد وكلمة المرور القديمة.
+        // نحتاج ذلك لأن Firebase Authentication لا يمكن حذف مستخدم آخر منه مباشرةً
+        // من جلسة المدير الرئيسية إلا بعد تسجيل الدخول بالحساب المراد حذفه عبر تطبيق ثانوي.
+        const ref = db.collection('customers').doc(key);
+        const snap = await ref.get({ source: 'server' });
+        if (!snap.exists) {
+          alert('حساب الزبون غير موجود في السحابة.');
+          return;
+        }
+
+        const data = snap.data() || {};
+        const authUid = String(data.authUid || '').trim();
+        const authEmail = String(data.authEmail || '').trim() || legacyAuthEmail(key, 'customer');
+        const password = String(data.password || '');
+
+        if (!authUid || !password) {
+          alert('لا يمكن حذف حساب Authentication لهذا الزبون بأمان لأن بيانات الربط أو كلمة المرور غير موجودة. لم يتم حذف سجل الزبون.');
+          console.error('Customer deletion blocked: missing authUid/password', { username: key, authUid: !!authUid, password: !!password });
+          return;
+        }
+
+        // حذف Authentication أولاً. إذا فشل، لا نحذف سجل Firestore حتى لا تصبح
+        // البيانات غير متناسقة ولا نظهر للمدير رسالة نجاح غير صحيحة.
+        const authPassword = await legacyAuthPassword(password);
+        const secondaryName = 'deleteCustomer_' + key.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
+        let secondaryApp;
+        try { secondaryApp = firebase.app(secondaryName); }
+        catch (_) { secondaryApp = firebase.initializeApp(firebaseConfig, secondaryName); }
+        const secondaryAuth = secondaryApp.auth();
+
+        try {
+          const credential = await secondaryAuth.signInWithEmailAndPassword(authEmail, authPassword);
+          if (credential.user.uid !== authUid) {
+            throw new Error('auth-uid-mismatch');
+          }
+          await credential.user.delete();
+        } finally {
+          try { await secondaryAuth.signOut(); } catch (_) {}
+          try { await secondaryApp.delete(); } catch (_) {}
+        }
+
+        // بعد نجاح حذف Authentication نحذف ملف الربط ثم سجل الحساب.
+        try { await db.collection('userProfiles').doc(authUid).delete(); }
+        catch (profileErr) { console.warn('تعذر حذف userProfiles للزبون:', profileErr); }
+
+        await ref.delete();
+
+        customers = customers.filter(c => String(c.username) !== key);
         saveData();
         renderAdminCustomersList();
+        alert('تم حذف حساب الزبون من Authentication وFirestore بنجاح.');
+      } catch (err) {
+        console.error('تعذر حذف حساب الزبون بالكامل:', err);
+        alert('تعذر حذف حساب الزبون بالكامل. لم يتم حذف سجل Firestore حتى لا يبقى الحساب غير متناسق.');
       }
     }
 
