@@ -2937,66 +2937,75 @@
 <script>
 /* =====================================================
    حماية التطبيق عند انقطاع الإنترنت
-   لا تغيّر منطق الحسابات أو كلمات المرور
+   - تراقب انقطاع/عودة الاتصال
+   - تمنع الضغطات على عناصر التطبيق أثناء عدم الاتصال
+   - تسمح بزر "موافق" الخاص بتنبيه التطبيق بالإغلاق
    ===================================================== */
 (function () {
-  var offlineAlertOpen = false;
+  var offlineMessage =
+    '📡 أنت غير متصل بالإنترنت\n\n' +
+    'يرجى التحقق من اتصالك بالإنترنت ثم المحاولة مرة أخرى.';
 
-  function appIsOffline() {
-    return navigator.onLine === false;
+  var isOffline = !navigator.onLine;
+  var lastOfflineAlertAt = 0;
+
+  function showOfflineAlert() {
+    var now = Date.now();
+    if (now - lastOfflineAlertAt < 900) return;
+    lastOfflineAlertAt = now;
+    window.alert(offlineMessage);
   }
 
-  function showOfflineMessage() {
-    if (offlineAlertOpen) return;
-    offlineAlertOpen = true;
-
-    window.alert(
-      '📡 أنت غير متصل بالإنترنت\n\n' +
-      'يرجى التحقق من اتصالك بالإنترنت ثم المحاولة مرة أخرى.'
-    );
-
-    setTimeout(function () {
-      offlineAlertOpen = false;
-    }, 800);
+  function refreshConnectionState() {
+    isOffline = !navigator.onLine;
   }
 
-  function checkConnection() {
-    return !appIsOffline();
-  }
-
-  window.addEventListener('offline', function () {});
-  window.addEventListener('online', function () {});
-  window.addEventListener('focus', checkConnection);
-  window.addEventListener('pageshow', checkConnection);
-  document.addEventListener('visibilitychange', function () {
-    if (!document.hidden) checkConnection();
+  window.addEventListener('offline', function () {
+    isOffline = true;
   });
 
+  window.addEventListener('online', function () {
+    isOffline = false;
+  });
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) refreshConnectionState();
+  });
+
+  window.addEventListener('focus', refreshConnectionState);
+  window.addEventListener('pageshow', refreshConnectionState);
+
   document.addEventListener('click', function (event) {
-    if (!appIsOffline()) return;
+    refreshConnectionState();
+
+    if (!isOffline) return;
 
     var target = event.target;
     if (!target || !target.closest) return;
 
-    // لا نعترض عناصر نافذة التنبيه نفسها
+    // السماح بالتفاعل مع نافذة التنبيه نفسها.
     if (target.closest('#mustaqbal-app-alert')) return;
 
+    // اعتراض العناصر التفاعلية فقط حتى لا يتأثر التمرير أو اختيار النص.
     var interactive = target.closest(
-      'button, a, input[type="button"], input[type="submit"], ' +
-      'input[type="reset"], [role="button"], [onclick]'
+      'button, a, input[type="button"], input[type="submit"], input[type="reset"], ' +
+      '[role="button"], [onclick]'
     );
 
     if (!interactive) return;
 
     event.preventDefault();
+    event.stopPropagation();
     event.stopImmediatePropagation();
-    showOfflineMessage();
+
+    showOfflineAlert();
   }, true);
 
-  // يمكن للدوال الداخلية استعمال هذا الفحص عند الحاجة
+  // متاح للدوال التي تريد فحص الاتصال يدويًا قبل تنفيذ عمليات حساسة.
   window.requireInternetConnection = function () {
-    if (appIsOffline()) {
-      showOfflineMessage();
+    refreshConnectionState();
+    if (isOffline) {
+      showOfflineAlert();
       return false;
     }
     return true;
