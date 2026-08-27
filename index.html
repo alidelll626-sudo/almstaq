@@ -5516,6 +5516,7 @@
         alert('انتهت جلسة المدير الرئيسي في Firebase. سجّل الدخول مرة أخرى بالبريد الإلكتروني.');
         return;
       }
+      // هذه العملية يدوية فقط. لا يتم تشغيلها تلقائياً عند تسجيل الدخول.
       await migrateAllLegacyAccountsToAuth();
     }
 
@@ -5763,13 +5764,10 @@
           localStorage.setItem('isAdmin', 'true');
           finishLoginProcess();
           startAdminSessionMonitor();
-          setTimeout(async () => {
-            try {
-              await migrateAllLegacyAccountsToAuth();
-            } catch (error) {
-              console.error('خطأ أثناء الترحيل التلقائي:', error);
-            }
-          }, 1500);
+          // لا ننفذ ترحيل الحسابات القديمة تلقائياً بعد كل دخول للمدير الرئيسي.
+          // الترحيل التلقائي كان سبباً في إعادة إنشاء/مزامنة حسابات legacy القديمة
+          // كلما بقيت مستندات قديمة داخل Firestore. تتم المزامنة الآن فقط عند إنشاء/تعديل
+          // حساب فعلي من لوحة حسابات المدراء، أو عند استدعاء الإصلاح يدوياً.
           return;
         } catch (authErr) {
           console.error('Firebase Authentication login error:', authErr);
@@ -6785,11 +6783,65 @@
 
     async function deleteAdminAccount(username) {
       if (!isAdmin) return alert('متاح للمدير الرئيسي فقط.');
+      const key = String(username || '').trim();
+      if (!key || key.toLowerCase() === 'admin') return alert('لا يمكن حذف المدير الرئيسي من هنا.');
       if (!confirm('تأكيد حذف حساب المدير؟')) return;
+
       try {
-        await db.collection('adminAccounts').doc(String(username)).delete();
+        // نقرأ البيانات أولاً لأننا نحتاج authUid/authEmail/كلمة المرور قبل حذف المستند.
+        const ref = db.collection('adminAccounts').doc(key);
+        const snap = await ref.get({ source: 'server' });
+        if (!snap.exists) {
+          await loadAdminAccountsFromFirestore();
+          return;
+        }
+
+        const data = snap.data() || {};
+        const authUid = String(data.authUid || '').trim();
+        const authEmail = String(data.authEmail || '').trim() || legacyAuthEmail(key, 'admin');
+        const password = String(data.password || '');
+
+        // احذف رابط userProfiles حتى لا تبقى هوية قديمة فعالة بعد حذف المدير.
+        if (authUid) {
+          try { await db.collection('userProfiles').doc(authUid).delete(); } catch (profileErr) {
+            console.warn('تعذر حذف userProfiles للمدير المحذوف:', profileErr);
+          }
+        }
+
+        // حذف مستخدم Firebase Authentication ممكن من المتصفح فقط بعد تسجيل دخوله
+        // في التطبيق الثانوي. إذا كانت كلمة المرور القديمة متوفرة نحاول حذفه أيضاً.
+        // إذا فشل ذلك، نكمل حذف سجل المدير من Firestore ولا نوقف العملية.
+        if (password) {
+          try {
+            const authPassword = await legacyAuthPassword(password);
+            const secondaryName = 'deleteAdmin_' + key.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 30);
+            let secondaryApp;
+            try { secondaryApp = firebase.app(secondaryName); }
+            catch (_) { secondaryApp = firebase.initializeApp(firebaseConfig, secondaryName); }
+            const secondaryAuth = secondaryApp.auth();
+            try {
+              const credential = await secondaryAuth.signInWithEmailAndPassword(authEmail, authPassword);
+              if (!authUid || credential.user.uid === authUid) {
+                await credential.user.delete();
+              }
+            } finally {
+              try { await secondaryAuth.signOut(); } catch (_) {}
+              try { await secondaryApp.delete(); } catch (_) {}
+            }
+          } catch (authDeleteErr) {
+            // لا نعرض خطأ للمستخدم إذا تعذر حذف سجل Authentication القديم؛
+            // لأن Firestore هو مصدر الحساب الإداري الحالي.
+            console.warn('تعذر حذف حساب Firebase Authentication للمدير المحذوف:', authDeleteErr);
+          }
+        }
+
+        await ref.delete();
         await loadAdminAccountsFromFirestore();
-      } catch(err) { alert('تعذر حذف حساب المدير.'); }
+        alert('تم حذف حساب المدير وبيانات الربط بنجاح.');
+      } catch(err) {
+        console.error('تعذر حذف حساب المدير:', err);
+        alert('تعذر حذف حساب المدير.');
+      }
     }
 
     async function handleAdminPasswordChange(e) {
