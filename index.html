@@ -2933,6 +2933,77 @@
   </div>
 </div>
 
+
+<script>
+/* =====================================================
+   حماية التطبيق عند انقطاع الإنترنت
+   لا تغيّر منطق الحسابات أو كلمات المرور
+   ===================================================== */
+(function () {
+  var offlineAlertOpen = false;
+
+  function appIsOffline() {
+    return navigator.onLine === false;
+  }
+
+  function showOfflineMessage() {
+    if (offlineAlertOpen) return;
+    offlineAlertOpen = true;
+
+    window.alert(
+      '📡 أنت غير متصل بالإنترنت\n\n' +
+      'يرجى التحقق من اتصالك بالإنترنت ثم المحاولة مرة أخرى.'
+    );
+
+    setTimeout(function () {
+      offlineAlertOpen = false;
+    }, 800);
+  }
+
+  function checkConnection() {
+    return !appIsOffline();
+  }
+
+  window.addEventListener('offline', function () {});
+  window.addEventListener('online', function () {});
+  window.addEventListener('focus', checkConnection);
+  window.addEventListener('pageshow', checkConnection);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) checkConnection();
+  });
+
+  document.addEventListener('click', function (event) {
+    if (!appIsOffline()) return;
+
+    var target = event.target;
+    if (!target || !target.closest) return;
+
+    // لا نعترض عناصر نافذة التنبيه نفسها
+    if (target.closest('#mustaqbal-app-alert')) return;
+
+    var interactive = target.closest(
+      'button, a, input[type="button"], input[type="submit"], ' +
+      'input[type="reset"], [role="button"], [onclick]'
+    );
+
+    if (!interactive) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    showOfflineMessage();
+  }, true);
+
+  // يمكن للدوال الداخلية استعمال هذا الفحص عند الحاجة
+  window.requireInternetConnection = function () {
+    if (appIsOffline()) {
+      showOfflineMessage();
+      return false;
+    }
+    return true;
+  };
+})();
+</script>
+
 <script>
 (function () {
   function initMustaqbalAlert() {
@@ -3873,30 +3944,6 @@
     }
     const db = firebase.firestore();
     const auth = firebase.auth();
-
-    // أمان الحسابات: لا تُخزن كلمة المرور داخل Firestore أو localStorage.
-    // Firebase Authentication هو المسؤول عن بيانات الاعتماد.
-    function stripPlaintextPassword(data) {
-      if (!data || typeof data !== 'object') return data;
-      const clean = { ...data };
-      delete clean.password;
-      return clean;
-    }
-
-    function removeLegacyCachedPasswords() {
-      ['loggedAdmin','loggedCustomer','loggedDelegate'].forEach(function(key) {
-        try {
-          const raw = localStorage.getItem(key);
-          if (!raw) return;
-          const value = JSON.parse(raw);
-          if (value && typeof value === 'object' && Object.prototype.hasOwnProperty.call(value, 'password')) {
-            localStorage.setItem(key, JSON.stringify(stripPlaintextPassword(value)));
-          }
-        } catch (_) {}
-      });
-    }
-    removeLegacyCachedPasswords();
-
 
     // ============================================================
     // هوية Firebase للحسابات القديمة (نفس اسم المستخدم وكلمة المرور)
@@ -5201,7 +5248,6 @@
     }
 
     function saveData() {
-      removeLegacyCachedPasswords();
       localStorage.setItem('mustaqbal_categories', JSON.stringify(categories));
       localStorage.setItem('mustaqbal_products', JSON.stringify(products));
       localStorage.setItem('mustaqbal_customers', JSON.stringify(customers));
@@ -5298,6 +5344,7 @@
       ADMIN_PERMISSION_KEYS.forEach(k => { permissions[k] = sourcePermissions[k] === true; });
       return {
         username:String(a && a.username || ''),
+        password:String(a && a.password || ''),
         fullname:String((a && a.fullname) || (a && a.username) || ''),
         permissions,
         deviceId:String(a && a.deviceId || ''),
@@ -6807,7 +6854,7 @@
 
         const account = normalizeAdminAccount({
           ...(old || {}),
-          username, fullname,
+          username, password, fullname,
           permissions: getSelectedAdminPermissions(),
           deviceId: old?.deviceId || '',
           sessionToken: old?.sessionToken || '',
@@ -6970,7 +7017,7 @@
 
         const delData = {
           ...(oldDel || {}),
-          username, fullname,
+          username, password, fullname,
           clients: Array.isArray(oldDel?.clients) ? oldDel.clients : [],
           deviceId: (usernameChanged || passwordChanged) ? '' : (oldDel?.deviceId || ''),
           sessionToken: (usernameChanged || passwordChanged) ? '' : (oldDel?.sessionToken || ''),
@@ -6995,7 +7042,7 @@
         delData.authEmail = authInfo.email || delData.authEmail || legacyAuthEmail(username, 'delegate');
 
         const batch = db.batch();
-        batch.set(db.collection('delegates').doc(username), stripPlaintextPassword(delData), { merge: true });
+        batch.set(db.collection('delegates').doc(username), delData, { merge: true });
         if (editFlag && editFlag !== username) batch.delete(db.collection('delegates').doc(editFlag));
         await batch.commit();
 
@@ -7007,7 +7054,7 @@
         }
 
         delegates = delegates.filter(d => String(d.username) !== String(editFlag) && String(d.username) !== String(username));
-        delegates.push(stripPlaintextPassword(delData));
+        delegates.push(delData);
         saveData();
         renderAdminDelegatesList();
         resetDelegateMgmtForm();
@@ -7331,7 +7378,7 @@
 
         const custData = {
           ...(oldCust || {}),
-          username, fullname, discount,
+          username, password, fullname, discount,
           deviceId: (usernameChanged || passwordChanged) ? '' : (oldCust?.deviceId || ''),
           sessionToken: (usernameChanged || passwordChanged) ? '' : (oldCust?.sessionToken || ''),
           sessionDeviceId: (usernameChanged || passwordChanged) ? '' : (oldCust?.sessionDeviceId || ''),
@@ -7355,7 +7402,7 @@
         custData.authEmail = authInfo.email || custData.authEmail || legacyAuthEmail(username, 'customer');
 
         const batch = db.batch();
-        batch.set(db.collection('customers').doc(username), stripPlaintextPassword(custData), { merge: true });
+        batch.set(db.collection('customers').doc(username), custData, { merge: true });
         if (editFlag && editFlag !== username) batch.delete(db.collection('customers').doc(editFlag));
         await batch.commit();
 
@@ -7367,7 +7414,7 @@
         }
 
         customers = customers.filter(c => String(c.username) !== String(editFlag) && String(c.username) !== String(username));
-        customers.push(stripPlaintextPassword(custData));
+        customers.push(custData);
         saveData();
         renderAdminCustomersList();
         resetCustomerMgmtForm();
