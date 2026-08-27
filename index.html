@@ -1140,56 +1140,6 @@
       color:#6d28d9;
     }
 
-    /* ===== تعديل مخزون المنتج مباشرة من نافذة المنتجات قليلة المخزون ===== */
-    .low-stock-product-card {
-      background:var(--bg-surface);
-      border:1px solid var(--border-color);
-      border-radius:16px;
-      padding:12px;
-      box-shadow:0 4px 12px rgba(15,23,42,.04);
-    }
-    .low-stock-product-main { display:flex; flex-direction:column; gap:8px; }
-    .low-stock-product-title {
-      display:flex; align-items:center; justify-content:space-between; gap:8px;
-    }
-    .low-stock-product-title strong {
-      color:var(--text-main); font-size:.88rem; line-height:1.5; overflow-wrap:anywhere;
-    }
-    .low-stock-status {
-      flex:0 0 auto; padding:4px 8px; border-radius:999px;
-      font-size:.62rem; font-weight:900;
-    }
-    .low-stock-status.low { background:#fef3c7; color:#92400e; }
-    .low-stock-status.out { background:#fee2e2; color:#991b1b; }
-    .low-stock-product-meta {
-      display:flex; gap:12px; flex-wrap:wrap;
-      color:var(--text-muted); font-size:.7rem;
-    }
-    .low-stock-edit-row {
-      margin-top:2px; padding-top:9px; border-top:1px solid var(--border-color);
-    }
-    .low-stock-edit-row > label {
-      display:block; margin-bottom:6px; color:var(--text-muted);
-      font-size:.7rem; font-weight:800;
-    }
-    .low-stock-edit-controls {
-      display:grid; grid-template-columns:minmax(0,1fr) auto; gap:7px; align-items:center;
-    }
-    .low-stock-qty-input {
-      min-width:0; min-height:40px; background:#fff; font-weight:900;
-      text-align:center; font-variant-numeric:tabular-nums;
-    }
-    .low-stock-save-btn {
-      min-height:40px; padding:8px 13px; white-space:nowrap; background:#10b981;
-    }
-    .low-stock-no-permission {
-      color:var(--danger); font-size:.65rem; font-weight:800; text-align:center;
-    }
-    @media (max-width:520px) {
-      .low-stock-edit-controls { grid-template-columns:1fr; }
-      .low-stock-save-btn { width:100%; }
-    }
-
     .order-status-chip {
       display:inline-flex; align-items:center; gap:4px;
       padding:4px 8px; border-radius:999px; font-size:.64rem; font-weight:900;
@@ -1239,6 +1189,18 @@
       #receipt-modal .modal-content { width:100% !important; max-width:none !important; max-height:none !important; box-shadow:none !important; }
       #receipt-modal .modal-header, #receipt-modal .invoice-export-actions { display:none !important; }
       #receipt-modal .modal-body { overflow:visible !important; max-height:none !important; }
+    }
+
+    /* ===== توحيد جميع الأرقام التي يكتبها المستخدم إلى أرقام إنكليزية 0-9 ===== */
+    input, textarea, select {
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+
+    /* يمنع ظهور الأرقام العربية داخل حقول الإدخال حتى مع واجهة RTL */
+    input,
+    textarea,
+    select {
+      unicode-bidi: plaintext;
     }
 
     .hidden { display: none !important; }
@@ -5301,6 +5263,60 @@
     let loggedDelegate = JSON.parse(localStorage.getItem('loggedDelegate')) || null;
     let currentImageData = "";
 
+    // تحويل الأرقام العربية والهندية والفارسية إلى أرقام إنكليزية 0-9
+    // في جميع حقول الإدخال، بما فيها الهاتف والسعر والكمية والخصم والكود وغيرها.
+    function normalizeEnglishDigits(value) {
+      return String(value ?? '')
+        .replace(/[٠-٩]/g, ch => String(ch.charCodeAt(0) - 0x0660))
+        .replace(/[۰-۹]/g, ch => String(ch.charCodeAt(0) - 0x06F0))
+        .replace(/[٤]/g, '4');
+    }
+
+    function normalizeInputDigits(el) {
+      if (!el || !('value' in el)) return;
+
+      const oldValue = el.value;
+      const newValue = normalizeEnglishDigits(oldValue);
+
+      if (oldValue !== newValue) {
+        const start = typeof el.selectionStart === 'number' ? el.selectionStart : oldValue.length;
+        const beforeCursor = oldValue.slice(0, start);
+        const newCursor = normalizeEnglishDigits(beforeCursor).length;
+        el.value = newValue;
+
+        try {
+          el.setSelectionRange(newCursor, newCursor);
+        } catch (_) {}
+      }
+    }
+
+    // يعمل على الكتابة واللصق وتعبئة الحقول من أي مصدر.
+    document.addEventListener('input', function(event) {
+      const el = event.target;
+      if (el && (el.matches('input') || el.matches('textarea'))) {
+        normalizeInputDigits(el);
+      }
+    }, true);
+
+    document.addEventListener('change', function(event) {
+      const el = event.target;
+      if (el && (el.matches('input') || el.matches('textarea'))) {
+        normalizeInputDigits(el);
+      }
+    }, true);
+
+    document.addEventListener('paste', function(event) {
+      const el = event.target;
+      if (!el || !(el.matches('input') || el.matches('textarea'))) return;
+
+      setTimeout(() => normalizeInputDigits(el), 0);
+    }, true);
+
+    // عند تحميل أي بيانات قديمة إلى الحقول، نوحّدها أيضاً.
+    function normalizeAllInputDigits() {
+      document.querySelectorAll('input, textarea').forEach(normalizeInputDigits);
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
       // نحدد الجلسة أولاً حتى لا نبدأ أي مستمع Firestore إذا لم يوجد مستخدم مسجل.
       checkInitialSessionState();
@@ -8394,103 +8410,18 @@
       if (!requireAdminPermission('viewLowStock')) return;
       const box = document.getElementById('low-stock-list');
       if (!box) return;
-
       const list = (products || []).filter(p => Number(p.stock ?? 0) <= Number(p.minStock ?? 5))
         .sort((a,b) => Number(a.stock||0)-Number(b.stock||0));
-
       box.innerHTML = list.length ? list.map(p => {
-        const stock = Math.max(0, Number(p.stock || 0));
-        const min = Math.max(0, Number(p.minStock ?? 5));
-        const canEditStock = hasAdminPermission('editStock');
-
-        return `<div class="low-stock-product-card">
-          <div class="low-stock-product-main">
-            <div class="low-stock-product-title">
-              <strong>${escapeHtml(p.name)}</strong>
-              <span class="low-stock-status ${stock <= 0 ? 'out' : 'low'}">${stock <= 0 ? 'نفاد' : 'منخفض'}</span>
-            </div>
-
-            <div class="low-stock-product-meta">
-              <span>حد التنبيه: <b>${min}</b></span>
-              <span>المباع: <b>${Number(p.soldQty || 0)}</b></span>
-            </div>
-
-            <div class="low-stock-edit-row">
-              <label for="low-stock-input-${p.id}">الكمية الموجودة في المخزن</label>
-              <div class="low-stock-edit-controls">
-                <input id="low-stock-input-${p.id}" class="compact-input low-stock-qty-input"
-                  type="number" min="0" step="1" value="${stock}"
-                  ${canEditStock ? '' : 'disabled'}
-                  onkeydown="if(event.key==='Enter'){event.preventDefault();updateLowStockQuantity(${p.id});}">
-                ${canEditStock
-                  ? `<button type="button" class="btn low-stock-save-btn" onclick="updateLowStockQuantity(${p.id})">💾 حفظ</button>`
-                  : `<span class="low-stock-no-permission">لا تملك صلاحية تعديل المخزون</span>`}
-              </div>
-            </div>
-          </div>
+        const stock = Number(p.stock || 0), min = Number(p.minStock ?? 5);
+        return `<div style="background:var(--bg-surface);border:1px solid var(--border-color);border-radius:14px;padding:11px;">
+          <strong>${escapeHtml(p.name)}</strong>
+          <div style="font-size:.74rem;color:var(--text-muted);margin-top:4px;">المخزون: ${stock} | حد التنبيه: ${min} | المباع: ${Number(p.soldQty||0)}</div>
         </div>`;
       }).join('') : '<div class="notification-empty">لا توجد منتجات منخفضة المخزون حالياً.</div>';
-
       document.getElementById('low-stock-modal').classList.remove('hidden');
     }
-
-    async function updateLowStockQuantity(productId) {
-      if (!requireAdminPermission('editStock')) return;
-
-      const product = (products || []).find(p => String(p.id) === String(productId));
-      if (!product) {
-        alert('لم يتم العثور على المنتج.');
-        return;
-      }
-
-      const input = document.getElementById(`low-stock-input-${productId}`);
-      const parsed = Number(input?.value);
-      if (!Number.isFinite(parsed) || parsed < 0) {
-        alert('أدخل كمية صحيحة للمخزون.');
-        return;
-      }
-
-      const newStock = Math.floor(parsed);
-      const oldStock = Math.max(0, Number(product.stock || 0));
-
-      if (oldStock === newStock) {
-        alert('لم تتغير كمية المخزون.');
-        return;
-      }
-
-      try {
-        await db.collection('products').doc(String(product.id)).set({
-          stock: newStock,
-          updatedAt: Date.now()
-        }, { merge: true });
-
-        product.stock = newStock;
-        product.updatedAt = Date.now();
-
-        saveData();
-        renderProducts();
-        renderBusinessDashboard();
-
-        await writeAuditLog(
-          'updateStock',
-          `تم تعديل مخزون المنتج "${product.name}" من ${oldStock} إلى ${newStock}`,
-          { productId: product.id, oldStock, newStock, source: 'lowStockReport' }
-        );
-
-        openLowStockReport();
-      } catch (err) {
-        console.error('فشل تعديل مخزون المنتج:', err);
-        alert('تعذر حفظ كمية المخزون في قاعدة البيانات. لم يتم اعتماد التعديل.');
-      }
-    }
-
-    function closeLowStockReport() {
-      document.getElementById('low-stock-modal')?.classList.add('hidden');
-      if (window.smartAlertsReturnAfterChildClose) {
-        window.smartAlertsReturnAfterChildClose = false;
-        if (typeof returnToSmartAlerts === 'function') returnToSmartAlerts();
-      }
-    }
+    function closeLowStockReport() { document.getElementById('low-stock-modal')?.classList.add('hidden'); if (window.smartAlertsReturnAfterChildClose) { window.smartAlertsReturnAfterChildClose = false; if (typeof returnToSmartAlerts === 'function') returnToSmartAlerts(); } }
 
     async function openAuditLogModal() {
       if (!requireAdminPermission('viewAuditLog')) return;
