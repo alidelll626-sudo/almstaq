@@ -2841,6 +2841,62 @@
 <body>
 
 <!-- ============================================================
+     حالة الاتصال بالإنترنت
+     ------------------------------------------------------------
+     تظهر فقط عند فقدان الاتصال بعد تحميل التطبيق، وتختفي
+     تلقائياً عند عودة الإنترنت. لا تعتمد على Firebase.
+     ============================================================ -->
+<style>
+  #mustaqbal-offline-banner {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    top: max(10px, env(safe-area-inset-top));
+    z-index: 2147483000;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 13px;
+    border: 1px solid #fecaca;
+    border-radius: 15px;
+    background: rgba(255,255,255,.97);
+    box-shadow: 0 10px 30px rgba(15,23,42,.14);
+    direction: rtl;
+  }
+  #mustaqbal-offline-banner.show { display: flex; }
+  #mustaqbal-offline-banner .offline-icon {
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    border-radius: 11px;
+    display: grid;
+    place-items: center;
+    background: #fee2e2;
+    font-size: 18px;
+  }
+  #mustaqbal-offline-banner strong {
+    display: block;
+    color: #991b1b;
+    font-size: .78rem;
+    font-weight: 900;
+  }
+  #mustaqbal-offline-banner small {
+    display: block;
+    margin-top: 2px;
+    color: #64748b;
+    font-size: .64rem;
+    line-height: 1.5;
+  }
+</style>
+<div id="mustaqbal-offline-banner" role="status" aria-live="polite">
+  <div class="offline-icon">📡</div>
+  <div>
+    <strong>لا يوجد اتصال بالإنترنت</strong>
+    <small>ستبقى الجلسة والبيانات المحفوظة محلياً كما هي. عند عودة الاتصال ستتم المزامنة تلقائياً.</small>
+  </div>
+</div>
+
+<!-- ============================================================
      Mustaqbal custom in-app alert
      Prevents the browser native alert from showing the GitHub
      Pages domain above application messages.
@@ -5374,6 +5430,12 @@
     let currentImageData = "";
 
     document.addEventListener('DOMContentLoaded', async () => {
+      // إذا كان الجهاز بلا اتصال، لا ننتظر فحص حساب المدير من الخادم.
+      // نحافظ على الجلسة المحلية ثم تتم إعادة المزامنة عند عودة الإنترنت.
+      if (navigator.onLine === false) {
+        console.warn('التطبيق بدأ بدون اتصال؛ تم تجاوز فحص الخادم المؤقت للمدير.');
+      }
+
       // قبل استعادة أي جلسة محفوظة، نتحقق من أن حساب المدير ما زال موجوداً في Firestore.
       // إذا كان الحساب (مثل adm) قد حُذف من لوحة المدير، ننظف الجلسة القديمة
       // من الجهاز وFirebase Authentication حتى لا تظهر رسالة "تعذر العثور على حساب المدير".
@@ -5430,6 +5492,11 @@
       if (!username) {
         clearStaleAdminSession();
         return false;
+      }
+
+      // لا نحذف جلسة المدير المحلية بسبب انقطاع الإنترنت.
+      if (navigator.onLine === false) {
+        return true;
       }
 
       try {
@@ -9314,33 +9381,234 @@
       }
     }
 
+    /* ============================================================
+       نظام تصدير الملفات المتوافق مع Kodular WebViewer
+       ------------------------------------------------------------
+       يحاول بالترتيب:
+       1) Kodular WebViewString إذا كانت واجهة AppInventor متاحة.
+       2) Web Share للهواتف التي تدعمه، حتى يستطيع المستخدم حفظ
+          الملف عبر مدير الملفات/المشاركة في Android.
+       3) تنزيل HTML القياسي عبر Blob + <a download>.
+       4) فتح الملف كرابط مؤقت كحل أخير.
+       ============================================================ */
+
+    function isKodularWebView() {
+      const ua = String(navigator.userAgent || '').toLowerCase();
+      return !!(
+        window.AppInventor ||
+        ua.includes('wv') ||
+        ua.includes('; wv)') ||
+        ua.includes('kodular')
+      );
+    }
+
+    function blobToDataUrl(blob) {
+      return new Promise((resolve, reject) => {
+        try {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => reject(reader.error || new Error('تعذر قراءة الملف.'));
+          reader.readAsDataURL(blob);
+        } catch (err) {
+          reject(err);
+        }
+      });
+    }
+
+    function dataUrlToBase64(dataUrl) {
+      const value = String(dataUrl || '');
+      const comma = value.indexOf(',');
+      return comma >= 0 ? value.slice(comma + 1) : value;
+    }
+
+    /*
+      إرسال الملف إلى Kodular عبر WebViewString.
+      هذه الخطوة لا تضر Median أو Appilix، وتعمل فقط إذا كانت
+      واجهة AppInventor موجودة داخل WebViewer.
+
+      ملاحظة: كتلة Kodular يجب أن تستقبل WebViewString وتتعامل مع
+      payload من النوع mustaqbal_file إذا أردت الحفظ الأصلي إلى الجهاز.
+    */
+    async function tryKodularFileBridge(blob, fileName, mimeType) {
+      try {
+        if (!window.AppInventor || typeof window.AppInventor.setWebViewString !== 'function') {
+          return false;
+        }
+
+        const dataUrl = await blobToDataUrl(blob);
+        const base64 = dataUrlToBase64(dataUrl);
+
+        /*
+          نستخدم رسائل صغيرة نسبيًا حتى لا تكون قيمة WebViewString
+          ضخمة جدًا عند إرسال فاتورة متعددة الصفحات.
+        */
+        const chunkSize = 48000;
+        const transferId = 'mf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+        const totalChunks = Math.max(1, Math.ceil(base64.length / chunkSize));
+
+        window.AppInventor.setWebViewString(JSON.stringify({
+          type: 'mustaqbal_file_start',
+          transferId,
+          fileName: String(fileName || 'file'),
+          mimeType: String(mimeType || 'application/octet-stream'),
+          totalChunks
+        }));
+
+        for (let i = 0; i < totalChunks; i++) {
+          const chunk = base64.slice(i * chunkSize, (i + 1) * chunkSize);
+          window.AppInventor.setWebViewString(JSON.stringify({
+            type: 'mustaqbal_file_chunk',
+            transferId,
+            index: i,
+            totalChunks,
+            data: chunk
+          }));
+          // إعطاء WebView فرصة لمعالجة كل جزء قبل إرسال الجزء التالي.
+          if (i % 3 === 2) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+          }
+        }
+
+        window.AppInventor.setWebViewString(JSON.stringify({
+          type: 'mustaqbal_file_end',
+          transferId
+        }));
+
+        return true;
+      } catch (err) {
+        console.warn('تعذر استخدام جسر Kodular لحفظ الملف:', err);
+        return false;
+      }
+    }
+
+    async function tryWebShareFile(blob, fileName, mimeType) {
+      try {
+        if (!navigator.share || typeof navigator.share !== 'function') return false;
+        if (!window.File) return false;
+
+        const file = new File([blob], fileName, {
+          type: mimeType || blob.type || 'application/octet-stream'
+        });
+
+        if (navigator.canShare && !navigator.canShare({ files: [file] })) {
+          return false;
+        }
+
+        await navigator.share({
+          files: [file],
+          title: fileName,
+          text: 'ملف من متجر المستقبل للجملة'
+        });
+
+        return true;
+      } catch (err) {
+        // إلغاء المستخدم لنافذة المشاركة ليس خطأ.
+        if (String(err?.name || '') === 'AbortError') return true;
+        console.warn('تعذر مشاركة الملف عبر Android:', err);
+        return false;
+      }
+    }
+
+    async function downloadBlobCompat(blob, fileName, mimeType) {
+      if (!blob) throw new Error('الملف فارغ.');
+
+      /*
+        في Kodular نحاول أولاً جسر AppInventor. إذا لم توجد كتلة
+        Kodular لاستقبال WebViewString، ننتقل تلقائيًا إلى Web Share
+        ثم إلى تنزيل WebView القياسي.
+      */
+      if (isKodularWebView()) {
+        const bridged = await tryKodularFileBridge(blob, fileName, mimeType);
+        if (bridged) {
+          showMustaqbalAlert(
+            'تم تجهيز الملف',
+            'تم إرسال الملف إلى مكوّن Kodular. إذا لم تكن قد أضفت كتلة استقبال WebViewString، سيُستخدم خيار الحفظ البديل تلقائياً.',
+            'info'
+          );
+          return true;
+        }
+
+        const shared = await tryWebShareFile(blob, fileName, mimeType);
+        if (shared) return true;
+      }
+
+      const url = URL.createObjectURL(blob);
+      let link = null;
+
+      try {
+        link = document.createElement('a');
+        link.href = url;
+        link.download = String(fileName || 'file');
+        link.setAttribute('download', String(fileName || 'file'));
+        link.style.display = 'none';
+        link.rel = 'noopener';
+        document.body.appendChild(link);
+
+        /*
+          بعض إصدارات Android WebView لا تنفذ download على Blob.
+          المحاولة القياسية تبقى ضرورية للمتصفحات وMedian وAppilix.
+        */
+        link.click();
+
+        /*
+          لا نعتبر click بحد ذاته ضمانًا بأن Android حفظ الملف.
+          لذلك نترك الرابط متاحًا لحظيًا كحل أخير إذا كان WebView
+          يتعامل معه كملف قابل للفتح.
+        */
+        setTimeout(() => {
+          try {
+            if (document.body.contains(link)) link.remove();
+          } catch (_) {}
+        }, 1000);
+
+        setTimeout(() => {
+          try { URL.revokeObjectURL(url); } catch (_) {}
+        }, 15000);
+
+        return true;
+      } catch (err) {
+        try {
+          if (link && document.body.contains(link)) link.remove();
+        } catch (_) {}
+
+        /*
+          حل أخير: فتح الملف نفسه. بعض أغلفة Android/WebView
+          تعترض هذا النوع من الروابط وتسمح بفتحه أو حفظه.
+        */
+        try {
+          window.open(url, '_blank');
+          setTimeout(() => {
+            try { URL.revokeObjectURL(url); } catch (_) {}
+          }, 15000);
+          return true;
+        } catch (_) {
+          try { URL.revokeObjectURL(url); } catch (_) {}
+          throw err;
+        }
+      }
+    }
+
     async function downloadInvoiceAsImage(invoiceElementId, fallbackName) {
       try {
         const canvas = await renderExportCanvas(invoiceElementId);
         const fileName = getExportFileName(invoiceElementId, fallbackName) + '.png';
 
-        const blob = await new Promise(resolve => {
-          canvas.toBlob(resolve, 'image/png');
+        const blob = await new Promise((resolve, reject) => {
+          try {
+            canvas.toBlob(result => {
+              if (result) resolve(result);
+              else reject(new Error('تعذر إنشاء صورة الفاتورة.'));
+            }, 'image/png');
+          } catch (err) {
+            reject(err);
+          }
         });
 
-        if (!blob) throw new Error('تعذر إنشاء صورة الفاتورة.');
-
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-
-        link.href = url;
-        link.download = fileName;
-        link.style.display = 'none';
-
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-
-        setTimeout(() => URL.revokeObjectURL(url), 3000);
+        await downloadBlobCompat(blob, fileName, 'image/png');
 
       } catch (err) {
         console.error('خطأ في حفظ الفاتورة كصورة:', err);
-        alert('تعذر حفظ الفاتورة كصورة. تأكد من فتح الفاتورة ثم حاول مرة أخرى.');
+        alert('تعذر حفظ الفاتورة كصورة. إذا كنت تستخدم Kodular فتأكد من إعداد WebViewString/التنزيل في التطبيق ثم حاول مرة أخرى.');
       }
     }
 
@@ -9358,11 +9626,12 @@
 
         const { jsPDF } = window.jspdf;
         const isReceipt = invoiceElementId === 'receipt-area';
+        let pdf;
 
         // الفاتورة العادية تُصدر الآن على ورق A4 عمودي،
         // مع تقسيم الصفحات عند نهاية صف المنتج حتى لا ينقطع الصف.
         if (isReceipt) {
-          const pdf = new jsPDF({
+          pdf = new jsPDF({
             orientation: 'portrait',
             unit: 'mm',
             format: 'a4',
@@ -9392,8 +9661,11 @@
           while (startY < contentBottom - 1) {
             let endY = null;
 
-            /* إذا كانت بقية الفاتورة، بما فيها المجموع الكلي، تتسع في الصفحة
-               الحالية، نأخذها كلها حتى لا ينتقل المجموع إلى صفحة فارغة. */
+            /*
+              إذا كانت بقية الفاتورة، بما فيها المجموع الكلي، تتسع
+              في الصفحة الحالية، نأخذها كلها حتى لا ينتقل المجموع
+              إلى صفحة فارغة.
+            */
             if (contentBottom - startY <= pageHeightPx) {
               endY = contentBottom;
               breakIndex = naturalBreaks.length;
@@ -9452,86 +9724,94 @@
               throw new Error('تعذر تقسيم الفاتورة إلى صفحات A4.');
             }
           }
+        } else {
+          // التقارير الإدارية تبقى بتنسيق A4 كما كانت.
+          pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4',
+            compress: true
+          });
 
-          pdf.save(getExportFileName(invoiceElementId, fallbackName) + '.pdf');
-          return;
-        }
+          const pageWidth = pdf.internal.pageSize.getWidth();
+          const pageHeight = pdf.internal.pageSize.getHeight();
+          const margin = 8;
+          const usableWidth = pageWidth - margin * 2;
+          const usableHeight = pageHeight - margin * 2;
+          const pxPerMm = canvas.width / usableWidth;
+          const pageHeightPx = Math.max(1, Math.floor(usableHeight * pxPerMm));
+          const naturalBreaks = Array.isArray(canvas.__exportRowBreaks)
+            ? canvas.__exportRowBreaks
+            : [];
 
-        // التقارير الإدارية تبقى بتنسيق A4 كما كانت.
-        const pdf = new jsPDF({
-          orientation: 'portrait',
-          unit: 'mm',
-          format: 'a4',
-          compress: true
-        });
+          let startY = 0;
+          let breakIndex = 0;
+          let pageNumber = 0;
 
-        const pageWidth = pdf.internal.pageSize.getWidth();
-        const pageHeight = pdf.internal.pageSize.getHeight();
-        const margin = 8;
-        const usableWidth = pageWidth - margin * 2;
-        const usableHeight = pageHeight - margin * 2;
-        const pxPerMm = canvas.width / usableWidth;
-        const pageHeightPx = Math.max(1, Math.floor(usableHeight * pxPerMm));
-        const naturalBreaks = Array.isArray(canvas.__exportRowBreaks)
-          ? canvas.__exportRowBreaks
-          : [];
+          while (startY < canvas.height - 1) {
+            let endY = null;
 
-        let startY = 0;
-        let breakIndex = 0;
-        let pageNumber = 0;
-
-        while (startY < canvas.height - 1) {
-          let endY = null;
-
-          for (let i = breakIndex; i < naturalBreaks.length; i++) {
-            const candidate = naturalBreaks[i];
-            if (candidate - startY <= pageHeightPx) {
-              endY = candidate;
-              breakIndex = i + 1;
-            } else {
-              break;
+            for (let i = breakIndex; i < naturalBreaks.length; i++) {
+              const candidate = naturalBreaks[i];
+              if (candidate - startY <= pageHeightPx) {
+                endY = candidate;
+                breakIndex = i + 1;
+              } else {
+                break;
+              }
             }
+
+            if (endY === null || endY <= startY) {
+              endY = Math.min(startY + pageHeightPx, canvas.height);
+            }
+
+            if (pageNumber > 0) pdf.addPage();
+
+            const sliceHeight = Math.max(1, endY - startY);
+            const slice = document.createElement('canvas');
+            slice.width = canvas.width;
+            slice.height = Math.ceil(sliceHeight);
+
+            const ctx = slice.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, slice.width, slice.height);
+            ctx.drawImage(
+              canvas,
+              0, startY, canvas.width, sliceHeight,
+              0, 0, canvas.width, sliceHeight
+            );
+
+            const sliceHeightMm = Math.min(usableHeight, slice.height / pxPerMm);
+            pdf.addImage(
+              slice.toDataURL('image/jpeg', 0.95),
+              'JPEG',
+              margin,
+              margin,
+              usableWidth,
+              sliceHeightMm,
+              undefined,
+              'FAST'
+            );
+
+            startY = endY;
+            pageNumber++;
+
+            if (pageNumber > 200) throw new Error('تعذر تقسيم التقرير إلى صفحات.');
           }
-
-          if (endY === null || endY <= startY) {
-            endY = Math.min(startY + pageHeightPx, canvas.height);
-          }
-
-          if (pageNumber > 0) pdf.addPage();
-
-          const sliceHeight = Math.max(1, endY - startY);
-          const slice = document.createElement('canvas');
-          slice.width = canvas.width;
-          slice.height = Math.ceil(sliceHeight);
-
-          const ctx = slice.getContext('2d');
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, slice.width, slice.height);
-          ctx.drawImage(
-            canvas,
-            0, startY, canvas.width, sliceHeight,
-            0, 0, canvas.width, sliceHeight
-          );
-
-          const sliceHeightMm = Math.min(usableHeight, slice.height / pxPerMm);
-          pdf.addImage(
-            slice.toDataURL('image/jpeg', 0.95),
-            'JPEG',
-            margin,
-            margin,
-            usableWidth,
-            sliceHeightMm,
-            undefined,
-            'FAST'
-          );
-
-          startY = endY;
-          pageNumber++;
-
-          if (pageNumber > 200) throw new Error('تعذر تقسيم التقرير إلى صفحات.');
         }
 
-        pdf.save(getExportFileName(invoiceElementId, fallbackName) + '.pdf');
+        /*
+          بدل pdf.save() مباشرة، نحول PDF إلى Blob.
+          هذا يسمح لـ Kodular/WebViewString وWeb Share والتنزيل
+          القياسي باستخدام نفس الملف.
+        */
+        const pdfBlob = pdf.output('blob');
+        await downloadBlobCompat(
+          pdfBlob,
+          getExportFileName(invoiceElementId, fallbackName) + '.pdf',
+          'application/pdf'
+        );
+
       } catch (err) {
         console.error('خطأ في حفظ الفاتورة كـ PDF:', err);
         alert('تعذر إنشاء ملف PDF. حاول مرة أخرى.');
@@ -10919,6 +11199,43 @@
   document.addEventListener('DOMContentLoaded', function(){
     setTimeout(updateSmartAlertsBadge, 700);
   });
+})();
+</script>
+
+
+<script>
+(function initMustaqbalConnectivity() {
+  function updateMustaqbalOfflineUI() {
+    const banner = document.getElementById('mustaqbal-offline-banner');
+    if (!banner) return;
+
+    const offline = navigator.onLine === false;
+    banner.classList.toggle('show', offline);
+
+    document.documentElement.classList.toggle('mustaqbal-offline', offline);
+  }
+
+  window.addEventListener('online', function () {
+    updateMustaqbalOfflineUI();
+
+    // إعادة التحقق من الجلسة والمزامنة عند عودة الإنترنت.
+    try {
+      if (typeof monitorActiveSession === 'function' &&
+          (loggedCustomer || loggedDelegate)) {
+        monitorActiveSession();
+      }
+    } catch (err) {
+      console.warn('تعذر إعادة مراقبة الجلسة بعد عودة الاتصال:', err);
+    }
+  });
+
+  window.addEventListener('offline', updateMustaqbalOfflineUI);
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateMustaqbalOfflineUI);
+  } else {
+    updateMustaqbalOfflineUI();
+  }
 })();
 </script>
 
