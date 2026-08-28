@@ -9513,20 +9513,24 @@
       if (!blob) throw new Error('الملف فارغ.');
 
       /*
-        في Kodular نحاول أولاً جسر AppInventor. إذا لم توجد كتلة
-        Kodular لاستقبال WebViewString، ننتقل تلقائيًا إلى Web Share
-        ثم إلى تنزيل WebView القياسي.
+        داخل Kodular نرسل الملف إلى التطبيق عبر WebViewString
+        بدلاً من إنشاء رابط blob: الذي لا يستطيع Download تنزيله.
       */
+      if (isKodularWebView()) {
+        const sentToKodular = await tryKodularFileBridge(
+          blob,
+          fileName,
+          mimeType
+        );
+
+        if (sentToKodular) {
+          return true;
+        }
+      }
+
       /*
-        مهم لـ Kodular: لا نعتبر وجود AppInventor/WebViewString دليلاً على أن
-        الملف تم حفظه فعلاً. في النسخة السابقة كان هذا يسبب ظهور رسالة تطلب
-        إعداد WebViewString حتى عندما لم يكن المستخدم يريد ذلك.
-
-        لذلك نبدأ دائماً بالطريقة القياسية للمتصفح/WebView، ثم نجرب المشاركة
-        كحل بديل. جسر WebViewString يبقى متاحاً في الدالة، لكنه لا يعرض أي
-        رسالة للمستخدم ولا يمنع محاولات التنزيل العادية.
+        خارج Kodular: تنزيل عادي من المتصفح.
       */
-
       const url = URL.createObjectURL(blob);
       let link = null;
 
@@ -9537,19 +9541,10 @@
         link.setAttribute('download', String(fileName || 'file'));
         link.style.display = 'none';
         link.rel = 'noopener';
-        document.body.appendChild(link);
 
-        /*
-          بعض إصدارات Android WebView لا تنفذ download على Blob.
-          المحاولة القياسية تبقى ضرورية للمتصفحات وMedian وAppilix.
-        */
+        document.body.appendChild(link);
         link.click();
 
-        /*
-          لا نعتبر click بحد ذاته ضمانًا بأن Android حفظ الملف.
-          لذلك نترك الرابط متاحًا لحظيًا كحل أخير إذا كان WebView
-          يتعامل معه كملف قابل للفتح.
-        */
         setTimeout(() => {
           try {
             if (document.body.contains(link)) link.remove();
@@ -9566,20 +9561,8 @@
           if (link && document.body.contains(link)) link.remove();
         } catch (_) {}
 
-        /*
-          حل أخير: فتح الملف نفسه. بعض أغلفة Android/WebView
-          تعترض هذا النوع من الروابط وتسمح بفتحه أو حفظه.
-        */
-        try {
-          window.open(url, '_blank');
-          setTimeout(() => {
-            try { URL.revokeObjectURL(url); } catch (_) {}
-          }, 15000);
-          return true;
-        } catch (_) {
-          try { URL.revokeObjectURL(url); } catch (_) {}
-          throw err;
-        }
+        try { URL.revokeObjectURL(url); } catch (_) {}
+        throw err;
       }
     }
 
