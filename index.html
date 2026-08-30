@@ -5747,8 +5747,9 @@
       productsSortMenuOpen = false;
       saveProductSortModes();
 
+      // لا نمسح نص البحث عند الرجوع من الخلفية.
+      // يبقى البحث كما كتبه المستخدم وتستمر نتائجه بالظهور.
       const searchInput = document.getElementById('search-input');
-      if (searchInput) searchInput.value = '';
 
       if (typeof renderTabs === 'function') renderTabs();
       if (typeof updateProductsSortUI === 'function') updateProductsSortUI();
