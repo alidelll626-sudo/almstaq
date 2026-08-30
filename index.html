@@ -1221,6 +1221,8 @@
     .tracking-timeline { display:flex; gap:5px; margin-top:10px; }
     .tracking-step { flex:1; height:6px; border-radius:999px; background:#e2e8f0; }
     .tracking-step.active { background:var(--primary); }
+    .tracking-timeline-rejected { justify-content:flex-start; }
+    .tracking-step.rejected.active { background:#ef4444; }
     @media (max-width:520px) {
       .business-dashboard { grid-template-columns:repeat(2,1fr); }
     }
@@ -9192,7 +9194,7 @@
     function getOrderStatusLabel(status) {
       return ({
         new:'📥 تم استلام الطلب', preparing:'🔵 الطلب قيد التجهيز', ready:'📦 الطلب جاهز', backorder:'🟣 طلب مؤجل — بانتظار توفر الكمية',
-        with_delegate:'🚚 الطلب مع السائق', delivered:'✅ تم تسليم الطلب', cancelled:'🔴 ملغي'
+        with_delegate:'🚚 الطلب مع السائق', delivered:'✅ تم تسليم الطلب', rejected:'❌ تم رفض الطلب', cancelled:'🔴 ملغي'
       })[status] || '🟡 جديد';
     }
 
@@ -9426,7 +9428,8 @@
       { value:'preparing', label:'الطلب قيد التجهيز', icon:'🔵' },
       { value:'ready', label:'الطلب جاهز', icon:'📦' },
       { value:'with_delegate', label:'الطلب مع السائق', icon:'🚚' },
-      { value:'delivered', label:'تم تسليم الطلب', icon:'✅' }
+      { value:'delivered', label:'تم تسليم الطلب', icon:'✅' },
+      { value:'rejected', label:'تم رفض الطلب', icon:'❌' }
     ];
 
     function getTrackingStatusLabel(status) {
@@ -9439,8 +9442,13 @@
     }
     function getTrackingTimelineHTML(status) {
       const current = String(status || 'new');
-      const index = Math.max(0, ORDER_TRACKING_STEPS.findIndex(x => x.value === current));
-      return `<div class="tracking-timeline">${ORDER_TRACKING_STEPS.map((x,i) => `<span class="tracking-step ${i <= index ? 'active' : ''}" title="${escapeHtml(x.label)}"></span>`).join('')}</div>`;
+      // حالة الرفض حالة نهائية مستقلة، لذلك لا نُظهر مراحل التجهيز والتسليم كمراحل مكتملة معها.
+      if (current === 'rejected') {
+        return `<div class="tracking-timeline tracking-timeline-rejected"><span class="tracking-step rejected active" title="تم رفض الطلب"></span></div>`;
+      }
+      const normalSteps = ORDER_TRACKING_STEPS.filter(x => x.value !== 'rejected');
+      const index = Math.max(0, normalSteps.findIndex(x => x.value === current));
+      return `<div class="tracking-timeline">${normalSteps.map((x,i) => `<span class="tracking-step ${i <= index ? 'active' : ''}" title="${escapeHtml(x.label)}"></span>`).join('')}</div>`;
     }
     async function openOrderTrackingModal() {
       if (!(isAdmin || loggedAdmin)) return alert('تتبع الطلبات متاح للمدير فقط.');
