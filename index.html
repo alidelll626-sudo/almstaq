@@ -1406,7 +1406,19 @@
       .invoice-export-actions .btn { min-height:46px; padding:8px 4px; border-radius:14px; font-size:.72rem; }
     }
 
-  </style>
+  
+    /* ===== إصلاح عرض جميع إشعارات المدير الرئيسي ===== */
+    #admin-notifications-list {
+      max-height: 62vh;
+      overflow-y: auto;
+      padding: 2px;
+      overscroll-behavior: contain;
+    }
+    #admin-notifications-list .notification-card {
+      width: 100%;
+    }
+
+</style>
 
 <style>
   /* ============================================================
@@ -6951,7 +6963,7 @@
     function renderAdminSentNotifications() {
       const box = document.getElementById('admin-sent-notifications-list');
       if (!box) return;
-      const list = (notifications || []).slice(0, 8);
+      const list = Array.isArray(notifications) ? notifications : [];
       if (!list.length) {
         box.innerHTML = '<div class="notification-empty" style="padding:20px;">لا توجد إشعارات مرسلة بعد.</div>';
         return;
