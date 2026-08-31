@@ -8412,6 +8412,10 @@
     }
 
     function renderProducts(itemsToRender = null) {
+    /* SEARCH_PRESERVE_FIX */
+    const __searchInput = document.querySelector('.search-input');
+    const __currentSearch = (__searchInput ? __searchInput.value : '').trim().toLowerCase();
+
       // المدير الفرعي loggedAdmin يجب أن يرى المنتجات أيضاً؛ الصلاحيات تحدد فقط ما يستطيع فعله عليها.
       const grid = document.getElementById('products-grid');
       if (!grid) return;
@@ -11928,6 +11932,18 @@
     if (event.target.closest && event.target.closest('#future-splash')) hideSplash();
   }, { once: true });
 })();
+</script>
+
+
+<script>
+/* SEARCH_PRESERVE_FIX_HOOK */
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.querySelector('.search-input');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    if (typeof renderProducts === 'function') renderProducts();
+  });
+});
 </script>
 
 </body>
