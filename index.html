@@ -1262,6 +1262,83 @@
     .notification-openable:focus { outline:3px solid rgba(59,130,246,.25); outline-offset:2px; }
 
 
+    /* ===== فلاتر إحصائيات المنتجات: التاريخ رئيسي والوقت اختياري ===== */
+    .product-stats-filter-panel {
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      background:linear-gradient(180deg,#f8fbff,#ffffff);
+      padding:12px;
+      border-radius:18px;
+      border:1px solid #dbeafe;
+      box-shadow:0 5px 16px rgba(15,23,42,.04);
+    }
+    .product-stats-filter-title {
+      font-size:.86rem;
+      font-weight:950;
+      color:var(--primary-dark);
+    }
+    .product-stats-filter-section {
+      background:#fff;
+      border:1px solid var(--border-color);
+      border-radius:15px;
+      padding:10px;
+    }
+    .product-stats-filter-section-title {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-bottom:8px;
+      color:var(--text-main);
+      font-size:.74rem;
+      font-weight:900;
+    }
+    .product-stats-filter-section-title span {
+      color:var(--text-muted);
+      font-size:.62rem;
+      font-weight:750;
+    }
+    .product-stats-filter-grid {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+    .product-stats-filter-grid label {
+      display:block;
+      margin-bottom:5px;
+      color:var(--text-muted);
+      font-size:.68rem;
+      font-weight:800;
+    }
+    .product-stats-filter-grid input {
+      width:100%;
+      min-height:40px;
+      padding:7px 9px !important;
+      font-size:.8rem !important;
+      font-variant-numeric:tabular-nums;
+    }
+    .product-stats-time-section {
+      border-color:#e2e8f0;
+      background:#fbfdff;
+    }
+    .product-stats-filter-hint {
+      margin-top:7px;
+      color:var(--text-muted);
+      font-size:.62rem;
+      line-height:1.55;
+    }
+    .product-stats-reset-btn {
+      align-self:flex-start;
+      padding:7px 11px;
+      font-size:.72rem;
+    }
+    @media (max-width:520px) {
+      .product-stats-filter-grid { grid-template-columns:1fr 1fr; }
+      .product-stats-filter-section-title { align-items:flex-start; flex-direction:column; gap:2px; }
+      .product-stats-reset-btn { width:100%; }
+    }
+
     /* ===== تقرير إحصائيات المنتجات والمخزون - تصميم عصري ===== */
     .product-stats-receipt {
       background: linear-gradient(180deg,#f8fbff 0%,#ffffff 38%,#f8fafc 100%);
@@ -4056,20 +4133,40 @@
           <button class="close-modal" onclick="closeProductStatsModal()">✕</button>
         </div>
         <div class="modal-body">
-          <!-- عناصر التصفية الفلترة حسب التاريخ بدون ساعات/دقائق -->
-          <div style="display: flex; flex-direction: column; gap: 8px; background: var(--bg-surface); padding: 10px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
-            <span style="font-size: 0.8rem; font-weight: bold; color: var(--primary-dark);">فلترة الإحصائيات حسب التاريخ:</span>
-            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-              <div style="flex: 1; min-width: 120px;">
-                <label style="font-size: 0.7rem; color: var(--text-muted); display: block;">من تاريخ:</label>
-                <input type="date" id="stats-date-from" class="compact-input" style="padding: 6px 8px; font-size: 0.8rem;" onchange="renderProductStatsReceipt()">
+          <!-- فلترة إحصائيات المنتجات: التاريخ هو الفلتر الرئيسي والوقت اختياري -->
+          <div class="product-stats-filter-panel">
+            <div class="product-stats-filter-title">فلترة الإحصائيات</div>
+
+            <div class="product-stats-filter-section">
+              <div class="product-stats-filter-section-title">📅 التاريخ <span>الفلتر الرئيسي</span></div>
+              <div class="product-stats-filter-grid">
+                <div>
+                  <label>من تاريخ:</label>
+                  <input type="date" id="stats-date-from" class="compact-input" onchange="renderProductStatsReceipt()">
+                </div>
+                <div>
+                  <label>إلى تاريخ:</label>
+                  <input type="date" id="stats-date-to" class="compact-input" onchange="renderProductStatsReceipt()">
+                </div>
               </div>
-              <div style="flex: 1; min-width: 120px;">
-                <label style="font-size: 0.7rem; color: var(--text-muted); display: block;">إلى تاريخ:</label>
-                <input type="date" id="stats-date-to" class="compact-input" style="padding: 6px 8px; font-size: 0.8rem;" onchange="renderProductStatsReceipt()">
-              </div>
-              <button class="btn btn-secondary" onclick="resetStatsDateFilter()" style="padding: 6px 10px; font-size: 0.75rem; margin-top: auto;">🔄 إعادة ضبط</button>
             </div>
+
+            <div class="product-stats-filter-section product-stats-time-section">
+              <div class="product-stats-filter-section-title">🕐 الوقت <span>اختياري — ساعة ودقيقة فقط</span></div>
+              <div class="product-stats-filter-grid">
+                <div>
+                  <label>من الساعة:</label>
+                  <input type="time" id="stats-time-from" class="compact-input" step="60" onchange="renderProductStatsReceipt()">
+                </div>
+                <div>
+                  <label>إلى الساعة:</label>
+                  <input type="time" id="stats-time-to" class="compact-input" step="60" onchange="renderProductStatsReceipt()">
+                </div>
+              </div>
+              <div class="product-stats-filter-hint">يمكنك ترك الوقت فارغاً. عند اختيار الوقت مع التاريخ تصبح النتائج أدق، بينما يبقى التاريخ هو الفلتر الأساسي.</div>
+            </div>
+
+            <button class="btn btn-secondary product-stats-reset-btn" onclick="resetStatsDateFilter()">🔄 إعادة ضبط الفلاتر</button>
           </div>
 
           <div id="product-stats-receipt-area" class="receipt-area"></div>
@@ -11121,10 +11218,11 @@
     }
 
     function resetStatsDateFilter() {
-      const fromInput = document.getElementById('stats-date-from');
-      const toInput = document.getElementById('stats-date-to');
-      if (fromInput) fromInput.value = '';
-      if (toInput) toInput.value = '';
+      const ids = ['stats-date-from', 'stats-date-to', 'stats-time-from', 'stats-time-to'];
+      ids.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = '';
+      });
       renderProductStatsReceipt();
     }
 
@@ -11154,10 +11252,14 @@
       const area = document.getElementById('product-stats-receipt-area');
       if (!area) return;
 
+      // التاريخ هو الفلتر الرئيسي، والوقت اختياري لتحسين دقة النتائج.
       const fromVal = document.getElementById('stats-date-from')?.value || '';
       const toVal = document.getElementById('stats-date-to')?.value || '';
+      const timeFromVal = document.getElementById('stats-time-from')?.value || '';
+      const timeToVal = document.getElementById('stats-time-to')?.value || '';
 
       let fromDate = null, toDate = null;
+
       if (fromVal) {
         const fp = fromVal.split('-');
         fromDate = new Date(+fp[0], +fp[1] - 1, +fp[2], 0, 0, 0, 0);
@@ -11166,6 +11268,18 @@
         const tp = toVal.split('-');
         toDate = new Date(+tp[0], +tp[1] - 1, +tp[2], 23, 59, 59, 999);
       }
+
+      // الوقت لا يعمل منفرداً؛ يجب أن يكون هناك تاريخ محدد أولاً.
+      const timeFilterActive = !!(fromVal || toVal) && !!(timeFromVal || timeToVal);
+
+      const timeToMinutes = value => {
+        if (!value || !/^\d{2}:\d{2}$/.test(value)) return null;
+        const [h, m] = value.split(':').map(Number);
+        return (h * 60) + m;
+      };
+
+      const timeFromMinutes = timeToMinutes(timeFromVal);
+      const timeToMinutesValue = timeToMinutes(timeToVal);
 
       if (fromDate && toDate && fromDate.getTime() > toDate.getTime()) {
         area.innerHTML = `
@@ -11176,12 +11290,51 @@
         return;
       }
 
+      if (timeFilterActive && timeFromMinutes !== null && timeToMinutesValue !== null && timeFromMinutes > timeToMinutesValue) {
+        area.innerHTML = `
+          <div style="text-align:center;padding:28px;color:var(--danger);background:#fef2f2;border-radius:18px;">
+            <strong>الفترة الزمنية بالساعات غير صحيحة</strong>
+            <div style="margin-top:6px;font-size:.8rem;">يجب أن تكون ساعة "من" قبل أو مساوية لساعة "إلى".</div>
+          </div>`;
+        return;
+      }
+
       const filteredInvoices = getActiveInvoices().filter(inv => {
         let invDate = inv.createdAt ? new Date(inv.createdAt) : null;
         if (!invDate || isNaN(invDate.getTime())) invDate = parseInvoiceDateString(inv.date, inv.rawDate);
         if (!invDate || isNaN(invDate.getTime())) return !fromDate && !toDate;
+
+        // تطبيق التاريخ أولاً دائماً.
         if (fromDate && invDate.getTime() < fromDate.getTime()) return false;
         if (toDate && invDate.getTime() > toDate.getTime()) return false;
+
+        // تطبيق الوقت فقط إذا اختاره المدير مع وجود تاريخ.
+        if (timeFilterActive) {
+          const invoiceMinutes = invDate.getHours() * 60 + invDate.getMinutes();
+
+          if (timeFromMinutes !== null && timeToMinutesValue !== null) {
+            // إذا كان التاريخان متعددي الأيام، نستخدم الوقت كحد من/إلى على طرفي الفترة.
+            if (fromVal && toVal && fromVal !== toVal) {
+              if (fromVal === toVal) {
+                if (invoiceMinutes < timeFromMinutes || invoiceMinutes > timeToMinutesValue) return false;
+              } else {
+                const invoiceDateOnly = new Date(invDate.getFullYear(), invDate.getMonth(), invDate.getDate());
+                const fromOnly = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+                const toOnly = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+
+                if (invoiceDateOnly.getTime() === fromOnly.getTime() && invoiceMinutes < timeFromMinutes) return false;
+                if (invoiceDateOnly.getTime() === toOnly.getTime() && invoiceMinutes > timeToMinutesValue) return false;
+              }
+            } else if (invoiceMinutes < timeFromMinutes || invoiceMinutes > timeToMinutesValue) {
+              return false;
+            }
+          } else if (timeFromMinutes !== null && invoiceMinutes < timeFromMinutes) {
+            return false;
+          } else if (timeToMinutesValue !== null && invoiceMinutes > timeToMinutesValue) {
+            return false;
+          }
+        }
+
         return true;
       });
 
@@ -11235,6 +11388,11 @@
       else if (fromVal) dateRangeText = `من تاريخ ${fromVal}`;
       else if (toVal) dateRangeText = `حتى تاريخ ${toVal}`;
 
+      let timeRangeText = '';
+      if (timeFromVal && timeToVal) timeRangeText = ` • الوقت ${timeFromVal}–${timeToVal}`;
+      else if (timeFromVal) timeRangeText = ` • من الساعة ${timeFromVal}`;
+      else if (timeToVal) timeRangeText = ` • حتى الساعة ${timeToVal}`;
+
       const totalStock = itemsList.reduce((sum, x) => sum + x.stock, 0);
       const totalShortage = itemsList.reduce((sum, x) => sum + x.shortage, 0);
       const totalProducts = itemsList.length;
@@ -11245,7 +11403,7 @@
             <div class="product-stats-hero">
               <div class="product-stats-brand">متجر المستقبل للجملة</div>
               <div class="product-stats-title">تقرير إحصائيات المنتجات والمخزون</div>
-              <div class="product-stats-period">الفترة: ${dateRangeText}</div>
+              <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText}</div>
             </div>
             <div class="product-stats-body">
               <div style="text-align:center;padding:28px 12px;color:var(--text-muted);">لا توجد أي طلبات مطابقة للفترة المحددة.</div>
@@ -11281,7 +11439,7 @@
           <div class="product-stats-hero">
             <div class="product-stats-brand">🛍️ متجر المستقبل للجملة</div>
             <div class="product-stats-title">تقرير إحصائيات المنتجات والمخزون</div>
-            <div class="product-stats-period">الفترة: ${dateRangeText} • ${filteredInvoices.length} فاتورة</div>
+            <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText} • ${filteredInvoices.length} فاتورة</div>
             <div class="product-stats-meta">
               <div class="product-stats-summary-card">
                 <div class="product-stats-summary-label">عدد المنتجات</div>
