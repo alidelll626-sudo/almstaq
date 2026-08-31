@@ -4019,6 +4019,12 @@
           </div>
           <button class="close-modal" onclick="closeInvoicesModal()">✕</button>
         </div>
+        <div id="invoices-search-wrap" class="archive-search-wrap hidden" style="margin:10px 16px 0;">
+          <span>🔍</span>
+          <input id="invoices-search" type="text" inputmode="search"
+                 placeholder="ابحث برقم الفاتورة أو اسم الزبون أو الهاتف..."
+                 oninput="renderInvoicesList()">
+        </div>
         <div class="modal-body" id="invoices-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
       </div>
     </div>
@@ -10583,6 +10589,14 @@
         markAllBtn.style.display = (isAdmin || loggedAdmin) ? 'inline-flex' : 'none';
       }
 
+      // شريط البحث يظهر للمندوب والمدير فقط، ولا يظهر للزبون.
+      const invoicesSearchWrap = document.getElementById('invoices-search-wrap');
+      const invoicesSearch = document.getElementById('invoices-search');
+      if (invoicesSearchWrap) {
+        invoicesSearchWrap.classList.toggle('hidden', !(loggedDelegate || isAdmin || loggedAdmin));
+      }
+      if (invoicesSearch) invoicesSearch.value = '';
+
       await loadInvoicesFromFirestore();
       renderInvoicesList();
       updateUnreadInvoicesBadge();
@@ -10616,8 +10630,40 @@
       }
 
       updateUnreadInvoicesBadge();
+
+      // البحث في الفواتير السابقة متاح للمندوب والمدير فقط.
+      const searchInput = document.getElementById('invoices-search');
+      const searchWrap = document.getElementById('invoices-search-wrap');
+      const canSearchInvoices = !!(loggedDelegate || isAdmin || loggedAdmin);
+      if (searchWrap) searchWrap.classList.toggle('hidden', !canSearchInvoices);
+
+      if (canSearchInvoices) {
+        const query = String(searchInput?.value || '').trim();
+        if (query) {
+          const normalizeSearchText = value => String(value ?? '')
+            .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+            .toLocaleLowerCase('ar');
+
+          const normalizedQuery = normalizeSearchText(query);
+          visibleInvoices = visibleInvoices.filter(inv => {
+            const customer = inv.customer || {};
+            const delegate = inv.delegate || {};
+            const haystack = [
+              inv.id, inv.date, inv.total,
+              customer.name, customer.username, customer.phone,
+              customer.mobile, customer.address,
+              inv.delegateUsername, inv.delegateName,
+              delegate.name, delegate.fullname, delegate.username, delegate.phone
+            ].map(normalizeSearchText).join(' ');
+            return haystack.includes(normalizedQuery);
+          });
+        }
+      }
+
       if (visibleInvoices.length === 0) {
-        listContainer.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد فواتير مسجلة.</p>';
+        listContainer.innerHTML = canSearchInvoices && String(searchInput?.value || '').trim()
+          ? '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد فاتورة تطابق البحث.</p>'
+          : '<p style="text-align:center; color:var(--text-muted); padding:20px; font-size:0.85rem;">لا توجد فواتير مسجلة.</p>';
         return;
       }
 
