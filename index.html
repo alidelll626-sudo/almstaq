@@ -8412,10 +8412,6 @@
     }
 
     function renderProducts(itemsToRender = null) {
-    /* SEARCH_PRESERVE_FIX */
-    const __searchInput = document.querySelector('.search-input');
-    const __currentSearch = (__searchInput ? __searchInput.value : '').trim().toLowerCase();
-
       // المدير الفرعي loggedAdmin يجب أن يرى المنتجات أيضاً؛ الصلاحيات تحدد فقط ما يستطيع فعله عليها.
       const grid = document.getElementById('products-grid');
       if (!grid) return;
@@ -8559,6 +8555,18 @@
       }
     });
 
+
+    // إعادة رسم المنتجات مع الحفاظ على نتائج البحث الحالية.
+    // لا نغيّر منطق البحث الأصلي؛ فقط نعيد تشغيله عند تغيّر السلة.
+    function renderProductsPreservingSearch() {
+      const searchInput = document.getElementById('search-input');
+      if (searchInput && searchInput.value.trim() !== '') {
+        handleSearch();
+      } else {
+        renderProducts();
+      }
+    }
+
     function handleSearch() {
       const searchInput = document.getElementById('search-input');
       if (!searchInput) return;
@@ -8600,7 +8608,7 @@
 
       setCurrentCart(currentCart);
       updateCartUI();
-      renderProducts();
+      renderProductsPreservingSearch();
     }
 
     function updateProductNote(productId, value) {
@@ -8640,7 +8648,7 @@
       setCurrentCart(currentCart);
       updateCartUI();
       renderCartModal();
-      renderProducts();
+      renderProductsPreservingSearch();
     }
 
     function updateCartItemNote(id, val) {
@@ -8658,7 +8666,7 @@
       setCurrentCart(currentCart);
       updateCartUI();
       renderCartModal();
-      renderProducts();
+      renderProductsPreservingSearch();
     }
 
     function clearCart() {
@@ -8668,7 +8676,7 @@
         setCurrentCart([]);
         updateCartUI();
         renderCartModal();
-        renderProducts();
+        renderProductsPreservingSearch();
       }
     }
 
@@ -11932,18 +11940,6 @@
     if (event.target.closest && event.target.closest('#future-splash')) hideSplash();
   }, { once: true });
 })();
-</script>
-
-
-<script>
-/* SEARCH_PRESERVE_FIX_HOOK */
-document.addEventListener('DOMContentLoaded', () => {
-  const input = document.querySelector('.search-input');
-  if (!input) return;
-  input.addEventListener('input', () => {
-    if (typeof renderProducts === 'function') renderProducts();
-  });
-});
 </script>
 
 </body>
