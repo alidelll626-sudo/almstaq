@@ -9012,85 +9012,16 @@
           throw createErr;
         }
 
-        // ثانياً: محاولة مزامنة المخزون بعد نجاح الفاتورة.
-        // أي فشل هنا يُسجل في Console فقط ولا يلغي الفاتورة.
-        const stockCandidates = stockPlans.filter(p =>
-          p.productExists &&
-          p.originalStockIsNumeric &&
-          Number(p.fulfilledQty || 0) > 0
-        );
-
-        const appliedStockAdjustments = {};
-        if (stockCandidates.length) {
-          try {
-            await db.runTransaction(async tx => {
-              for (const p of stockCandidates) {
-                const freshSnap = await tx.get(p.ref);
-                if (!freshSnap.exists) continue;
-
-                const fresh = freshSnap.data() || {};
-                const freshStock = Number(fresh.stock);
-                const freshSoldQtyRaw = Number(fresh.soldQty);
-
-                // لا نحدّث منتجاً مخزونه غير رقمي أو صفراً.
-                if (!Number.isFinite(freshStock) || freshStock <= 0) continue;
-
-                const freshSoldQty = Number.isFinite(freshSoldQtyRaw) ? freshSoldQtyRaw : 0;
-                const fulfilledQty = Math.min(Math.max(0, freshStock), Number(p.requestedQty || 0));
-                if (!Number.isFinite(fulfilledQty) || fulfilledQty <= 0) continue;
-
-                tx.set(p.ref, {
-                  stock: Math.max(0, freshStock - fulfilledQty),
-                  soldQty: freshSoldQty + fulfilledQty,
-                  updatedAt: Date.now(),
-                  lastStockUpdateUid: firebaseUser.uid,
-                  lastStockUpdateInvoiceId: newInvoice.id
-                }, {merge:true});
-
-                appliedStockAdjustments[String(p.productId)] = {
-                  productId: p.productId,
-                  name: p.name,
-                  qty: fulfilledQty
-                };
-              }
-            });
-
-            // نحفظ الكمية التي خُصمت فعلياً، وليس فقط الكمية المطلوبة،
-            // حتى تكون عملية الحذف أو التعديل لاحقاً دقيقة.
-            newInvoice.stockAdjustments = Object.values(appliedStockAdjustments);
-            await invoiceRef.set({
-              stockAdjustments: newInvoice.stockAdjustments,
-              stockAdjustedAt: Date.now(),
-              stockAdjustedBy: firebaseUser.uid
-            }, {merge:true});
-          } catch (stockErr) {
-            // إذا فشلت مزامنة المخزون، لا نترك metadata توحي بأن الكمية خُصمت.
-            newInvoice.stockAdjustments = [];
-            try { await invoiceRef.set({ stockAdjustments: [] }, {merge:true}); } catch (_) {}
-            console.warn('تم إصدار الفاتورة لكن تعذرت مزامنة بعض كميات المخزون:', stockErr);
-          }
-        } else {
-          newInvoice.stockAdjustments = [];
-          try { await invoiceRef.set({ stockAdjustments: [] }, {merge:true}); } catch (_) {}
-        }
-
-        // لا ينشئ المندوب/الزبون إشعاراً باسم الإدارة؛ إشعارات حالة الطلب
-        // ينشئها المدير عند تغيير الحالة من لوحة تتبع الطلبات.
+        // ===== تحسين سرعة ظهور الفاتورة =====
+        // بمجرد نجاح حفظ الفاتورة الأساسية في Firestore نعرضها فوراً للمستخدم.
+        // مزامنة المخزون وسجل العمليات أعمال ثانوية، لذلك لا نجعل الزبون/المندوب
+        // ينتظر اكتمالها قبل رؤية الفاتورة.
         invoices.unshift(newInvoice);
-        await writeAuditLog('createInvoice'
-, `تم إصدار الفاتورة ${newInvoice.id} للزبون "${custName}"`, {
-          invoiceId: newInvoice.id, total: totalAmount, paymentStatus, orderStatus
-        });
-
         saveData();
 
-        // بعد نجاح حفظ الفاتورة: تصفير كميات المنتجات والملاحظات فوراً.
-        // يجب تفريغ السلة قبل إعادة رسم المنتجات حتى تظهر كل العدادات = 0
-        // وتختفي ملاحظات المنتجات مباشرة، مع بقاء الفاتورة المحفوظة كما هي.
+        // تفريغ السلة وعرض الفاتورة فوراً.
         setCurrentCart([]);
         updateCartUI();
-        renderProducts();
-        renderBusinessDashboard();
         renderReceiptHTML(newInvoice);
         document.getElementById('checkout-form').reset();
         applyPaymentUIByRole();
@@ -9098,6 +9029,90 @@
         if (searchCustomerInput) searchCustomerInput.value = '';
         closeCartModal();
         document.getElementById('receipt-modal').classList.remove('hidden');
+
+        // إعادة رسم المنتجات بعد إظهار الفاتورة حتى لا تؤخر فتحها.
+        // requestAnimationFrame يمنح المتصفح فرصة لرسم نافذة الفاتورة أولاً.
+        requestAnimationFrame(() => {
+          try {
+            renderProducts();
+            renderBusinessDashboard();
+          } catch (uiErr) {
+            console.warn('تعذر تحديث بعض عناصر الواجهة بعد إصدار الفاتورة:', uiErr);
+          }
+        });
+
+        // مزامنة المخزون وسجل العمليات في مسار مستقل بعد ظهور الفاتورة.
+        // أي فشل هنا لا يخفي الفاتورة ولا يعيد السلة، لأن الفاتورة الأساسية محفوظة بالفعل.
+        (async () => {
+          const stockCandidates = stockPlans.filter(p =>
+            p.productExists &&
+            p.originalStockIsNumeric &&
+            Number(p.fulfilledQty || 0) > 0
+          );
+
+          const appliedStockAdjustments = {};
+          if (stockCandidates.length) {
+            try {
+              await db.runTransaction(async tx => {
+                for (const p of stockCandidates) {
+                  const freshSnap = await tx.get(p.ref);
+                  if (!freshSnap.exists) continue;
+
+                  const fresh = freshSnap.data() || {};
+                  const freshStock = Number(fresh.stock);
+                  const freshSoldQtyRaw = Number(fresh.soldQty);
+
+                  if (!Number.isFinite(freshStock) || freshStock <= 0) continue;
+
+                  const freshSoldQty = Number.isFinite(freshSoldQtyRaw) ? freshSoldQtyRaw : 0;
+                  const fulfilledQty = Math.min(Math.max(0, freshStock), Number(p.requestedQty || 0));
+                  if (!Number.isFinite(fulfilledQty) || fulfilledQty <= 0) continue;
+
+                  tx.set(p.ref, {
+                    stock: Math.max(0, freshStock - fulfilledQty),
+                    soldQty: freshSoldQty + fulfilledQty,
+                    updatedAt: Date.now(),
+                    lastStockUpdateUid: firebaseUser.uid,
+                    lastStockUpdateInvoiceId: newInvoice.id
+                  }, {merge:true});
+
+                  appliedStockAdjustments[String(p.productId)] = {
+                    productId: p.productId,
+                    name: p.name,
+                    qty: fulfilledQty
+                  };
+                }
+              });
+
+              newInvoice.stockAdjustments = Object.values(appliedStockAdjustments);
+              await invoiceRef.set({
+                stockAdjustments: newInvoice.stockAdjustments,
+                stockAdjustedAt: Date.now(),
+                stockAdjustedBy: firebaseUser.uid
+              }, {merge:true});
+            } catch (stockErr) {
+              newInvoice.stockAdjustments = [];
+              try { await invoiceRef.set({ stockAdjustments: [] }, {merge:true}); } catch (_) {}
+              console.warn('تم إصدار الفاتورة لكن تعذرت مزامنة بعض كميات المخزون:', stockErr);
+            }
+          } else {
+            newInvoice.stockAdjustments = [];
+            try { await invoiceRef.set({ stockAdjustments: [] }, {merge:true}); } catch (_) {}
+          }
+
+          try {
+            await writeAuditLog('createInvoice',
+              `تم إصدار الفاتورة ${newInvoice.id} للزبون "${custName}"`, {
+                invoiceId: newInvoice.id, total: totalAmount, paymentStatus, orderStatus
+              }
+            );
+          } catch (auditErr) {
+            console.warn('تم إصدار الفاتورة لكن تعذر حفظ سجل العملية:', auditErr);
+          }
+
+          // نحفظ النسخة المحلية المحدثة بعد انتهاء مزامنة المخزون.
+          try { saveData(); } catch (_) {}
+        })();
       } catch (err) {
         console.error('فشل إصدار الفاتورة:', err);
         const message = String(err?.message || '');
