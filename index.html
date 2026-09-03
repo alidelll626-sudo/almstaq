@@ -1264,103 +1264,6 @@
       #receipt-modal .modal-body { overflow:visible !important; max-height:none !important; }
     }
 
-
-    /* ===== تأكيد إفراغ السلة داخل HTML — بدون confirm الخاص بـ Kodular ===== */
-    #custom-clear-cart-modal {
-      position: fixed;
-      inset: 0;
-      z-index: 5000 !important;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 18px;
-      background: rgba(15, 23, 42, .58);
-      backdrop-filter: blur(5px);
-    }
-
-    #custom-clear-cart-modal.hidden {
-      display: none !important;
-    }
-
-    .clear-cart-confirm-card {
-      width: min(390px, calc(100vw - 36px));
-      background: #fff;
-      border: 1px solid rgba(226,232,240,.95);
-      border-radius: 22px;
-      padding: 20px;
-      box-shadow: 0 22px 55px rgba(15,23,42,.24);
-      animation: clearCartConfirmIn .18s ease-out;
-      text-align: center;
-    }
-
-    @keyframes clearCartConfirmIn {
-      from { opacity: 0; transform: translateY(8px) scale(.97); }
-      to { opacity: 1; transform: translateY(0) scale(1); }
-    }
-
-    .clear-cart-confirm-icon {
-      width: 58px;
-      height: 58px;
-      margin: 0 auto 12px;
-      border-radius: 18px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #fef2f2;
-      color: #dc2626;
-      font-size: 1.55rem;
-    }
-
-    .clear-cart-confirm-title {
-      font-size: 1.05rem;
-      font-weight: 900;
-      color: var(--text-main);
-      margin-bottom: 7px;
-    }
-
-    .clear-cart-confirm-text {
-      font-size: .78rem;
-      line-height: 1.7;
-      color: var(--text-muted);
-      margin-bottom: 17px;
-    }
-
-    .clear-cart-confirm-actions {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 9px;
-    }
-
-    .clear-cart-confirm-actions button {
-      min-height: 46px;
-      border: 0;
-      border-radius: 13px;
-      cursor: pointer;
-      font-size: .82rem;
-      font-weight: 900;
-      transition: transform .15s ease;
-    }
-
-    .clear-cart-confirm-actions button:active {
-      transform: scale(.97);
-    }
-
-    .clear-cart-cancel-btn {
-      background: #f1f5f9;
-      color: #334155;
-    }
-
-    .clear-cart-confirm-btn {
-      background: #ef4444;
-      color: #fff;
-      box-shadow: 0 7px 16px rgba(239,68,68,.18);
-    }
-
-    body.clear-cart-confirm-open {
-      overflow: hidden;
-    }
-
-
     .hidden { display: none !important; }
   
     /* نافذة عرض تفاصيل الإشعار */
@@ -3567,6 +3470,147 @@
 }
 </style>
 
+<style id="mustaqbal-dialogs-style">
+  /* ===== نوافذ التأكيد والإدخال داخل التطبيق — متوافقة مع Kodular ===== */
+  #mustaqbal-app-confirm,
+  #mustaqbal-app-prompt {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483646;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, .58);
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+    direction: rtl;
+    font-family: inherit;
+  }
+
+  #mustaqbal-app-confirm.show,
+  #mustaqbal-app-prompt.show {
+    display: flex;
+  }
+
+  .mustaqbal-dialog-box {
+    width: min(430px, 94vw);
+    background: #fff;
+    border-radius: 22px;
+    box-shadow: 0 24px 70px rgba(0,0,0,.28);
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,.06);
+    animation: mustaqbalDialogIn .18s ease-out;
+  }
+
+  .mustaqbal-dialog-head {
+    padding: 20px 22px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .mustaqbal-dialog-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    display: grid;
+    place-items: center;
+    background: #fef2f2;
+    color: #dc2626;
+    font-size: 22px;
+    flex: 0 0 46px;
+  }
+
+  .mustaqbal-dialog-title {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 900;
+    color: #172033;
+  }
+
+  .mustaqbal-dialog-message {
+    padding: 4px 22px 18px;
+    color: #4b5563;
+    font-size: 15px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .mustaqbal-dialog-input-wrap {
+    padding: 0 22px 18px;
+  }
+
+  .mustaqbal-dialog-input {
+    width: 100%;
+    min-height: 46px;
+    border: 1px solid #dbe3ec;
+    border-radius: 13px;
+    padding: 10px 12px;
+    outline: none;
+    background: #f8fafc;
+    color: #172033;
+    font: inherit;
+    font-size: 15px;
+    box-sizing: border-box;
+  }
+
+  .mustaqbal-dialog-input:focus {
+    border-color: #7dd3fc;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(14,165,233,.10);
+  }
+
+  .mustaqbal-dialog-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+    padding: 0 22px 20px;
+  }
+
+  .mustaqbal-dialog-actions button {
+    min-height: 46px;
+    border: 0;
+    border-radius: 13px;
+    font: inherit;
+    font-size: .82rem;
+    font-weight: 900;
+    cursor: pointer;
+    transition: transform .15s ease;
+  }
+
+  .mustaqbal-dialog-actions button:active {
+    transform: scale(.97);
+  }
+
+  .mustaqbal-dialog-cancel {
+    background: #f1f5f9;
+    color: #334155;
+  }
+
+  .mustaqbal-dialog-ok {
+    background: #2563eb;
+    color: #fff;
+    box-shadow: 0 7px 16px rgba(37,99,235,.18);
+  }
+
+  .mustaqbal-dialog-danger {
+    background: #ef4444;
+    color: #fff;
+    box-shadow: 0 7px 16px rgba(239,68,68,.18);
+  }
+
+  @keyframes mustaqbalDialogIn {
+    from { opacity: 0; transform: translateY(8px) scale(.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  body.mustaqbal-dialog-open {
+    overflow: hidden;
+  }
+</style>
+
 <div id="mustaqbal-app-alert" aria-hidden="true">
   <div id="mustaqbal-app-alert-box" role="alertdialog"
        aria-modal="true" aria-labelledby="mustaqbal-app-alert-title">
@@ -3576,6 +3620,40 @@
     </div>
     <div id="mustaqbal-app-alert-message"></div>
     <button type="button" id="mustaqbal-app-alert-ok">موافق</button>
+  </div>
+</div>
+
+<div id="mustaqbal-app-confirm" aria-hidden="true">
+  <div class="mustaqbal-dialog-box" role="alertdialog" aria-modal="true"
+       aria-labelledby="mustaqbal-confirm-title">
+    <div class="mustaqbal-dialog-head">
+      <div class="mustaqbal-dialog-icon">⚠️</div>
+      <h3 id="mustaqbal-confirm-title" class="mustaqbal-dialog-title">تأكيد العملية</h3>
+    </div>
+    <div id="mustaqbal-confirm-message" class="mustaqbal-dialog-message"></div>
+    <div class="mustaqbal-dialog-actions">
+      <button type="button" id="mustaqbal-confirm-cancel" class="mustaqbal-dialog-cancel">إلغاء</button>
+      <button type="button" id="mustaqbal-confirm-ok" class="mustaqbal-dialog-danger">موافق</button>
+    </div>
+  </div>
+</div>
+
+<div id="mustaqbal-app-prompt" aria-hidden="true">
+  <div class="mustaqbal-dialog-box" role="dialog" aria-modal="true"
+       aria-labelledby="mustaqbal-prompt-title">
+    <div class="mustaqbal-dialog-head">
+      <div class="mustaqbal-dialog-icon" style="background:#e0f2fe;color:#0369a1;">✏️</div>
+      <h3 id="mustaqbal-prompt-title" class="mustaqbal-dialog-title">إدخال البيانات</h3>
+    </div>
+    <div id="mustaqbal-prompt-message" class="mustaqbal-dialog-message"></div>
+    <div class="mustaqbal-dialog-input-wrap">
+      <input id="mustaqbal-prompt-input" class="mustaqbal-dialog-input" type="text"
+             autocomplete="off" />
+    </div>
+    <div class="mustaqbal-dialog-actions">
+      <button type="button" id="mustaqbal-prompt-cancel" class="mustaqbal-dialog-cancel">إلغاء</button>
+      <button type="button" id="mustaqbal-prompt-ok" class="mustaqbal-dialog-ok">موافق</button>
+    </div>
   </div>
 </div>
 
@@ -3639,6 +3717,195 @@
     document.addEventListener('DOMContentLoaded', initMustaqbalAlert);
   } else {
     initMustaqbalAlert();
+  }
+})();
+
+/* ===== بديل confirm/prompt الأصلي: لا يعرض رابط GitHub داخل Kodular ===== */
+(function () {
+  var confirmOverlay = null;
+  var confirmMessage = null;
+  var confirmOk = null;
+  var confirmCancel = null;
+  var promptOverlay = null;
+  var promptMessage = null;
+  var promptInput = null;
+  var promptOk = null;
+  var promptCancel = null;
+
+  function initMustaqbalDialogs() {
+    confirmOverlay = document.getElementById('mustaqbal-app-confirm');
+    confirmMessage = document.getElementById('mustaqbal-confirm-message');
+    confirmOk = document.getElementById('mustaqbal-confirm-ok');
+    confirmCancel = document.getElementById('mustaqbal-confirm-cancel');
+
+    promptOverlay = document.getElementById('mustaqbal-app-prompt');
+    promptMessage = document.getElementById('mustaqbal-prompt-message');
+    promptInput = document.getElementById('mustaqbal-prompt-input');
+    promptOk = document.getElementById('mustaqbal-prompt-ok');
+    promptCancel = document.getElementById('mustaqbal-prompt-cancel');
+
+    if (!confirmOverlay || !confirmMessage || !confirmOk || !confirmCancel ||
+        !promptOverlay || !promptMessage || !promptInput || !promptOk || !promptCancel) {
+      return;
+    }
+
+    confirmOk.addEventListener('click', function () {
+      if (typeof window.__mustaqbalConfirmResolve === 'function') {
+        var resolve = window.__mustaqbalConfirmResolve;
+        window.__mustaqbalConfirmResolve = null;
+        closeConfirm();
+        resolve(true);
+      }
+    });
+
+    confirmCancel.addEventListener('click', function () {
+      if (typeof window.__mustaqbalConfirmResolve === 'function') {
+        var resolve = window.__mustaqbalConfirmResolve;
+        window.__mustaqbalConfirmResolve = null;
+        closeConfirm();
+        resolve(false);
+      }
+    });
+
+    confirmOverlay.addEventListener('click', function (e) {
+      if (e.target === confirmOverlay && typeof window.__mustaqbalConfirmResolve === 'function') {
+        var resolve = window.__mustaqbalConfirmResolve;
+        window.__mustaqbalConfirmResolve = null;
+        closeConfirm();
+        resolve(false);
+      }
+    });
+
+    promptOk.addEventListener('click', function () {
+      if (typeof window.__mustaqbalPromptResolve === 'function') {
+        var resolve = window.__mustaqbalPromptResolve;
+        window.__mustaqbalPromptResolve = null;
+        var value = promptInput.value;
+        closePrompt();
+        resolve(value);
+      }
+    });
+
+    promptCancel.addEventListener('click', function () {
+      if (typeof window.__mustaqbalPromptResolve === 'function') {
+        var resolve = window.__mustaqbalPromptResolve;
+        window.__mustaqbalPromptResolve = null;
+        closePrompt();
+        resolve(null);
+      }
+    });
+
+    promptOverlay.addEventListener('click', function (e) {
+      if (e.target === promptOverlay && typeof window.__mustaqbalPromptResolve === 'function') {
+        var resolve = window.__mustaqbalPromptResolve;
+        window.__mustaqbalPromptResolve = null;
+        closePrompt();
+        resolve(null);
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+
+      if (confirmOverlay.classList.contains('show') &&
+          typeof window.__mustaqbalConfirmResolve === 'function') {
+        var resolveConfirm = window.__mustaqbalConfirmResolve;
+        window.__mustaqbalConfirmResolve = null;
+        closeConfirm();
+        resolveConfirm(false);
+      } else if (promptOverlay.classList.contains('show') &&
+                 typeof window.__mustaqbalPromptResolve === 'function') {
+        var resolvePrompt = window.__mustaqbalPromptResolve;
+        window.__mustaqbalPromptResolve = null;
+        closePrompt();
+        resolvePrompt(null);
+      }
+    });
+
+    promptInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        promptOk.click();
+      }
+    });
+  }
+
+  function closeConfirm() {
+    if (confirmOverlay) {
+      confirmOverlay.classList.remove('show');
+      confirmOverlay.setAttribute('aria-hidden', 'true');
+    }
+    document.body.classList.remove('mustaqbal-dialog-open');
+  }
+
+  function closePrompt() {
+    if (promptOverlay) {
+      promptOverlay.classList.remove('show');
+      promptOverlay.setAttribute('aria-hidden', 'true');
+    }
+    document.body.classList.remove('mustaqbal-dialog-open');
+  }
+
+  window.showMustaqbalConfirm = function (message, title) {
+    return new Promise(function (resolve) {
+      if (!confirmOverlay) {
+        resolve(false);
+        return;
+      }
+
+      if (typeof window.__mustaqbalConfirmResolve === 'function') {
+        window.__mustaqbalConfirmResolve(false);
+      }
+
+      confirmMessage.textContent = String(message == null ? '' : message);
+      document.getElementById('mustaqbal-confirm-title').textContent =
+        String(title || 'تأكيد العملية');
+
+      confirmOverlay.classList.add('show');
+      confirmOverlay.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('mustaqbal-dialog-open');
+
+      window.__mustaqbalConfirmResolve = resolve;
+      setTimeout(function () { confirmCancel.focus(); }, 0);
+    });
+  };
+
+  window.showMustaqbalPrompt = function (title, message, defaultValue) {
+    return new Promise(function (resolve) {
+      if (!promptOverlay) {
+        resolve(null);
+        return;
+      }
+
+      if (typeof window.__mustaqbalPromptResolve === 'function') {
+        window.__mustaqbalPromptResolve(null);
+      }
+
+      document.getElementById('mustaqbal-prompt-title').textContent =
+        String(title || 'إدخال البيانات');
+      promptMessage.textContent = String(message == null ? '' : message);
+      promptInput.value = String(defaultValue == null ? '' : defaultValue);
+
+      promptOverlay.classList.add('show');
+      promptOverlay.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('mustaqbal-dialog-open');
+
+      window.__mustaqbalPromptResolve = resolve;
+      setTimeout(function () {
+        promptInput.focus();
+        promptInput.select();
+      }, 0);
+    });
+  };
+
+  function start() {
+    initMustaqbalDialogs();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
   }
 })();
 </script>
@@ -7213,7 +7480,7 @@
       if (!id) return;
       const item = (notifications || []).find(n => String(n.id) === id);
       if (!item) return alert('لم يتم العثور على الإشعار.');
-      const ok = confirm(`هل أنت متأكد من حذف الإشعار «${String(item.subject || '').replace(/\n/g, ' ')}»؟\n\nسيختفي الإشعار أيضاً من حساب المستلم.`);
+      const ok = await showMustaqbalConfirm(`هل أنت متأكد من حذف الإشعار «${String(item.subject || '').replace(/\n/g, ' ')}»؟\n\nسيختفي الإشعار أيضاً من حساب المستلم.`);
       if (!ok) return;
       try {
         // حذف المستند من Firestore هو الحذف الفعلي المشترك بين جميع الأجهزة؛
@@ -7624,7 +7891,7 @@
       if (!isAdmin) return alert('متاح للمدير الرئيسي فقط.');
       const key = String(username || '').trim();
       if (!key || key.toLowerCase() === 'admin') return alert('لا يمكن حذف المدير الرئيسي من هنا.');
-      if (!confirm('تأكيد حذف حساب المدير؟')) return;
+      if (!await showMustaqbalConfirm('تأكيد حذف حساب المدير؟')) return;
 
       try {
         // نقرأ البيانات أولاً لأننا نحتاج authUid/authEmail/كلمة المرور قبل حذف المستند.
@@ -7832,7 +8099,7 @@
 
     async function deleteDelegate(username) {
       if (!requireAdminPermission('deleteDelegates')) return;
-      if (!confirm('تأكيد حذف حساب المندوب نهائياً؟\nسيتم حذف حساب تسجيل الدخول وملف المستخدم وبيانات الحساب من السحابة.')) return;
+      if (!await showMustaqbalConfirm('تأكيد حذف حساب المندوب نهائياً؟\nسيتم حذف حساب تسجيل الدخول وملف المستخدم وبيانات الحساب من السحابة.')) return;
 
       const key = String(username || '').trim();
       if (!key) return alert('اسم المستخدم غير صالح.');
@@ -7959,7 +8226,7 @@
 
     async function deleteDelegateClient(clientId) {
       if (!loggedDelegate || !loggedDelegate.clients) return;
-      if (confirm('تأكيد حذف هذا الزبون؟')) {
+      if (await showMustaqbalConfirm('تأكيد حذف هذا الزبون؟')) {
         loggedDelegate.clients = loggedDelegate.clients.filter(c => c.id !== clientId);
         
         const dIndex = delegates.findIndex(d => d.username === loggedDelegate.username);
@@ -8193,7 +8460,7 @@
 
     async function deleteCustomer(username) {
       if (!requireAdminPermission('deleteCustomers')) return;
-      if (!confirm('تأكيد حذف حساب الزبون نهائياً؟\nسيتم حذف حساب تسجيل الدخول وملف المستخدم وبيانات الحساب من السحابة.')) return;
+      if (!await showMustaqbalConfirm('تأكيد حذف حساب الزبون نهائياً؟\nسيتم حذف حساب تسجيل الدخول وملف المستخدم وبيانات الحساب من السحابة.')) return;
 
       const key = String(username || '').trim();
       if (!key) return alert('اسم المستخدم غير صالح.');
@@ -8401,7 +8668,7 @@
     async function editTab(catId) {
       const cat = categories.find(c => c.id === catId);
       if (!cat) return;
-      const newName = prompt('تعديل اسم القسم:', cat.name);
+      const newName = await showMustaqbalPrompt('تعديل اسم القسم', 'أدخل اسم القسم الجديد:', cat.name);
       if (newName && newName.trim() !== '') {
         cat.name = newName.trim();
         saveData();
@@ -8413,7 +8680,7 @@
 
     async function deleteTab(catId) {
       if (catId === 'all' || catId === 'new_arrivals') return;
-      if (confirm('تأكيد حذف القسم وجميع منتجاته؟')) {
+      if (await showMustaqbalConfirm('تأكيد حذف القسم وجميع منتجاته؟')) {
         categories = categories.filter(c => c.id !== catId);
         products = products.filter(p => p.category !== catId);
         try { await db.collection('categories').doc(String(catId)).delete(); } catch(err){}
@@ -8505,7 +8772,7 @@
       if (!requireAdminPermission('editProducts')) return;
       const product = products.find(p => p.id === id);
       if (!product) return;
-      if (confirm('هل تريد إزالة هذا المنتج من تبويب "أُضيفت حديثاً"؟')) {
+      if (await showMustaqbalConfirm('هل تريد إزالة هذا المنتج من تبويب "أُضيفت حديثاً"؟')) {
         product.isNew = false;
         saveData();
         renderProductsPreservingSearch();
@@ -8515,7 +8782,7 @@
 
     async function deleteProduct(id) {
       if (!requireAdminPermission('deleteProducts')) return;
-      if (confirm('تأكيد حذف المنتج بالكامل من البرنامج؟')) {
+      if (await showMustaqbalConfirm('تأكيد حذف المنتج بالكامل من البرنامج؟')) {
         const deletedProduct = products.find(p => p.id === id);
         products = products.filter(p => p.id !== id);
         try {
@@ -8820,37 +9087,15 @@
       renderProductsPreservingSearch();
     }
 
-    function clearCart() {
-      const currentCart = getCurrentCart();
+    async function clearCart() {
+      let currentCart = getCurrentCart();
       if (currentCart.length === 0) return;
-
-      // لا نستخدم confirm() هنا لأن Kodular WebView يعرض عنوان/رابط الصفحة
-      // داخل نافذة التأكيد. نستخدم نافذة HTML داخل التطبيق بدلاً منها.
-      const modal = document.getElementById('custom-clear-cart-modal');
-      if (modal) {
-        modal.classList.remove('hidden');
-        document.body.classList.add('clear-cart-confirm-open');
+      if (await showMustaqbalConfirm('تأكيد إفراغ السلة؟')) {
+        setCurrentCart([]);
+        updateCartUI();
+        renderCartModal();
+        renderProductsPreservingSearch();
       }
-    }
-
-    function closeClearCartConfirm() {
-      const modal = document.getElementById('custom-clear-cart-modal');
-      if (modal) modal.classList.add('hidden');
-      document.body.classList.remove('clear-cart-confirm-open');
-    }
-
-    function confirmClearCart() {
-      const currentCart = getCurrentCart();
-      if (currentCart.length === 0) {
-        closeClearCartConfirm();
-        return;
-      }
-
-      setCurrentCart([]);
-      updateCartUI();
-      renderCartModal();
-      renderProductsPreservingSearch();
-      closeClearCartConfirm();
     }
 
     function updateCartUI() {
@@ -11283,7 +11528,7 @@
       if (archived && isInvoiceArchived(inv)) return;
       if (!archived && !isInvoiceArchived(inv)) return;
       const actionText = archived ? 'أرشفة' : 'إلغاء أرشفة';
-      if (!confirm(`تأكيد ${actionText} الفاتورة ${id}؟\nلن يتم تغيير المخزون أو الكميات بسبب هذه العملية.`)) return;
+      if (!await showMustaqbalConfirm(`تأكيد ${actionText} الفاتورة ${id}؟\nلن يتم تغيير المخزون أو الكميات بسبب هذه العملية.`)) return;
       try {
         const refs = [];
         const directRef = db.collection('invoices').doc(id);
@@ -11324,7 +11569,7 @@
         alert('هذه الفاتورة مؤرشفة. استخدم حذف الفاتورة المؤرشفة من قسم الفواتير المؤرشفة.');
         return;
       }
-      if (!confirm(fromArchive ? 'تأكيد حذف الفاتورة المؤرشفة نهائياً؟\nسيتم أيضاً إعادة الكميات التي خُصمت فعلياً منها إلى المخزون.' : 'تأكيد حذف هذه الفاتورة نهائياً؟\nسيتم أيضاً إعادة الكميات التي خُصمت فعلياً إلى المخزون.')) return;
+      if (!await showMustaqbalConfirm(fromArchive ? 'تأكيد حذف الفاتورة المؤرشفة نهائياً؟\nسيتم أيضاً إعادة الكميات التي خُصمت فعلياً منها إلى المخزون.' : 'تأكيد حذف هذه الفاتورة نهائياً؟\nسيتم أيضاً إعادة الكميات التي خُصمت فعلياً إلى المخزون.')) return;
       try {
         const refsToDelete = [];
         const directRef = db.collection('invoices').doc(invoiceKey);
@@ -12220,20 +12465,6 @@
     }, true);
 })();
 </script>
-
-
-  <!-- تأكيد إفراغ السلة داخل التطبيق؛ يمنع Kodular WebView من عرض رابط الموقع -->
-  <div id="custom-clear-cart-modal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="clear-cart-confirm-title">
-    <div class="clear-cart-confirm-card" onclick="event.stopPropagation()">
-      <div class="clear-cart-confirm-icon">🗑️</div>
-      <div id="clear-cart-confirm-title" class="clear-cart-confirm-title">تأكيد إفراغ السلة</div>
-      <div class="clear-cart-confirm-text">هل أنت متأكد من حذف جميع المنتجات الموجودة في السلة؟</div>
-      <div class="clear-cart-confirm-actions">
-        <button type="button" class="clear-cart-cancel-btn" onclick="closeClearCartConfirm()">إلغاء</button>
-        <button type="button" class="clear-cart-confirm-btn" onclick="confirmClearCart()">موافق</button>
-      </div>
-    </div>
-  </div>
 
 </body>
 </html>
