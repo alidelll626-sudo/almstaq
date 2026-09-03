@@ -6005,7 +6005,7 @@
       if (typeof renderTabs === 'function') renderTabs();
       if (typeof updateProductsSortUI === 'function') updateProductsSortUI();
       // نستخدم renderProducts مباشرة حتى نضمن عرض جميع المنتجات بالأقدم أولاً.
-      if (typeof renderProducts === 'function') renderProducts();
+      if (typeof renderProducts === 'function') renderProductsPreservingSearch();
     }
 
     function getProductCreatedTime(product) {
@@ -6760,7 +6760,7 @@
           alert('تم تعديل اسم مستخدم حسابك من قبل المدير الرئيسي، لذلك تم تسجيل خروجك تلقائياً. يرجى تسجيل الدخول بالمعلومات الجديدة.');
           checkInitialSessionState();
           renderTabs();
-          renderProducts();
+          renderProductsPreservingSearch();
           updateCartUI();
           return;
         }
@@ -6788,7 +6788,7 @@
 
           checkInitialSessionState();
           renderTabs();
-          renderProducts();
+          renderProductsPreservingSearch();
           updateCartUI();
         }
       }, (err) => {
@@ -6862,7 +6862,7 @@
       localStorage.setItem('isAdmin','false');
       try { auth.signOut(); } catch (_) {}
       checkInitialSessionState();
-      renderProducts();
+      renderProductsPreservingSearch();
     }
 
     function hasAdminPermission(permission) {
@@ -6914,7 +6914,7 @@
       checkInitialSessionState();
       refreshOnLoginData();
       renderTabs();
-      renderProducts();
+      renderProductsPreservingSearch();
       updateCartUI();
       monitorActiveSession();
       startExclusiveSessionHeartbeat();
@@ -8324,7 +8324,7 @@
         if (activeCategory === catId) activeCategory = 'all';
         renderTabs();
         populateCategorySelect();
-        renderProducts();
+        renderProductsPreservingSearch();
       }
     }
 
@@ -8379,7 +8379,7 @@
         });
         saveData();
         resetProductForm();
-        renderProducts();
+        renderProductsPreservingSearch();
         renderBusinessDashboard();
         alert('تم حفظ المنتج بنجاح!');
       } catch (err) {
@@ -8411,7 +8411,7 @@
       if (confirm('هل تريد إزالة هذا المنتج من تبويب "أُضيفت حديثاً"؟')) {
         product.isNew = false;
         saveData();
-        renderProducts();
+        renderProductsPreservingSearch();
         try { await db.collection('products').doc(String(id)).update({ isNew: false }); } catch (err) {}
       }
     }
@@ -8426,7 +8426,7 @@
           await writeAuditLog('deleteProduct', `تم حذف المنتج "${deletedProduct?.name || id}"`, {productId:id});
         } catch(err){}
         saveData();
-        renderProducts();
+        renderProductsPreservingSearch();
       }
     }
 
@@ -8573,7 +8573,7 @@
       if (searchInput && searchInput.value.trim() !== '') {
         handleSearch();
       } else {
-        renderProducts();
+        renderProductsPreservingSearch();
       }
     }
 
@@ -8592,7 +8592,7 @@
       if (searchInput && searchInput.value.trim() !== '') {
         handleSearch();
       } else {
-        renderProducts();
+        renderProductsPreservingSearch();
       }
     }
 
@@ -8608,7 +8608,7 @@
       if (!searchInput) return;
       searchInput.value = '';
       updateProductSearchClearButton();
-      renderProducts();
+      renderProductsPreservingSearch();
       searchInput.focus();
     }
 
@@ -8620,7 +8620,7 @@
 
       // عند تفريغ شريط البحث نرجع مباشرة إلى عرض المنتجات الطبيعي للقسم الحالي.
       if (!query) {
-        renderProducts();
+        renderProductsPreservingSearch();
         return;
       }
 
@@ -9088,7 +9088,7 @@
         // requestAnimationFrame يمنح المتصفح فرصة لرسم نافذة الفاتورة أولاً.
         requestAnimationFrame(() => {
           try {
-            renderProducts();
+            renderProductsPreservingSearch();
             renderBusinessDashboard();
           } catch (uiErr) {
             console.warn('تعذر تحديث بعض عناصر الواجهة بعد إصدار الفاتورة:', uiErr);
@@ -9517,7 +9517,7 @@
         product.updatedAt = Date.now();
 
         saveData();
-        renderProducts();
+        renderProductsPreservingSearch();
         renderBusinessDashboard();
 
         await writeAuditLog(
@@ -11074,7 +11074,7 @@
         Object.assign(inv, updatedFields);
         saveData();
         renderInvoicesList();
-        renderProducts();
+        renderProductsPreservingSearch();
         renderBusinessDashboard();
         await writeAuditLog(
           'editInvoice',
@@ -11260,7 +11260,7 @@
         invoices = invoices.filter(i => String(i.id) !== invoiceKey);
         saveData();
         try { setReadInvoiceIds(getReadInvoiceIds().filter(id => String(id) !== invoiceKey)); } catch (_) {}
-        renderInvoicesList(); renderArchivedInvoicesList(); renderProducts(); renderBusinessDashboard();
+        renderInvoicesList(); renderArchivedInvoicesList(); renderProductsPreservingSearch(); renderBusinessDashboard();
         await writeAuditLog(fromArchive ? 'deleteArchivedInvoice' : 'deleteInvoice', `تم حذف الفاتورة ${invoiceKey} نهائياً وإعادة الكميات التي خُصمت فعلياً منها إلى المخزون.`, {invoiceId:invoiceKey, archived:fromArchive, inventoryChanged:true});
         alert(fromArchive ? 'تم حذف الفاتورة المؤرشفة وإعادة الكميات التي خُصمت فعلياً منها إلى المخزون بنجاح.' : 'تم حذف الفاتورة وإعادة الكميات التي خُصمت منها إلى المخزون بنجاح.');
       } catch (err) {
@@ -12066,6 +12066,39 @@
     } else {
         resetProductsAfterFreshAppOpen();
     }
+})();
+</script>
+
+
+<script>
+/* Search state guard: while text exists in the search box, product actions must keep filtering. */
+(function () {
+    let lastQuery = '';
+
+    function keepSearchApplied() {
+        const input = document.getElementById('search-input');
+        if (!input) return;
+        const query = input.value.trim();
+        if (!query) {
+            lastQuery = '';
+            return;
+        }
+        if (query !== lastQuery && typeof handleSearch === 'function') {
+            lastQuery = query;
+            handleSearch();
+        }
+    }
+
+    document.addEventListener('input', function (e) {
+        if (e.target && e.target.id === 'search-input') {
+            lastQuery = e.target.value.trim();
+        }
+    });
+
+    // Reapply after UI interactions that may trigger a product rerender.
+    document.addEventListener('click', function () {
+        setTimeout(keepSearchApplied, 0);
+    }, true);
 })();
 </script>
 
