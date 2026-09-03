@@ -188,6 +188,26 @@
       background: transparent;
     }
 
+    .search-clear-btn {
+      width: 30px;
+      height: 30px;
+      flex: 0 0 30px;
+      border: none;
+      border-radius: 50%;
+      background: #f1f5f9;
+      color: var(--text-muted);
+      font-size: 1rem;
+      font-weight: 900;
+      line-height: 1;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .search-clear-btn.visible { display: inline-flex; }
+    .search-clear-btn:active { transform: scale(.92); background: #e2e8f0; }
+
     .categories-bar {
       display: flex;
       gap: 8px;
@@ -3566,7 +3586,8 @@
 
       <div class="search-box hidden" id="search-bar-container">
         <span style="color: var(--text-muted);">🔍</span>
-        <input type="text" id="search-input" class="search-input" placeholder="ابحث عن منتج..." oninput="handleSearch()">
+        <input type="text" id="search-input" class="search-input" placeholder="ابحث عن منتج..." oninput="handleSearch()" autocomplete="off">
+        <button type="button" id="search-clear-btn" class="search-clear-btn" onclick="clearProductSearch()" aria-label="مسح البحث" title="مسح البحث">×</button>
       </div>
 
       <div class="categories-bar hidden" id="main-sidebar">
@@ -5964,18 +5985,26 @@
     // نعيد تلقائياً عرض جميع المنتجات من الأقدم إلى الأحدث،
     // ولا نغيّر ترتيب الأقسام الأخرى الذي اختاره المستخدم.
     function resetProductsToOldestOnReturn() {
+      // عند الرجوع إلى التطبيق نبدأ دائماً من الواجهة الرئيسية للمنتجات:
+      // جميع المنتجات + الأقدم أولاً، مع إلغاء أي بحث أو قسم كان مفتوحاً.
       activeCategory = 'all';
       productSortModes = productSortModes || {};
       productSortModes.all = 'oldest';
       productsSortMenuOpen = false;
       saveProductSortModes();
 
-      // لا نمسح نص البحث عند الرجوع من الخلفية.
-      // يبقى البحث كما كتبه المستخدم وتستمر نتائجه بالظهور.
+      // مسح البحث عند الرجوع حتى لا تبقى نتائج البحث السابقة ظاهرة.
       const searchInput = document.getElementById('search-input');
+      if (searchInput) {
+        searchInput.value = '';
+      }
+      if (typeof updateProductSearchClearButton === 'function') {
+        updateProductSearchClearButton();
+      }
 
       if (typeof renderTabs === 'function') renderTabs();
       if (typeof updateProductsSortUI === 'function') updateProductsSortUI();
+      // نستخدم renderProducts مباشرة حتى نضمن عرض جميع المنتجات بالأقدم أولاً.
       if (typeof renderProducts === 'function') renderProducts();
     }
 
@@ -8242,7 +8271,7 @@
       productsSortMenuOpen = false;
       renderTabs();
       updateProductsSortUI();
-      renderProducts();
+      renderProductsPreservingSearch();
     }
 
     function populateCategorySelect() {
@@ -8567,10 +8596,34 @@
       }
     }
 
+    function updateProductSearchClearButton() {
+      const searchInput = document.getElementById('search-input');
+      const clearBtn = document.getElementById('search-clear-btn');
+      if (!clearBtn) return;
+      clearBtn.classList.toggle('visible', !!(searchInput && searchInput.value.length));
+    }
+
+    function clearProductSearch() {
+      const searchInput = document.getElementById('search-input');
+      if (!searchInput) return;
+      searchInput.value = '';
+      updateProductSearchClearButton();
+      renderProducts();
+      searchInput.focus();
+    }
+
     function handleSearch() {
       const searchInput = document.getElementById('search-input');
       if (!searchInput) return;
       const query = searchInput.value.toLowerCase().trim();
+      updateProductSearchClearButton();
+
+      // عند تفريغ شريط البحث نرجع مباشرة إلى عرض المنتجات الطبيعي للقسم الحالي.
+      if (!query) {
+        renderProducts();
+        return;
+      }
+
       const filtered = products.filter(p => {
         const matchesCategory = activeCategory === 'all' ? true :
                                 activeCategory === 'new_arrivals' ? (p.isNew !== false) :
@@ -8637,6 +8690,7 @@
 
       setCurrentCart(currentCart);
       updateCartUI();
+      renderProductsPreservingSearch();
     }
 
     function updateQty(id, change) {
@@ -11954,6 +12008,64 @@
   document.addEventListener('pointerdown', (event) => {
     if (event.target.closest && event.target.closest('#future-splash')) hideSplash();
   }, { once: true });
+})();
+</script>
+
+
+<script>
+/*
+ * عند إعادة فتح التطبيق بعد إغلاقه/إعادة تحميل الصفحة فقط:
+ * - إظهار جميع المنتجات
+ * - ترتيبها من الأقدم إلى الأحدث
+ * - مسح البحث والتصنيف السابق
+ *
+ * لا نستخدم visibilitychange أو pageshow، لذلك الانتقال للخلفية
+ * والعودة للتطبيق لا يغيّر الواجهة.
+ */
+(function () {
+    function resetProductsAfterFreshAppOpen() {
+        try {
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) searchInput.value = '';
+
+            if (typeof activeCategory !== 'undefined') {
+                activeCategory = 'all';
+            }
+
+            if (typeof products !== 'undefined' && Array.isArray(products)) {
+                // الأقدم أولاً، مع الحفاظ على المنتجات التي لا تملك تاريخاً في النهاية.
+                products.sort(function (a, b) {
+                    const da = a && (a.createdAt || a.created_at || a.timestamp);
+                    const db = b && (b.createdAt || b.created_at || b.timestamp);
+                    const ta = da && typeof da.toMillis === 'function' ? da.toMillis() :
+                               da && typeof da.seconds === 'number' ? da.seconds * 1000 :
+                               (da ? new Date(da).getTime() : Number.POSITIVE_INFINITY);
+                    const tb = db && typeof db.toMillis === 'function' ? db.toMillis() :
+                               db && typeof db.seconds === 'number' ? db.seconds * 1000 :
+                               (db ? new Date(db).getTime() : Number.POSITIVE_INFINITY);
+                    return ta - tb;
+                });
+            }
+
+            if (typeof updateProductSearchClearButton === 'function') {
+                updateProductSearchClearButton();
+            }
+
+            if (typeof renderProducts === 'function') {
+                renderProducts();
+            }
+        } catch (e) {
+            console.warn('Fresh app-open product reset skipped:', e);
+        }
+    }
+
+    // هذا الحدث يعمل عند تحميل الصفحة/التطبيق من جديد فقط.
+    // لا يوجد أي مستمع لـ visibilitychange أو pagehide/pageshow.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', resetProductsAfterFreshAppOpen, { once: true });
+    } else {
+        resetProductsAfterFreshAppOpen();
+    }
 })();
 </script>
 
