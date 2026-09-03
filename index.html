@@ -6004,8 +6004,8 @@
 
       if (typeof renderTabs === 'function') renderTabs();
       if (typeof updateProductsSortUI === 'function') updateProductsSortUI();
-      // نستخدم renderProducts مباشرة حتى نضمن عرض جميع المنتجات بالأقدم أولاً.
-      if (typeof renderProducts === 'function') renderProductsPreservingSearch();
+      // بعد مسح البحث نعرض جميع المنتجات بالأقدم أولاً.
+      if (typeof renderProducts === 'function') renderProducts();
     }
 
     function getProductCreatedTime(product) {
@@ -8592,7 +8592,7 @@
       if (searchInput && searchInput.value.trim() !== '') {
         handleSearch();
       } else {
-        renderProductsPreservingSearch();
+        renderProducts();
       }
     }
 
@@ -8608,7 +8608,7 @@
       if (!searchInput) return;
       searchInput.value = '';
       updateProductSearchClearButton();
-      renderProductsPreservingSearch();
+      renderProducts();
       searchInput.focus();
     }
 
@@ -8620,7 +8620,7 @@
 
       // عند تفريغ شريط البحث نرجع مباشرة إلى عرض المنتجات الطبيعي للقسم الحالي.
       if (!query) {
-        renderProductsPreservingSearch();
+        renderProducts();
         return;
       }
 
