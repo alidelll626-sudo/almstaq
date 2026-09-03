@@ -1264,6 +1264,103 @@
       #receipt-modal .modal-body { overflow:visible !important; max-height:none !important; }
     }
 
+
+    /* ===== تأكيد إفراغ السلة داخل HTML — بدون confirm الخاص بـ Kodular ===== */
+    #custom-clear-cart-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 5000 !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(15, 23, 42, .58);
+      backdrop-filter: blur(5px);
+    }
+
+    #custom-clear-cart-modal.hidden {
+      display: none !important;
+    }
+
+    .clear-cart-confirm-card {
+      width: min(390px, calc(100vw - 36px));
+      background: #fff;
+      border: 1px solid rgba(226,232,240,.95);
+      border-radius: 22px;
+      padding: 20px;
+      box-shadow: 0 22px 55px rgba(15,23,42,.24);
+      animation: clearCartConfirmIn .18s ease-out;
+      text-align: center;
+    }
+
+    @keyframes clearCartConfirmIn {
+      from { opacity: 0; transform: translateY(8px) scale(.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .clear-cart-confirm-icon {
+      width: 58px;
+      height: 58px;
+      margin: 0 auto 12px;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fef2f2;
+      color: #dc2626;
+      font-size: 1.55rem;
+    }
+
+    .clear-cart-confirm-title {
+      font-size: 1.05rem;
+      font-weight: 900;
+      color: var(--text-main);
+      margin-bottom: 7px;
+    }
+
+    .clear-cart-confirm-text {
+      font-size: .78rem;
+      line-height: 1.7;
+      color: var(--text-muted);
+      margin-bottom: 17px;
+    }
+
+    .clear-cart-confirm-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+    }
+
+    .clear-cart-confirm-actions button {
+      min-height: 46px;
+      border: 0;
+      border-radius: 13px;
+      cursor: pointer;
+      font-size: .82rem;
+      font-weight: 900;
+      transition: transform .15s ease;
+    }
+
+    .clear-cart-confirm-actions button:active {
+      transform: scale(.97);
+    }
+
+    .clear-cart-cancel-btn {
+      background: #f1f5f9;
+      color: #334155;
+    }
+
+    .clear-cart-confirm-btn {
+      background: #ef4444;
+      color: #fff;
+      box-shadow: 0 7px 16px rgba(239,68,68,.18);
+    }
+
+    body.clear-cart-confirm-open {
+      overflow: hidden;
+    }
+
+
     .hidden { display: none !important; }
   
     /* نافذة عرض تفاصيل الإشعار */
@@ -8724,14 +8821,36 @@
     }
 
     function clearCart() {
-      let currentCart = getCurrentCart();
+      const currentCart = getCurrentCart();
       if (currentCart.length === 0) return;
-      if (confirm('تأكيد إفراغ السلة؟')) {
-        setCurrentCart([]);
-        updateCartUI();
-        renderCartModal();
-        renderProductsPreservingSearch();
+
+      // لا نستخدم confirm() هنا لأن Kodular WebView يعرض عنوان/رابط الصفحة
+      // داخل نافذة التأكيد. نستخدم نافذة HTML داخل التطبيق بدلاً منها.
+      const modal = document.getElementById('custom-clear-cart-modal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        document.body.classList.add('clear-cart-confirm-open');
       }
+    }
+
+    function closeClearCartConfirm() {
+      const modal = document.getElementById('custom-clear-cart-modal');
+      if (modal) modal.classList.add('hidden');
+      document.body.classList.remove('clear-cart-confirm-open');
+    }
+
+    function confirmClearCart() {
+      const currentCart = getCurrentCart();
+      if (currentCart.length === 0) {
+        closeClearCartConfirm();
+        return;
+      }
+
+      setCurrentCart([]);
+      updateCartUI();
+      renderCartModal();
+      renderProductsPreservingSearch();
+      closeClearCartConfirm();
     }
 
     function updateCartUI() {
@@ -12101,6 +12220,20 @@
     }, true);
 })();
 </script>
+
+
+  <!-- تأكيد إفراغ السلة داخل التطبيق؛ يمنع Kodular WebView من عرض رابط الموقع -->
+  <div id="custom-clear-cart-modal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="clear-cart-confirm-title">
+    <div class="clear-cart-confirm-card" onclick="event.stopPropagation()">
+      <div class="clear-cart-confirm-icon">🗑️</div>
+      <div id="clear-cart-confirm-title" class="clear-cart-confirm-title">تأكيد إفراغ السلة</div>
+      <div class="clear-cart-confirm-text">هل أنت متأكد من حذف جميع المنتجات الموجودة في السلة؟</div>
+      <div class="clear-cart-confirm-actions">
+        <button type="button" class="clear-cart-cancel-btn" onclick="closeClearCartConfirm()">إلغاء</button>
+        <button type="button" class="clear-cart-confirm-btn" onclick="confirmClearCart()">موافق</button>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>
