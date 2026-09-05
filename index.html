@@ -4,7 +4,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- BUILD: business-v18-product-stats-delegate-filter-20260906 -->
+  <!-- BUILD: business-v19-product-stats-delegate-filter-fixed-20260906 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>متجر المستقبل للجملة - النظام التجاري</title>
@@ -5544,8 +5544,10 @@
         const snapshot = await db.collection('delegates').get();
         delegates = [];
         snapshot.forEach(doc => {
-          const data = doc.data();
-          if (data && data.username && data.username !== 'undefined') delegates.push(data);
+          const data = doc.data() || {};
+          const username = String(data.username || doc.id || '').trim();
+          if (!username || username === 'undefined' || username === 'null') return;
+          delegates.push({ ...data, username });
         });
         localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
         if (typeof renderAdminDelegatesList === 'function') renderAdminDelegatesList();
@@ -6221,6 +6223,7 @@
         renderDelegateClientsList();
         if (typeof populateDelegateCustomerDelegateSelect === 'function') populateDelegateCustomerDelegateSelect();
         if (typeof renderDelegateCustomerAccounts === 'function') renderDelegateCustomerAccounts();
+        if (typeof renderProductStatsDelegateFilter === 'function') renderProductStatsDelegateFilter();
         renderBusinessDashboard();
 
         if (btn) {
@@ -11731,33 +11734,59 @@
       if (!select) return;
 
       const previous = String(select.value || '');
-      const sortedDelegates = [...(delegates || [])].sort((a, b) => {
-        const an = String(a.fullname || a.username || '');
-        const bn = String(b.fullname || b.username || '');
-        return an.localeCompare(bn, 'ar');
-      });
+      let sourceDelegates = Array.isArray(delegates) ? delegates : [];
+
+      // إذا لم تكن القائمة العامة جاهزة بعد، استخدم النسخة المحفوظة محلياً.
+      if (!sourceDelegates.length) {
+        try {
+          const cached = JSON.parse(localStorage.getItem('mustaqbal_delegates') || '[]');
+          if (Array.isArray(cached)) sourceDelegates = cached;
+        } catch (_) {}
+      }
+
+      const normalized = sourceDelegates
+        .map((del, index) => {
+          const username = String(del?.username || del?.userName || del?.login || '').trim();
+          const fullname = String(del?.fullname || del?.name || username).trim();
+          return { ...del, username, fullname, __index: index };
+        })
+        .filter(del => del.username && del.username !== 'undefined' && del.username !== 'null');
+
+      const seen = new Set();
+      const sortedDelegates = normalized
+        .filter(del => {
+          if (seen.has(del.username)) return false;
+          seen.add(del.username);
+          return true;
+        })
+        .sort((a, b) => a.fullname.localeCompare(b.fullname, 'ar'));
 
       select.innerHTML = '<option value="">جميع المندوبين</option>';
 
       sortedDelegates.forEach(del => {
-        const username = String(del.username || '').trim();
-        if (!username) return;
-        const name = String(del.fullname || username).trim();
         const option = document.createElement('option');
-        option.value = username;
-        option.textContent = name === username ? name : `${name} — ${username}`;
+        option.value = del.username;
+        option.textContent = del.fullname === del.username
+          ? del.fullname
+          : `${del.fullname} — ${del.username}`;
         select.appendChild(option);
       });
 
-      if (previous && sortedDelegates.some(del => String(del.username || '') === previous)) {
+      if (previous && sortedDelegates.some(del => del.username === previous)) {
         select.value = previous;
       } else {
         select.value = '';
       }
     }
 
-    function openProductStatsModal() {
+    async function openProductStatsModal() {
       if (!requireAdminPermission('viewProductStats')) return;
+
+      // ضمان تحميل قائمة المندوبين قبل فتح قائمة الفلتر.
+      if (!Array.isArray(delegates) || delegates.length === 0) {
+        await loadDelegatesFromFirestore();
+      }
+
       renderProductStatsDelegateFilter();
       renderProductStatsReceipt();
       document.getElementById('product-stats-modal').classList.remove('hidden');
