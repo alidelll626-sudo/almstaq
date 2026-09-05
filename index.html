@@ -4,7 +4,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- BUILD: business-v17-invoice-a4-pagination-total-20260827 -->
+  <!-- BUILD: business-v18-product-stats-delegate-filter-20260906 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>متجر المستقبل للجملة - النظام التجاري</title>
@@ -1348,6 +1348,21 @@
       font-size:.62rem;
       line-height:1.55;
     }
+    .product-stats-delegate-section {
+      border-color:#dbeafe;
+      background:#fbfdff;
+    }
+    .product-stats-delegate-section .compact-input {
+      min-height:42px;
+      font-weight:800;
+      color:var(--text-main);
+      background:#fff;
+    }
+    .product-stats-delegate-section .compact-input:focus {
+      border-color:#7dd3fc;
+      box-shadow:0 0 0 3px rgba(14,165,233,.08);
+    }
+
     .product-stats-reset-btn {
       align-self:flex-start;
       padding:7px 11px;
@@ -4557,6 +4572,17 @@
               <div class="product-stats-filter-hint">يمكنك ترك الوقت فارغاً. عند اختيار الوقت مع التاريخ تصبح النتائج أدق، بينما يبقى التاريخ هو الفلتر الأساسي.</div>
             </div>
 
+            <div class="product-stats-filter-section product-stats-delegate-section">
+              <div class="product-stats-filter-section-title">
+                🛵 المندوب
+                <span>اختياري — تصفية النتائج حسب مندوب واحد</span>
+              </div>
+              <select id="stats-delegate-filter" class="compact-input" onchange="renderProductStatsReceipt()">
+                <option value="">جميع المندوبين</option>
+              </select>
+              <div class="product-stats-filter-hint">عند اختيار مندوب، تظهر إحصائيات المنتجات الخاصة بفواتيره فقط، مع بقاء فلتر التاريخ والوقت فعالاً.</div>
+            </div>
+
             <button class="btn btn-secondary product-stats-reset-btn" onclick="resetStatsDateFilter()">🔄 إعادة ضبط الفلاتر</button>
           </div>
 
@@ -5523,6 +5549,7 @@
         });
         localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
         if (typeof renderAdminDelegatesList === 'function') renderAdminDelegatesList();
+        if (typeof renderProductStatsDelegateFilter === 'function') renderProductStatsDelegateFilter();
         if (loggedDelegate) {
           const currentDel = delegates.find(d => d.username === loggedDelegate.username);
           if (currentDel) {
@@ -11699,8 +11726,40 @@
     }
 
     /* --- وظائف إحصائيات المنتجات المعدلة بالكامل لحل مشكلة الفلترة --- */
+    function renderProductStatsDelegateFilter() {
+      const select = document.getElementById('stats-delegate-filter');
+      if (!select) return;
+
+      const previous = String(select.value || '');
+      const sortedDelegates = [...(delegates || [])].sort((a, b) => {
+        const an = String(a.fullname || a.username || '');
+        const bn = String(b.fullname || b.username || '');
+        return an.localeCompare(bn, 'ar');
+      });
+
+      select.innerHTML = '<option value="">جميع المندوبين</option>';
+
+      sortedDelegates.forEach(del => {
+        const username = String(del.username || '').trim();
+        if (!username) return;
+        const name = String(del.fullname || username).trim();
+        const option = document.createElement('option');
+        option.value = username;
+        option.textContent = name === username ? name : `${name} — ${username}`;
+        select.appendChild(option);
+      });
+
+      if (previous && sortedDelegates.some(del => String(del.username || '') === previous)) {
+        select.value = previous;
+      } else {
+        select.value = '';
+      }
+    }
+
     function openProductStatsModal() {
-      if (!requireAdminPermission('viewProductStats')) return; renderProductStatsReceipt();
+      if (!requireAdminPermission('viewProductStats')) return;
+      renderProductStatsDelegateFilter();
+      renderProductStatsReceipt();
       document.getElementById('product-stats-modal').classList.remove('hidden');
     }
 
@@ -11709,7 +11768,7 @@
     }
 
     function resetStatsDateFilter() {
-      const ids = ['stats-date-from', 'stats-date-to', 'stats-time-from', 'stats-time-to'];
+      const ids = ['stats-date-from', 'stats-date-to', 'stats-time-from', 'stats-time-to', 'stats-delegate-filter'];
       ids.forEach(id => {
         const input = document.getElementById(id);
         if (input) input.value = '';
@@ -11748,6 +11807,7 @@
       const toVal = document.getElementById('stats-date-to')?.value || '';
       const timeFromVal = document.getElementById('stats-time-from')?.value || '';
       const timeToVal = document.getElementById('stats-time-to')?.value || '';
+      const selectedDelegateUsername = document.getElementById('stats-delegate-filter')?.value || '';
 
       let fromDate = null, toDate = null;
 
@@ -11791,6 +11851,17 @@
       }
 
       const filteredInvoices = getActiveInvoices().filter(inv => {
+        // فلتر المندوب اختياري. نستخدم username كمعرّف ثابت،
+        // مع دعم الصيغ القديمة التي قد تحتوي delegate داخل الفاتورة.
+        if (selectedDelegateUsername) {
+          const invoiceDelegateUsername = String(
+            inv.delegateUsername ??
+            inv.delegate?.username ??
+            ''
+          ).trim();
+          if (invoiceDelegateUsername !== String(selectedDelegateUsername).trim()) return false;
+        }
+
         let invDate = inv.createdAt ? new Date(inv.createdAt) : null;
         if (!invDate || isNaN(invDate.getTime())) invDate = parseInvoiceDateString(inv.date, inv.rawDate);
         if (!invDate || isNaN(invDate.getTime())) return !fromDate && !toDate;
@@ -11884,6 +11955,17 @@
       else if (timeFromVal) timeRangeText = ` • من الساعة ${timeFromVal}`;
       else if (timeToVal) timeRangeText = ` • حتى الساعة ${timeToVal}`;
 
+      let delegateRangeText = '';
+      if (selectedDelegateUsername) {
+        const selectedDelegate = (delegates || []).find(
+          d => String(d.username || '') === String(selectedDelegateUsername)
+        );
+        const delegateLabel = String(
+          selectedDelegate?.fullname || selectedDelegate?.username || selectedDelegateUsername
+        ).trim();
+        delegateRangeText = ` • المندوب: ${delegateLabel}`;
+      }
+
       const totalStock = itemsList.reduce((sum, x) => sum + x.stock, 0);
       const totalShortage = itemsList.reduce((sum, x) => sum + x.shortage, 0);
       const totalProducts = itemsList.length;
@@ -11894,7 +11976,7 @@
             <div class="product-stats-hero">
               <div class="product-stats-brand">متجر المستقبل للجملة</div>
               <div class="product-stats-title">تقرير إحصائيات المنتجات والمخزون</div>
-              <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText}</div>
+              <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText}${delegateRangeText}</div>
             </div>
             <div class="product-stats-body">
               <div style="text-align:center;padding:28px 12px;color:var(--text-muted);">لا توجد أي طلبات مطابقة للفترة المحددة.</div>
@@ -11930,7 +12012,7 @@
           <div class="product-stats-hero">
             <div class="product-stats-brand">🛍️ متجر المستقبل للجملة</div>
             <div class="product-stats-title">تقرير إحصائيات المنتجات والمخزون</div>
-            <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText} • ${filteredInvoices.length} فاتورة</div>
+            <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText}${delegateRangeText} • ${filteredInvoices.length} فاتورة</div>
             <div class="product-stats-meta">
               <div class="product-stats-summary-card">
                 <div class="product-stats-summary-label">عدد المنتجات</div>
