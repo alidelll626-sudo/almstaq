@@ -12187,62 +12187,47 @@
       }
 
       const filteredInvoices = getActiveInvoices().filter(inv => {
-        // فلتر المندوب متعدد الاختيار: يكفي تطابق الفاتورة مع أحد المندوبين المحددين.
-        if (selectedDelegateUsernames.size) {
-          // المندوب والزبون فلتران مستقلان ويعملان دائماً بشرط AND.
-          // المعرّف الأساسي للمندوب في الفاتورة هو delegateUsername.
-          // لا نستخدم customer.username كحقل مندوب إلا للفواتير القديمة
-          // التي ownerRole فيها delegate ولا تحتوي delegateUsername.
-          const invoiceDelegateUsername = normalizeStatsIdentity(
-            inv.delegateUsername || inv.delegateUserName || inv.delegateLogin ||
-            ((String(inv.ownerRole || '').toLowerCase() === 'delegate')
-              ? (inv.customer?.username || inv.customer?.userName || '')
-              : '')
-          );
+        // المندوبون والزبائن العاديون نظامان منفصلان تماماً.
+        // لذلك لا نحاول مطابقة زبون عادي مع زبائن المندوبين، ولا العكس.
+        const ownerRole = String(inv.ownerRole || '').trim().toLowerCase();
+        const isDelegateInvoice = ownerRole === 'delegate' || ownerRole === 'مندوب';
+        const isCustomerInvoice = ownerRole === 'customer' || ownerRole === 'زبون';
 
-          const delegateMatches = Array.from(selectedDelegateUsernames).some(selected =>
-            !!selected && !!invoiceDelegateUsername && selected === invoiceDelegateUsername
-          );
+        // المندوبون والزبائن العاديون نظامان منفصلان تماماً، لكن عند تحديد
+        // فلتر من كل نظام معاً نريد جمع النتائج (OR) وليس مطابقتها معاً (AND).
+        // أي: فواتير المندوب المحدد + فواتير الزبون العادي المحدد.
+        let matchesSelectedOwner = true;
 
-          if (!delegateMatches) return false;
+        if (selectedDelegateUsernames.size || selectedCustomerKeys.size) {
+          let delegateMatch = false;
+          let customerMatch = false;
+
+          if (selectedDelegateUsernames.size && isDelegateInvoice) {
+            const invoiceDelegateUsername = normalizeStatsIdentity(
+              inv.delegateUsername || inv.delegateUserName || inv.delegateLogin || ''
+            );
+            delegateMatch = !!invoiceDelegateUsername &&
+              Array.from(selectedDelegateUsernames).some(selected => selected === invoiceDelegateUsername);
+          }
+
+          if (selectedCustomerKeys.size && isCustomerInvoice) {
+            const invCustomer = inv.customer || {};
+            const invoiceUsername = normalizeStatsIdentity(
+              invCustomer.username || invCustomer.userName || ''
+            );
+
+            customerMatch = selectedCustomerOptions.some(selected => {
+              const selectedUsername = normalizeStatsIdentity(selected.username || '');
+              return !!selectedUsername && !!invoiceUsername && selectedUsername === invoiceUsername;
+            });
+          }
+
+          // إذا تم اختيار الفلترين: نقبل الفاتورة إذا كانت تابعة
+          // للمندوب المحدد أو للزبون العادي المحدد.
+          matchesSelectedOwner = delegateMatch || customerMatch;
         }
 
-        // فلتر الزبون متعدد الاختيار: يعمل مع فلتر المندوب كشرط AND.
-        // مهم: فواتير المندوبين القديمة/الحالية قد تحفظ customer.username باسم
-        // المندوب نفسه، لذلك لا نعتمد على username وحده. نطابق الزبون بالمعرف،
-        // ثم الاسم والهاتف كبدائل موثوقة، مع بقاء المندوب شرطاً مستقلاً.
-        if (selectedCustomerKeys.size) {
-          const invCustomer = inv.customer || {};
-          const invoiceUsername = normalizeStatsIdentity(invCustomer.username || invCustomer.userName || '');
-          const invoiceName = normalizeStatsIdentity(invCustomer.name || invCustomer.fullname || invCustomer.fullName || '');
-          const invoicePhone = String(invCustomer.phone || invCustomer.mobile || invCustomer.phoneNumber || '').replace(/\D/g, '');
-
-          const customerMatches = selectedCustomerOptions.some(selected => {
-            const selectedUsername = normalizeStatsIdentity(selected.username || '');
-            const selectedName = normalizeStatsIdentity(selected.name || '');
-            const selectedPhone = String(selected.phone || '').replace(/\D/g, '');
-
-            // أولاً: اسم المستخدم للزبون العادي.
-            if (selectedUsername && invoiceUsername && invoiceUsername === selectedUsername) return true;
-
-            // ثانياً: الاسم + الهاتف. هذا هو التطابق المهم لفاتورة أنشأها
-            // مندوب لزبون عادي، لأن customer.username في تلك الفاتورة قد يكون
-            // اسم المندوب بدلاً من اسم الزبون.
-            if (selectedName && invoiceName && selectedPhone && invoicePhone) {
-              if (selectedName === invoiceName && selectedPhone === invoicePhone) return true;
-            }
-
-            // ثالثاً: الاسم + الهاتف الجزئي عند اختلاف تنسيق الهاتف.
-            if (selectedName && invoiceName && selectedName === invoiceName) {
-              if (!selectedPhone || !invoicePhone) return true;
-              if (selectedPhone.endsWith(invoicePhone) || invoicePhone.endsWith(selectedPhone)) return true;
-            }
-
-            return false;
-          });
-
-          if (!customerMatches) return false;
-        }
+        if (!matchesSelectedOwner) return false;
 
         let invDate = inv.createdAt ? new Date(inv.createdAt) : null;
         if (!invDate || isNaN(invDate.getTime())) invDate = parseInvoiceDateString(inv.date, inv.rawDate);
@@ -12257,7 +12242,6 @@
           const invoiceMinutes = invDate.getHours() * 60 + invDate.getMinutes();
 
           if (timeFromMinutes !== null && timeToMinutesValue !== null) {
-            // إذا كان التاريخان متعددي الأيام، نستخدم الوقت كحد من/إلى على طرفي الفترة.
             if (fromVal && toVal && fromVal !== toVal) {
               if (fromVal === toVal) {
                 if (invoiceMinutes < timeFromMinutes || invoiceMinutes > timeToMinutesValue) return false;
