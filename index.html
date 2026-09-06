@@ -4,7 +4,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- BUILD: business-v20-product-stats-multi-delegate-customer-filter-20260907 -->
+  <!-- BUILD: business-v21-product-stats-regular-customer-filter-20260907 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>متجر المستقبل للجملة - النظام التجاري</title>
@@ -1347,10 +1347,6 @@
       color:var(--text-muted);
       font-size:.62rem;
       line-height:1.55;
-    }
-    .product-stats-delegate-section {
-      border-color:#dbeafe;
-      background:#fbfdff;
     }
     .product-stats-delegate-section .compact-input {
       min-height:42px;
@@ -4700,34 +4696,15 @@
               <div class="product-stats-filter-hint">يمكنك ترك الوقت فارغاً. عند اختيار الوقت مع التاريخ تصبح النتائج أدق، بينما يبقى التاريخ هو الفلتر الأساسي.</div>
             </div>
 
-            <div class="product-stats-filter-section product-stats-delegate-section">
-              <div class="product-stats-filter-section-title">
-                🛵 المندوبون
-                <span>اختيار أكثر من مندوب — اترك الكل بدون تحديد لعرض الجميع</span>
-              </div>
-              <div class="product-stats-multi-filter">
-                <div class="product-stats-multi-search">
-                  <span class="product-stats-multi-search-icon">🔎</span>
-                  <input type="search" id="stats-delegate-search" placeholder="ابحث عن اسم المندوب أو المستخدم..." autocomplete="off" oninput="renderProductStatsDelegateFilter()">
-                </div>
-                <div id="stats-delegate-list" class="product-stats-multi-list"></div>
-                <div class="product-stats-multi-summary">
-                  <span id="stats-delegate-count" class="product-stats-selected-count">👥 لم يتم تحديد مندوب</span>
-                  <button type="button" class="product-stats-multi-clear" onclick="clearProductStatsDelegates()">مسح الاختيار</button>
-                </div>
-              </div>
-              <div class="product-stats-filter-hint">يمكنك تحديد مندوبين أو أكثر في الوقت نفسه. عند تحديد عدة مندوبين ستظهر إحصائيات فواتيرهم جميعاً، مع بقاء فلتر التاريخ والوقت فعالاً.</div>
-            </div>
-
             <div class="product-stats-filter-section product-stats-customer-section">
               <div class="product-stats-filter-section-title">
-                👥 الزبائن
-                <span>اختيار أكثر من زبون — مرتبط بالفواتير المحددة</span>
+                👤 الزبائن العاديون
+                <span>اختيار أكثر من زبون — من حسابات الزبائن العاديين</span>
               </div>
               <div class="product-stats-multi-filter">
                 <div class="product-stats-multi-search">
                   <span class="product-stats-multi-search-icon">🔎</span>
-                  <input type="search" id="stats-customer-search" placeholder="ابحث عن اسم الزبون أو المستخدم أو الهاتف..." autocomplete="off" oninput="renderProductStatsCustomerFilter()">
+                  <input type="search" id="stats-customer-search" placeholder="ابحث عن اسم الزبون أو اسم المستخدم أو الهاتف..." autocomplete="off" oninput="renderProductStatsCustomerFilter()">
                 </div>
                 <div id="stats-customer-list" class="product-stats-multi-list"></div>
                 <div class="product-stats-multi-summary">
@@ -4735,7 +4712,7 @@
                   <button type="button" class="product-stats-multi-clear" onclick="clearProductStatsCustomers()">مسح الاختيار</button>
                 </div>
               </div>
-              <div class="product-stats-filter-hint">يمكنك تحديد زبونين أو أكثر في الوقت نفسه. عند تحديد زبائن مع المندوبين تعمل الفلاتر معاً، أي تظهر فقط الفواتير المطابقة للاختيارين.</div>
+              <div class="product-stats-filter-hint">يمكنك تحديد زبونين أو أكثر في الوقت نفسه، وتظهر فقط الفواتير الخاصة بالزبائن العاديين المحددين.</div>
             </div>
 
             <button class="btn btn-secondary product-stats-reset-btn" onclick="resetStatsDateFilter()">🔄 إعادة ضبط الفلاتر</button>
@@ -5706,7 +5683,6 @@
         });
         localStorage.setItem('mustaqbal_delegates', JSON.stringify(delegates));
         if (typeof renderAdminDelegatesList === 'function') renderAdminDelegatesList();
-        if (typeof renderProductStatsDelegateFilter === 'function') renderProductStatsDelegateFilter();
         if (loggedDelegate) {
           const currentDel = delegates.find(d => d.username === loggedDelegate.username);
           if (currentDel) {
@@ -6378,7 +6354,6 @@
         renderDelegateClientsList();
         if (typeof populateDelegateCustomerDelegateSelect === 'function') populateDelegateCustomerDelegateSelect();
         if (typeof renderDelegateCustomerAccounts === 'function') renderDelegateCustomerAccounts();
-        if (typeof renderProductStatsDelegateFilter === 'function') renderProductStatsDelegateFilter();
         renderBusinessDashboard();
 
         if (btn) {
@@ -11884,92 +11859,15 @@
     }
 
     /* --- فلاتر إحصائيات المنتجات متعددة الاختيار --- */
-    window.statsSelectedDelegates = window.statsSelectedDelegates instanceof Set ? window.statsSelectedDelegates : new Set();
     window.statsSelectedCustomers = window.statsSelectedCustomers instanceof Set ? window.statsSelectedCustomers : new Set();
-
-    function normalizeStatsDelegateList() {
-      let sourceDelegates = Array.isArray(delegates) ? delegates : [];
-      if (!sourceDelegates.length) {
-        try {
-          const cached = JSON.parse(localStorage.getItem('mustaqbal_delegates') || '[]');
-          if (Array.isArray(cached)) sourceDelegates = cached;
-        } catch (_) {}
-      }
-
-      const normalized = sourceDelegates
-        .map((del, index) => {
-          const username = String(del?.username || del?.userName || del?.login || '').trim();
-          const fullname = String(del?.fullname || del?.name || username).trim();
-          return { ...del, username, fullname, __index: index };
-        })
-        .filter(del => del.username && del.username !== 'undefined' && del.username !== 'null');
-
-      const seen = new Set();
-      return normalized
-        .filter(del => {
-          if (seen.has(del.username)) return false;
-          seen.add(del.username);
-          return true;
-        })
-        .sort((a,b) => a.fullname.localeCompare(b.fullname, 'ar'));
-    }
-
-    function renderProductStatsDelegateFilter() {
-      const list = document.getElementById('stats-delegate-list');
-      if (!list) return;
-
-      const source = normalizeStatsDelegateList();
-      const search = String(document.getElementById('stats-delegate-search')?.value || '').trim().toLowerCase();
-
-      const filtered = source.filter(del => {
-        const haystack = `${del.fullname} ${del.username}`.toLowerCase();
-        return !search || haystack.includes(search);
-      });
-
-      if (!filtered.length) {
-        list.innerHTML = '<div class="product-stats-multi-empty">لا يوجد مندوب مطابق للبحث.</div>';
-      } else {
-        list.innerHTML = filtered.map(del => {
-          const username = String(del.username);
-          const checked = window.statsSelectedDelegates.has(username);
-          const safeValue = escapeHtml(username);
-          const safeName = escapeHtml(del.fullname || username);
-          const secondary = del.fullname && del.fullname !== username ? `<small>— ${escapeHtml(username)}</small>` : '';
-          return `
-            <label class="product-stats-multi-option ${checked ? 'selected' : ''}">
-              <input type="checkbox" value="${safeValue}" ${checked ? 'checked' : ''} onchange="toggleProductStatsDelegate(this)">
-              <span class="product-stats-multi-option-text">${safeName}${secondary}</span>
-            </label>`;
-        }).join('');
-      }
-
-      const count = window.statsSelectedDelegates.size;
-      const badge = document.getElementById('stats-delegate-count');
-      if (badge) badge.textContent = count ? `🛵 تم تحديد ${count} مندوب${count === 1 ? '' : 'ين'}` : '👥 لم يتم تحديد مندوب';
-    }
-
-    function toggleProductStatsDelegate(input) {
-      const value = String(input?.value || '').trim();
-      if (!value) return;
-      if (input.checked) window.statsSelectedDelegates.add(value);
-      else window.statsSelectedDelegates.delete(value);
-      renderProductStatsDelegateFilter();
-      renderProductStatsReceipt();
-    }
-
-    function clearProductStatsDelegates() {
-      window.statsSelectedDelegates.clear();
-      renderProductStatsDelegateFilter();
-      renderProductStatsReceipt();
-    }
 
     function buildProductStatsCustomerOptions() {
       const map = new Map();
 
-      const addCustomer = (customer, delegateUsername = '', delegateName = '') => {
+      const addCustomer = (customer) => {
         if (!customer) return;
         const username = String(customer.username || '').replace(/^زبون:\s*/i, '').trim();
-        const name = String(customer.name || '').trim();
+        const name = String(customer.fullname || customer.name || '').trim();
         const phone = String(customer.phone || '').trim();
         const address = String(customer.address || '').trim();
         const key = username ? `u:${username.toLowerCase()}` : `n:${name.toLowerCase()}|p:${phone}`;
@@ -11981,30 +11879,19 @@
             username,
             name: name || username || 'زبون بدون اسم',
             phone,
-            address,
-            delegateUsername: String(delegateUsername || '').trim(),
-            delegateName: String(delegateName || '').trim()
+            address
           });
-        } else {
-          const existing = map.get(key);
-          if (!existing.delegateUsername && delegateUsername) {
-            existing.delegateUsername = String(delegateUsername).trim();
-            existing.delegateName = String(delegateName || '').trim();
-          }
         }
       };
 
-      // جميع الزبائن الذين ظهروا في الفواتير، لأن الإحصائيات مبنية على الفواتير.
-      (Array.isArray(invoices) ? invoices : []).forEach(inv => {
-        addCustomer(inv?.customer || null, inv?.delegateUsername || '', '');
-      });
+      // المصدر الأساسي: حسابات الزبائن العاديين في النظام.
+      (Array.isArray(customers) ? customers : []).forEach(customer => addCustomer(customer));
 
-      // إضافة زبائن المندوبين حتى يظهروا في الفلتر حتى لو لم تصدر لهم فاتورة في الفترة الحالية.
-      const sourceDelegates = Array.isArray(delegates) ? delegates : [];
-      sourceDelegates.forEach(del => {
-        const du = String(del?.username || '').trim();
-        const dn = String(del?.fullname || del?.name || du).trim();
-        (Array.isArray(del?.clients) ? del.clients : []).forEach(client => addCustomer(client, du, dn));
+      // احتياط للفواتير القديمة/الحسابات التي لم تعد موجودة في القائمة الحالية.
+      // هذا لا يضيف زبائن المندوبين؛ يعتمد فقط على بيانات الزبون الموجودة داخل الفاتورة.
+      (Array.isArray(invoices) ? invoices : []).forEach(inv => {
+        const customer = inv?.customer || null;
+        if (customer) addCustomer(customer);
       });
 
       return Array.from(map.values()).sort((a,b) => {
@@ -12026,9 +11913,7 @@
           customer.name,
           customer.username,
           customer.phone,
-          customer.address,
-          customer.delegateName,
-          customer.delegateUsername
+          customer.address
         ].map(v => String(v || '').toLowerCase()).join(' ');
         return !search || haystack.includes(search);
       });
@@ -12043,13 +11928,10 @@
           const safeName = escapeHtml(customer.name || 'زبون بدون اسم');
           const secondary = customer.username && customer.username !== customer.name
             ? `<small>— ${escapeHtml(customer.username)}</small>` : '';
-          const delegate = customer.delegateName
-            ? `<small style="display:block;margin-top:2px;color:#64748b;">🛵 ${escapeHtml(customer.delegateName)}</small>` : '';
-
           return `
             <label class="product-stats-multi-option ${checked ? 'selected' : ''}">
               <input type="checkbox" value="${safeKey}" ${checked ? 'checked' : ''} onchange="toggleProductStatsCustomer(this)">
-              <span class="product-stats-multi-option-text">${safeName}${secondary}${delegate}</span>
+              <span class="product-stats-multi-option-text">${safeName}${secondary}</span>
             </label>`;
         }).join('');
       }
@@ -12081,12 +11963,13 @@
     async function openProductStatsModal() {
       if (!requireAdminPermission('viewProductStats')) return;
 
-      // ضمان تحميل قائمة المندوبين قبل فتح قائمة الفلتر.
-      if (!Array.isArray(delegates) || delegates.length === 0) {
-        await loadDelegatesFromFirestore();
+      // تحميل حسابات الزبائن العاديين قبل فتح فلتر الإحصائيات.
+      try {
+        await loadCustomersFromFirestore();
+      } catch (err) {
+        console.warn('تعذر تحديث قائمة الزبائن العاديين قبل عرض الإحصائيات:', err);
       }
 
-      renderProductStatsDelegateFilter();
       renderProductStatsCustomerFilter();
       renderProductStatsReceipt();
       document.getElementById('product-stats-modal').classList.remove('hidden');
@@ -12097,14 +11980,12 @@
     }
 
     function resetStatsDateFilter() {
-      const ids = ['stats-date-from', 'stats-date-to', 'stats-time-from', 'stats-time-to', 'stats-delegate-search', 'stats-customer-search'];
+      const ids = ['stats-date-from', 'stats-date-to', 'stats-time-from', 'stats-time-to', 'stats-customer-search'];
       ids.forEach(id => {
         const input = document.getElementById(id);
         if (input) input.value = '';
       });
-      window.statsSelectedDelegates = new Set();
       window.statsSelectedCustomers = new Set();
-      renderProductStatsDelegateFilter();
       renderProductStatsCustomerFilter();
       renderProductStatsReceipt();
     }
@@ -12140,9 +12021,6 @@
       const toVal = document.getElementById('stats-date-to')?.value || '';
       const timeFromVal = document.getElementById('stats-time-from')?.value || '';
       const timeToVal = document.getElementById('stats-time-to')?.value || '';
-      const selectedDelegateUsernames = new Set(
-        Array.from(window.statsSelectedDelegates || []).map(v => String(v).trim()).filter(Boolean)
-      );
       const selectedCustomerKeys = new Set(
         Array.from(window.statsSelectedCustomers || []).map(v => String(v).trim()).filter(Boolean)
       );
@@ -12191,16 +12069,6 @@
       }
 
       const filteredInvoices = getActiveInvoices().filter(inv => {
-        // فلتر المندوب متعدد الاختيار: يكفي تطابق الفاتورة مع أحد المندوبين المحددين.
-        if (selectedDelegateUsernames.size) {
-          const invoiceDelegateUsername = String(
-            inv.delegateUsername ??
-            inv.delegate?.username ??
-            ''
-          ).trim();
-          if (!selectedDelegateUsernames.has(invoiceDelegateUsername)) return false;
-        }
-
         // فلتر الزبون متعدد الاختيار: يكفي تطابق الفاتورة مع أحد الزبائن المحددين.
         if (selectedCustomerKeys.size) {
           const invCustomer = inv.customer || {};
@@ -12306,15 +12174,6 @@
       else if (timeFromVal) timeRangeText = ` • من الساعة ${timeFromVal}`;
       else if (timeToVal) timeRangeText = ` • حتى الساعة ${timeToVal}`;
 
-      let delegateRangeText = '';
-      if (selectedDelegateUsernames.size) {
-        const selectedLabels = normalizeStatsDelegateList()
-          .filter(d => selectedDelegateUsernames.has(String(d.username)))
-          .map(d => String(d.fullname || d.username).trim())
-          .filter(Boolean);
-        delegateRangeText = ` • المندوبون: ${selectedLabels.join('، ') || `${selectedDelegateUsernames.size} محدد`}`;
-      }
-
       let customerRangeText = '';
       if (selectedCustomerKeys.size) {
         const selectedLabels = selectedCustomerOptions
@@ -12333,7 +12192,7 @@
             <div class="product-stats-hero">
               <div class="product-stats-brand">متجر المستقبل للجملة</div>
               <div class="product-stats-title">تقرير إحصائيات المنتجات والمخزون</div>
-              <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText}${delegateRangeText}${customerRangeText}</div>
+              <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText}${customerRangeText}</div>
             </div>
             <div class="product-stats-body">
               <div style="text-align:center;padding:28px 12px;color:var(--text-muted);">لا توجد أي طلبات مطابقة للفترة المحددة.</div>
@@ -12369,7 +12228,7 @@
           <div class="product-stats-hero">
             <div class="product-stats-brand">🛍️ متجر المستقبل للجملة</div>
             <div class="product-stats-title">تقرير إحصائيات المنتجات والمخزون</div>
-            <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText}${delegateRangeText}${customerRangeText} • ${filteredInvoices.length} فاتورة</div>
+            <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText}${customerRangeText} • ${filteredInvoices.length} فاتورة</div>
             <div class="product-stats-meta">
               <div class="product-stats-summary-card">
                 <div class="product-stats-summary-label">عدد المنتجات</div>
