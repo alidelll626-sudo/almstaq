@@ -4761,8 +4761,8 @@
 
             <div class="product-stats-filter-section product-stats-customer-section">
               <div class="product-stats-filter-section-title">
-                👤 الزبائن
-                <span>زبائن التطبيق العاديون — اختيار أكثر من زبون</span>
+                👥 الزبائن
+                <span>اختيار أكثر من زبون — مرتبط بالفواتير المحددة</span>
               </div>
               <div class="product-stats-multi-filter">
                 <div class="product-stats-multi-search">
@@ -4775,7 +4775,7 @@
                   <button type="button" class="product-stats-multi-clear" onclick="clearProductStatsCustomers()">مسح الاختيار</button>
                 </div>
               </div>
-              <div class="product-stats-filter-hint">يمكنك تحديد زبونين أو أكثر في الوقت نفسه. هذا الفلتر خاص بحسابات الزبائن العاديين في التطبيق، وليس زبائن المندوبين.</div>
+              <div class="product-stats-filter-hint">يمكنك تحديد زبونين أو أكثر في الوقت نفسه. عند تحديد زبائن مع المندوبين تعمل الفلاتر معاً، أي تظهر فقط الفواتير المطابقة للاختيارين.</div>
             </div>
 
             <button class="btn btn-secondary product-stats-reset-btn" onclick="resetStatsDateFilter()">🔄 إعادة ضبط الفلاتر</button>
@@ -6405,15 +6405,7 @@
           tasks.push(loadNotificationsFromFirestore(false));
         }
 
-        // لا تجعل فشل مزامنة قسم واحد (مثل الإشعارات) يمنع بقية البيانات من التحديث.
-        // هذا مهم خصوصاً للمدير: يجب أن تبقى الفواتير وإحصائيات المنتجات متاحة حتى
-        // لو فشلت قراءة خدمة جانبية.
-        const results = await Promise.allSettled(tasks);
-        results.forEach((result, index) => {
-          if (result.status === 'rejected') {
-            console.warn('فشل أحد مهام التحديث اليدوي:', index, result.reason);
-          }
-        });
+        await Promise.all(tasks);
 
         saveData();
         updateNotificationsBadge();
@@ -12123,16 +12115,17 @@
         }
       };
 
-      // مصدر الفلتر هو حسابات الزبائن العاديين في التطبيق فقط.
-      // لا نستخدم del.clients ولا نضيف زبائن المندوبين إلى هذه القائمة.
-      (Array.isArray(customers) ? customers : []).forEach(customer => {
-        const normalizedUsername = String(customer?.username || '').trim();
-        if (!normalizedUsername || /^مندوب\s*:/i.test(normalizedUsername)) return;
-        addCustomer({
-          ...customer,
-          name: customer?.fullname || customer?.name || normalizedUsername,
-          username: normalizedUsername
-        });
+      // جميع الزبائن الذين ظهروا في الفواتير، لأن الإحصائيات مبنية على الفواتير.
+      (Array.isArray(invoices) ? invoices : []).forEach(inv => {
+        addCustomer(inv?.customer || null, inv?.delegateUsername || '', '');
+      });
+
+      // إضافة زبائن المندوبين حتى يظهروا في الفلتر حتى لو لم تصدر لهم فاتورة في الفترة الحالية.
+      const sourceDelegates = Array.isArray(delegates) ? delegates : [];
+      sourceDelegates.forEach(del => {
+        const du = String(del?.username || '').trim();
+        const dn = String(del?.fullname || del?.name || du).trim();
+        (Array.isArray(del?.clients) ? del.clients : []).forEach(client => addCustomer(client, du, dn));
       });
 
       return Array.from(map.values()).sort((a,b) => {
@@ -12207,56 +12200,17 @@
     }
 
     async function openProductStatsModal() {
-      // افتح النافذة أولاً حتى لا يمنع فشل/تأخر Firestore ظهور التقرير.
       if (!requireAdminPermission('viewProductStats')) return;
-      const modal = document.getElementById('product-stats-modal');
-      if (!modal) return;
-      modal.classList.remove('hidden');
 
-      // اعرض التقرير فوراً بالبيانات المحلية.
-      try {
-        renderProductStatsDelegateFilter();
-        renderProductStatsCustomerFilter();
-        renderProductStatsReceipt();
-      } catch (err) {
-        console.error('خطأ أولي في فتح إحصائيات المنتجات:', err);
+      // ضمان تحميل قائمة المندوبين قبل فتح قائمة الفلتر.
+      if (!Array.isArray(delegates) || delegates.length === 0) {
+        await loadDelegatesFromFirestore();
       }
 
-      // عند دخول المدير إلى إحصائيات المنتجات، اطلب الفواتير من Firestore مباشرةً.
-      // سابقاً كان القسم يعتمد على آخر نسخة محلية فقط، لذلك قد يظهر التقرير فارغاً
-      // بعد التحديث أو عند فتح التطبيق قبل اكتمال مزامنة الفواتير.
-      if (isAdmin || loggedAdmin) {
-        try {
-          await loadInvoicesFromFirestore();
-        } catch (err) {
-          console.warn('تعذر تحديث فواتير إحصائيات المنتجات، سيتم استخدام النسخة المحلية:', err);
-        }
-      }
-
-      try {
-        if (!Array.isArray(customers) || customers.length === 0) {
-          await loadCustomersFromFirestore();
-        }
-      } catch (err) {
-        console.warn('تعذر تحميل حسابات الزبائن من Firestore، سيتم استخدام البيانات المحلية:', err);
-      }
-
-      try {
-        if (!Array.isArray(delegates) || delegates.length === 0) {
-          await loadDelegatesFromFirestore();
-        }
-      } catch (err) {
-        console.warn('تعذر تحميل المندوبين من Firestore، سيتم استخدام البيانات المحلية:', err);
-      }
-
-      // تحديث التقرير والفلاتر بعد اكتمال مزامنة البيانات دون إعادة فتح النافذة.
-      try {
-        renderProductStatsDelegateFilter();
-        renderProductStatsCustomerFilter();
-        renderProductStatsReceipt();
-      } catch (err) {
-        console.error('خطأ في تحديث إحصائيات المنتجات:', err);
-      }
+      renderProductStatsDelegateFilter();
+      renderProductStatsCustomerFilter();
+      renderProductStatsReceipt();
+      document.getElementById('product-stats-modal').classList.remove('hidden');
     }
 
     function closeProductStatsModal() {
