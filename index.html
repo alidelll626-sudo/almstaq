@@ -12189,35 +12189,20 @@
       const filteredInvoices = getActiveInvoices().filter(inv => {
         // فلتر المندوب متعدد الاختيار: يكفي تطابق الفاتورة مع أحد المندوبين المحددين.
         if (selectedDelegateUsernames.size) {
-          // المندوب شرط إلزامي مستقل (AND) ولا يجوز أن يتجاوزه فلتر الزبون.
-          // نطابق المندوب من جميع الحقول التي قد تكون محفوظة في الفاتورة،
-          // بما فيها ownerUid/ownerUsername و customer.username للفواتير
-          // التي أُنشئت من حساب المندوب.
-          const invoiceDelegate = inv.delegate || {};
-          const invoiceDelegateIdentities = [
-            inv.delegateUsername, inv.delegateUserName, inv.delegateLogin,
-            inv.salesRepUsername, inv.salesmanUsername, inv.ownerUsername,
-            inv.createdByUsername, invoiceDelegate.username, invoiceDelegate.userName,
-            invoiceDelegate.login, invoiceDelegate.name, inv.customer?.username
-          ].map(normalizeStatsIdentity).filter(Boolean);
-
-          const selectedDelegateRecords = normalizeStatsDelegateList().filter(del =>
-            selectedDelegateUsernames.has(normalizeStatsIdentity(del.username))
+          // المندوب والزبون فلتران مستقلان ويعملان دائماً بشرط AND.
+          // المعرّف الأساسي للمندوب في الفاتورة هو delegateUsername.
+          // لا نستخدم customer.username كحقل مندوب إلا للفواتير القديمة
+          // التي ownerRole فيها delegate ولا تحتوي delegateUsername.
+          const invoiceDelegateUsername = normalizeStatsIdentity(
+            inv.delegateUsername || inv.delegateUserName || inv.delegateLogin ||
+            ((String(inv.ownerRole || '').toLowerCase() === 'delegate')
+              ? (inv.customer?.username || inv.customer?.userName || '')
+              : '')
           );
 
-          const invoiceOwnerUid = String(
-            inv.ownerUid ?? inv.ownerUID ?? inv.createdByUid ?? inv.createdByUID ?? ''
-          ).trim();
-
-          const delegateMatches = selectedDelegateRecords.some(del => {
-            const delUsername = normalizeStatsIdentity(del.username);
-            const delName = normalizeStatsIdentity(del.fullname || del.name);
-            const delUid = String(del.authUid ?? del.uid ?? del.userId ?? del.id ?? '').trim();
-            if (delUsername && invoiceDelegateIdentities.includes(delUsername)) return true;
-            if (delName && invoiceDelegateIdentities.includes(delName)) return true;
-            if (delUid && invoiceOwnerUid && delUid === invoiceOwnerUid) return true;
-            return false;
-          });
+          const delegateMatches = Array.from(selectedDelegateUsernames).some(selected =>
+            !!selected && !!invoiceDelegateUsername && selected === invoiceDelegateUsername
+          );
 
           if (!delegateMatches) return false;
         }
