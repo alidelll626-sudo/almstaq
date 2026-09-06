@@ -12188,16 +12188,47 @@
           if (!selectedDelegateUsernames.has(invoiceDelegateUsername)) return false;
         }
 
-        // فلتر الزبون متعدد الاختيار: يكفي تطابق الفاتورة مع أحد الزبائن المحددين.
+        // فلتر الزبون متعدد الاختيار: يعمل مع فلتر المندوب كشرط AND.
+        // مهم: فواتير المندوبين القديمة/الحالية قد تحفظ customer.username باسم
+        // المندوب نفسه، لذلك لا نعتمد على username وحده. نطابق الزبون بالمعرف،
+        // ثم الاسم والهاتف كبدائل موثوقة، مع بقاء المندوب شرطاً مستقلاً.
         if (selectedCustomerKeys.size) {
           const invCustomer = inv.customer || {};
-          const invoiceUsername = String(invCustomer.username || '').replace(/^زبون:\s*/i, '').trim();
-          const invoiceName = String(invCustomer.name || '').trim();
-          const invoicePhone = String(invCustomer.phone || '').trim();
-          const invoiceKey = invoiceUsername
-            ? `u:${invoiceUsername.toLowerCase()}`
-            : `n:${invoiceName.toLowerCase()}|p:${invoicePhone}`;
-          if (!selectedCustomerKeys.has(invoiceKey)) return false;
+          const invoiceUsernameRaw = String(invCustomer.username || '').trim();
+          const invoiceUsername = invoiceUsernameRaw
+            .replace(/^زبون:\s*/i, '')
+            .replace(/^customer:\s*/i, '')
+            .trim()
+            .toLowerCase();
+          const invoiceName = String(invCustomer.name || '').trim().toLowerCase();
+          const invoicePhone = String(invCustomer.phone || invCustomer.mobile || '').trim();
+
+          const customerMatches = selectedCustomerOptions.some(selected => {
+            const selectedUsername = String(selected.username || '').trim().toLowerCase();
+            const selectedName = String(selected.name || '').trim().toLowerCase();
+            const selectedPhone = String(selected.phone || '').trim();
+
+            // 1) مطابقة اسم المستخدم للزبون العادي.
+            if (selectedUsername && invoiceUsername && invoiceUsername === selectedUsername) {
+              return true;
+            }
+
+            // 2) مطابقة الاسم + الهاتف، وهي مهمة لفواتير المندوبين التي
+            // يكون فيها customer.username محفوظاً باسم المندوب.
+            if (selectedName && invoiceName && selectedPhone && invoicePhone) {
+              return selectedName === invoiceName && selectedPhone === invoicePhone;
+            }
+
+            // 3) إذا لم يوجد هاتف في أحد السجلين، نستخدم الاسم وحده فقط
+            // عندما يكون اسم المستخدم غير مطابق، لتغطية الفواتير القديمة.
+            if (selectedName && invoiceName && !selectedPhone && !invoicePhone) {
+              return selectedName === invoiceName;
+            }
+
+            return false;
+          });
+
+          if (!customerMatches) return false;
         }
 
         let invDate = inv.createdAt ? new Date(inv.createdAt) : null;
