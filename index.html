@@ -4,7 +4,7 @@
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <!-- BUILD: business-v19-product-stats-delegate-filter-fixed-20260906 -->
+  <!-- BUILD: business-v20-product-stats-multi-delegate-customer-filter-20260907 -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>متجر المستقبل للجملة - النظام التجاري</title>
@@ -1361,6 +1361,134 @@
     .product-stats-delegate-section .compact-input:focus {
       border-color:#7dd3fc;
       box-shadow:0 0 0 3px rgba(14,165,233,.08);
+    }
+
+    /* ===== فلاتر المندوبين والزبائن متعددة الاختيار في إحصائيات المنتجات ===== */
+    .product-stats-multi-filter {
+      position:relative;
+      width:100%;
+    }
+    .product-stats-multi-search {
+      display:flex;
+      align-items:center;
+      gap:7px;
+      min-height:42px;
+      padding:7px 10px;
+      background:#fff;
+      border:1px solid var(--border-color);
+      border-radius:12px;
+      box-shadow:0 2px 7px rgba(15,23,42,.03);
+    }
+    .product-stats-multi-search:focus-within {
+      border-color:#7dd3fc;
+      box-shadow:0 0 0 3px rgba(14,165,233,.08);
+    }
+    .product-stats-multi-search input {
+      flex:1;
+      min-width:0;
+      border:0;
+      outline:0;
+      background:transparent;
+      font-size:.78rem;
+      color:var(--text-main);
+    }
+    .product-stats-multi-search-icon {
+      color:#64748b;
+      font-size:.9rem;
+      flex:0 0 auto;
+    }
+    .product-stats-multi-list {
+      margin-top:7px;
+      max-height:190px;
+      overflow-y:auto;
+      border:1px solid #dbe5ec;
+      border-radius:13px;
+      background:#fff;
+      padding:5px;
+    }
+    .product-stats-multi-list::-webkit-scrollbar { width:5px; }
+    .product-stats-multi-list::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:999px; }
+    .product-stats-multi-option {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      width:100%;
+      min-height:38px;
+      padding:7px 9px;
+      border-radius:10px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .product-stats-multi-option:hover { background:#f8fafc; }
+    .product-stats-multi-option.selected { background:#eff8ff; }
+    .product-stats-multi-option input {
+      width:17px;
+      height:17px;
+      margin:0;
+      flex:0 0 17px;
+      accent-color:var(--primary);
+    }
+    .product-stats-multi-option-text {
+      min-width:0;
+      flex:1;
+      font-size:.74rem;
+      font-weight:800;
+      color:var(--text-main);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .product-stats-multi-option-text small {
+      color:var(--text-muted);
+      font-size:.61rem;
+      font-weight:700;
+      margin-right:4px;
+    }
+    .product-stats-multi-summary {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      margin-top:7px;
+      min-height:27px;
+    }
+    .product-stats-selected-count {
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      color:#0369a1;
+      background:#e0f2fe;
+      border:1px solid #bae6fd;
+      border-radius:999px;
+      padding:4px 8px;
+      font-size:.63rem;
+      font-weight:900;
+      white-space:nowrap;
+    }
+    .product-stats-multi-clear {
+      border:0;
+      background:transparent;
+      color:#64748b;
+      padding:4px 6px;
+      font-size:.65rem;
+      font-weight:800;
+      cursor:pointer;
+    }
+    .product-stats-multi-clear:hover { color:#dc2626; }
+    .product-stats-multi-empty {
+      text-align:center;
+      padding:16px 8px;
+      color:var(--text-muted);
+      font-size:.7rem;
+      font-weight:700;
+    }
+    .product-stats-customer-section {
+      border-color:#d1fae5;
+      background:#fbfffd;
+    }
+    .product-stats-customer-section .product-stats-multi-search:focus-within {
+      border-color:#86efac;
+      box-shadow:0 0 0 3px rgba(16,185,129,.08);
     }
 
     .product-stats-reset-btn {
@@ -4574,13 +4702,40 @@
 
             <div class="product-stats-filter-section product-stats-delegate-section">
               <div class="product-stats-filter-section-title">
-                🛵 المندوب
-                <span>اختياري — تصفية النتائج حسب مندوب واحد</span>
+                🛵 المندوبون
+                <span>اختيار أكثر من مندوب — اترك الكل بدون تحديد لعرض الجميع</span>
               </div>
-              <select id="stats-delegate-filter" class="compact-input" onchange="renderProductStatsReceipt()">
-                <option value="">جميع المندوبين</option>
-              </select>
-              <div class="product-stats-filter-hint">عند اختيار مندوب، تظهر إحصائيات المنتجات الخاصة بفواتيره فقط، مع بقاء فلتر التاريخ والوقت فعالاً.</div>
+              <div class="product-stats-multi-filter">
+                <div class="product-stats-multi-search">
+                  <span class="product-stats-multi-search-icon">🔎</span>
+                  <input type="search" id="stats-delegate-search" placeholder="ابحث عن اسم المندوب أو المستخدم..." autocomplete="off" oninput="renderProductStatsDelegateFilter()">
+                </div>
+                <div id="stats-delegate-list" class="product-stats-multi-list"></div>
+                <div class="product-stats-multi-summary">
+                  <span id="stats-delegate-count" class="product-stats-selected-count">👥 لم يتم تحديد مندوب</span>
+                  <button type="button" class="product-stats-multi-clear" onclick="clearProductStatsDelegates()">مسح الاختيار</button>
+                </div>
+              </div>
+              <div class="product-stats-filter-hint">يمكنك تحديد مندوبين أو أكثر في الوقت نفسه. عند تحديد عدة مندوبين ستظهر إحصائيات فواتيرهم جميعاً، مع بقاء فلتر التاريخ والوقت فعالاً.</div>
+            </div>
+
+            <div class="product-stats-filter-section product-stats-customer-section">
+              <div class="product-stats-filter-section-title">
+                👥 الزبائن
+                <span>اختيار أكثر من زبون — مرتبط بالفواتير المحددة</span>
+              </div>
+              <div class="product-stats-multi-filter">
+                <div class="product-stats-multi-search">
+                  <span class="product-stats-multi-search-icon">🔎</span>
+                  <input type="search" id="stats-customer-search" placeholder="ابحث عن اسم الزبون أو المستخدم أو الهاتف..." autocomplete="off" oninput="renderProductStatsCustomerFilter()">
+                </div>
+                <div id="stats-customer-list" class="product-stats-multi-list"></div>
+                <div class="product-stats-multi-summary">
+                  <span id="stats-customer-count" class="product-stats-selected-count">👤 لم يتم تحديد زبون</span>
+                  <button type="button" class="product-stats-multi-clear" onclick="clearProductStatsCustomers()">مسح الاختيار</button>
+                </div>
+              </div>
+              <div class="product-stats-filter-hint">يمكنك تحديد زبونين أو أكثر في الوقت نفسه. عند تحديد زبائن مع المندوبين تعمل الفلاتر معاً، أي تظهر فقط الفواتير المطابقة للاختيارين.</div>
             </div>
 
             <button class="btn btn-secondary product-stats-reset-btn" onclick="resetStatsDateFilter()">🔄 إعادة ضبط الفلاتر</button>
@@ -11728,15 +11883,12 @@
       });
     }
 
-    /* --- وظائف إحصائيات المنتجات المعدلة بالكامل لحل مشكلة الفلترة --- */
-    function renderProductStatsDelegateFilter() {
-      const select = document.getElementById('stats-delegate-filter');
-      if (!select) return;
+    /* --- فلاتر إحصائيات المنتجات متعددة الاختيار --- */
+    window.statsSelectedDelegates = window.statsSelectedDelegates instanceof Set ? window.statsSelectedDelegates : new Set();
+    window.statsSelectedCustomers = window.statsSelectedCustomers instanceof Set ? window.statsSelectedCustomers : new Set();
 
-      const previous = String(select.value || '');
+    function normalizeStatsDelegateList() {
       let sourceDelegates = Array.isArray(delegates) ? delegates : [];
-
-      // إذا لم تكن القائمة العامة جاهزة بعد، استخدم النسخة المحفوظة محلياً.
       if (!sourceDelegates.length) {
         try {
           const cached = JSON.parse(localStorage.getItem('mustaqbal_delegates') || '[]');
@@ -11753,30 +11905,177 @@
         .filter(del => del.username && del.username !== 'undefined' && del.username !== 'null');
 
       const seen = new Set();
-      const sortedDelegates = normalized
+      return normalized
         .filter(del => {
           if (seen.has(del.username)) return false;
           seen.add(del.username);
           return true;
         })
-        .sort((a, b) => a.fullname.localeCompare(b.fullname, 'ar'));
+        .sort((a,b) => a.fullname.localeCompare(b.fullname, 'ar'));
+    }
 
-      select.innerHTML = '<option value="">جميع المندوبين</option>';
+    function renderProductStatsDelegateFilter() {
+      const list = document.getElementById('stats-delegate-list');
+      if (!list) return;
 
-      sortedDelegates.forEach(del => {
-        const option = document.createElement('option');
-        option.value = del.username;
-        option.textContent = del.fullname === del.username
-          ? del.fullname
-          : `${del.fullname} — ${del.username}`;
-        select.appendChild(option);
+      const source = normalizeStatsDelegateList();
+      const search = String(document.getElementById('stats-delegate-search')?.value || '').trim().toLowerCase();
+
+      const filtered = source.filter(del => {
+        const haystack = `${del.fullname} ${del.username}`.toLowerCase();
+        return !search || haystack.includes(search);
       });
 
-      if (previous && sortedDelegates.some(del => del.username === previous)) {
-        select.value = previous;
+      if (!filtered.length) {
+        list.innerHTML = '<div class="product-stats-multi-empty">لا يوجد مندوب مطابق للبحث.</div>';
       } else {
-        select.value = '';
+        list.innerHTML = filtered.map(del => {
+          const username = String(del.username);
+          const checked = window.statsSelectedDelegates.has(username);
+          const safeValue = escapeHtml(username);
+          const safeName = escapeHtml(del.fullname || username);
+          const secondary = del.fullname && del.fullname !== username ? `<small>— ${escapeHtml(username)}</small>` : '';
+          return `
+            <label class="product-stats-multi-option ${checked ? 'selected' : ''}">
+              <input type="checkbox" value="${safeValue}" ${checked ? 'checked' : ''} onchange="toggleProductStatsDelegate(this)">
+              <span class="product-stats-multi-option-text">${safeName}${secondary}</span>
+            </label>`;
+        }).join('');
       }
+
+      const count = window.statsSelectedDelegates.size;
+      const badge = document.getElementById('stats-delegate-count');
+      if (badge) badge.textContent = count ? `🛵 تم تحديد ${count} مندوب${count === 1 ? '' : 'ين'}` : '👥 لم يتم تحديد مندوب';
+    }
+
+    function toggleProductStatsDelegate(input) {
+      const value = String(input?.value || '').trim();
+      if (!value) return;
+      if (input.checked) window.statsSelectedDelegates.add(value);
+      else window.statsSelectedDelegates.delete(value);
+      renderProductStatsDelegateFilter();
+      renderProductStatsReceipt();
+    }
+
+    function clearProductStatsDelegates() {
+      window.statsSelectedDelegates.clear();
+      renderProductStatsDelegateFilter();
+      renderProductStatsReceipt();
+    }
+
+    function buildProductStatsCustomerOptions() {
+      const map = new Map();
+
+      const addCustomer = (customer, delegateUsername = '', delegateName = '') => {
+        if (!customer) return;
+        const username = String(customer.username || '').replace(/^زبون:\s*/i, '').trim();
+        const name = String(customer.name || '').trim();
+        const phone = String(customer.phone || '').trim();
+        const address = String(customer.address || '').trim();
+        const key = username ? `u:${username.toLowerCase()}` : `n:${name.toLowerCase()}|p:${phone}`;
+        if (key === 'n:|p:') return;
+
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            username,
+            name: name || username || 'زبون بدون اسم',
+            phone,
+            address,
+            delegateUsername: String(delegateUsername || '').trim(),
+            delegateName: String(delegateName || '').trim()
+          });
+        } else {
+          const existing = map.get(key);
+          if (!existing.delegateUsername && delegateUsername) {
+            existing.delegateUsername = String(delegateUsername).trim();
+            existing.delegateName = String(delegateName || '').trim();
+          }
+        }
+      };
+
+      // جميع الزبائن الذين ظهروا في الفواتير، لأن الإحصائيات مبنية على الفواتير.
+      (Array.isArray(invoices) ? invoices : []).forEach(inv => {
+        addCustomer(inv?.customer || null, inv?.delegateUsername || '', '');
+      });
+
+      // إضافة زبائن المندوبين حتى يظهروا في الفلتر حتى لو لم تصدر لهم فاتورة في الفترة الحالية.
+      const sourceDelegates = Array.isArray(delegates) ? delegates : [];
+      sourceDelegates.forEach(del => {
+        const du = String(del?.username || '').trim();
+        const dn = String(del?.fullname || del?.name || du).trim();
+        (Array.isArray(del?.clients) ? del.clients : []).forEach(client => addCustomer(client, du, dn));
+      });
+
+      return Array.from(map.values()).sort((a,b) => {
+        const aa = `${a.name} ${a.username}`.trim();
+        const bb = `${b.name} ${b.username}`.trim();
+        return aa.localeCompare(bb, 'ar');
+      });
+    }
+
+    function renderProductStatsCustomerFilter() {
+      const list = document.getElementById('stats-customer-list');
+      if (!list) return;
+
+      const source = buildProductStatsCustomerOptions();
+      const search = String(document.getElementById('stats-customer-search')?.value || '').trim().toLowerCase();
+
+      const filtered = source.filter(customer => {
+        const haystack = [
+          customer.name,
+          customer.username,
+          customer.phone,
+          customer.address,
+          customer.delegateName,
+          customer.delegateUsername
+        ].map(v => String(v || '').toLowerCase()).join(' ');
+        return !search || haystack.includes(search);
+      });
+
+      if (!filtered.length) {
+        list.innerHTML = '<div class="product-stats-multi-empty">لا يوجد زبون مطابق للبحث.</div>';
+      } else {
+        list.innerHTML = filtered.map(customer => {
+          const key = String(customer.key);
+          const checked = window.statsSelectedCustomers.has(key);
+          const safeKey = escapeHtml(key);
+          const safeName = escapeHtml(customer.name || 'زبون بدون اسم');
+          const secondary = customer.username && customer.username !== customer.name
+            ? `<small>— ${escapeHtml(customer.username)}</small>` : '';
+          const delegate = customer.delegateName
+            ? `<small style="display:block;margin-top:2px;color:#64748b;">🛵 ${escapeHtml(customer.delegateName)}</small>` : '';
+
+          return `
+            <label class="product-stats-multi-option ${checked ? 'selected' : ''}">
+              <input type="checkbox" value="${safeKey}" ${checked ? 'checked' : ''} onchange="toggleProductStatsCustomer(this)">
+              <span class="product-stats-multi-option-text">${safeName}${secondary}${delegate}</span>
+            </label>`;
+        }).join('');
+      }
+
+      const count = window.statsSelectedCustomers.size;
+      const badge = document.getElementById('stats-customer-count');
+      if (badge) badge.textContent = count ? `👤 تم تحديد ${count} زبون${count === 1 ? '' : 'ين'}` : '👤 لم يتم تحديد زبون';
+    }
+
+    function toggleProductStatsCustomer(input) {
+      const value = String(input?.value || '').trim();
+      if (!value) return;
+      if (input.checked) window.statsSelectedCustomers.add(value);
+      else window.statsSelectedCustomers.delete(value);
+      renderProductStatsCustomerFilter();
+      renderProductStatsReceipt();
+    }
+
+    function clearProductStatsCustomers() {
+      window.statsSelectedCustomers.clear();
+      renderProductStatsCustomerFilter();
+      renderProductStatsReceipt();
+    }
+
+    function getProductStatsSelectedCustomers() {
+      return buildProductStatsCustomerOptions().filter(c => window.statsSelectedCustomers.has(c.key));
     }
 
     async function openProductStatsModal() {
@@ -11788,6 +12087,7 @@
       }
 
       renderProductStatsDelegateFilter();
+      renderProductStatsCustomerFilter();
       renderProductStatsReceipt();
       document.getElementById('product-stats-modal').classList.remove('hidden');
     }
@@ -11797,11 +12097,15 @@
     }
 
     function resetStatsDateFilter() {
-      const ids = ['stats-date-from', 'stats-date-to', 'stats-time-from', 'stats-time-to', 'stats-delegate-filter'];
+      const ids = ['stats-date-from', 'stats-date-to', 'stats-time-from', 'stats-time-to', 'stats-delegate-search', 'stats-customer-search'];
       ids.forEach(id => {
         const input = document.getElementById(id);
         if (input) input.value = '';
       });
+      window.statsSelectedDelegates = new Set();
+      window.statsSelectedCustomers = new Set();
+      renderProductStatsDelegateFilter();
+      renderProductStatsCustomerFilter();
       renderProductStatsReceipt();
     }
 
@@ -11836,7 +12140,14 @@
       const toVal = document.getElementById('stats-date-to')?.value || '';
       const timeFromVal = document.getElementById('stats-time-from')?.value || '';
       const timeToVal = document.getElementById('stats-time-to')?.value || '';
-      const selectedDelegateUsername = document.getElementById('stats-delegate-filter')?.value || '';
+      const selectedDelegateUsernames = new Set(
+        Array.from(window.statsSelectedDelegates || []).map(v => String(v).trim()).filter(Boolean)
+      );
+      const selectedCustomerKeys = new Set(
+        Array.from(window.statsSelectedCustomers || []).map(v => String(v).trim()).filter(Boolean)
+      );
+      const selectedCustomerOptions = buildProductStatsCustomerOptions()
+        .filter(c => selectedCustomerKeys.has(c.key));
 
       let fromDate = null, toDate = null;
 
@@ -11880,15 +12191,26 @@
       }
 
       const filteredInvoices = getActiveInvoices().filter(inv => {
-        // فلتر المندوب اختياري. نستخدم username كمعرّف ثابت،
-        // مع دعم الصيغ القديمة التي قد تحتوي delegate داخل الفاتورة.
-        if (selectedDelegateUsername) {
+        // فلتر المندوب متعدد الاختيار: يكفي تطابق الفاتورة مع أحد المندوبين المحددين.
+        if (selectedDelegateUsernames.size) {
           const invoiceDelegateUsername = String(
             inv.delegateUsername ??
             inv.delegate?.username ??
             ''
           ).trim();
-          if (invoiceDelegateUsername !== String(selectedDelegateUsername).trim()) return false;
+          if (!selectedDelegateUsernames.has(invoiceDelegateUsername)) return false;
+        }
+
+        // فلتر الزبون متعدد الاختيار: يكفي تطابق الفاتورة مع أحد الزبائن المحددين.
+        if (selectedCustomerKeys.size) {
+          const invCustomer = inv.customer || {};
+          const invoiceUsername = String(invCustomer.username || '').replace(/^زبون:\s*/i, '').trim();
+          const invoiceName = String(invCustomer.name || '').trim();
+          const invoicePhone = String(invCustomer.phone || '').trim();
+          const invoiceKey = invoiceUsername
+            ? `u:${invoiceUsername.toLowerCase()}`
+            : `n:${invoiceName.toLowerCase()}|p:${invoicePhone}`;
+          if (!selectedCustomerKeys.has(invoiceKey)) return false;
         }
 
         let invDate = inv.createdAt ? new Date(inv.createdAt) : null;
@@ -11985,14 +12307,20 @@
       else if (timeToVal) timeRangeText = ` • حتى الساعة ${timeToVal}`;
 
       let delegateRangeText = '';
-      if (selectedDelegateUsername) {
-        const selectedDelegate = (delegates || []).find(
-          d => String(d.username || '') === String(selectedDelegateUsername)
-        );
-        const delegateLabel = String(
-          selectedDelegate?.fullname || selectedDelegate?.username || selectedDelegateUsername
-        ).trim();
-        delegateRangeText = ` • المندوب: ${delegateLabel}`;
+      if (selectedDelegateUsernames.size) {
+        const selectedLabels = normalizeStatsDelegateList()
+          .filter(d => selectedDelegateUsernames.has(String(d.username)))
+          .map(d => String(d.fullname || d.username).trim())
+          .filter(Boolean);
+        delegateRangeText = ` • المندوبون: ${selectedLabels.join('، ') || `${selectedDelegateUsernames.size} محدد`}`;
+      }
+
+      let customerRangeText = '';
+      if (selectedCustomerKeys.size) {
+        const selectedLabels = selectedCustomerOptions
+          .map(c => String(c.name || c.username || '').trim())
+          .filter(Boolean);
+        customerRangeText = ` • الزبائن: ${selectedLabels.join('، ') || `${selectedCustomerKeys.size} محدد`}`;
       }
 
       const totalStock = itemsList.reduce((sum, x) => sum + x.stock, 0);
@@ -12005,7 +12333,7 @@
             <div class="product-stats-hero">
               <div class="product-stats-brand">متجر المستقبل للجملة</div>
               <div class="product-stats-title">تقرير إحصائيات المنتجات والمخزون</div>
-              <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText}${delegateRangeText}</div>
+              <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText}${delegateRangeText}${customerRangeText}</div>
             </div>
             <div class="product-stats-body">
               <div style="text-align:center;padding:28px 12px;color:var(--text-muted);">لا توجد أي طلبات مطابقة للفترة المحددة.</div>
@@ -12041,7 +12369,7 @@
           <div class="product-stats-hero">
             <div class="product-stats-brand">🛍️ متجر المستقبل للجملة</div>
             <div class="product-stats-title">تقرير إحصائيات المنتجات والمخزون</div>
-            <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText}${delegateRangeText} • ${filteredInvoices.length} فاتورة</div>
+            <div class="product-stats-period">الفترة: ${dateRangeText}${timeRangeText}${delegateRangeText}${customerRangeText} • ${filteredInvoices.length} فاتورة</div>
             <div class="product-stats-meta">
               <div class="product-stats-summary-card">
                 <div class="product-stats-summary-label">عدد المنتجات</div>
