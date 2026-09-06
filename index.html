@@ -12127,8 +12127,17 @@
       const toVal = document.getElementById('stats-date-to')?.value || '';
       const timeFromVal = document.getElementById('stats-time-from')?.value || '';
       const timeToVal = document.getElementById('stats-time-to')?.value || '';
+      // توحيد معرفات الفلاتر قبل المقارنة حتى لا يختلف التطابق بسبب
+      // المسافات أو البادئات (مندوب:) أو اختلاف حالة الأحرف.
+      const normalizeStatsIdentity = value => String(value ?? '')
+        .replace(/^\s*(?:مندوب|delegate|زبون|customer)\s*:\s*/i, '')
+        .trim()
+        .toLowerCase();
+
       const selectedDelegateUsernames = new Set(
-        Array.from(window.statsSelectedDelegates || []).map(v => String(v).trim()).filter(Boolean)
+        Array.from(window.statsSelectedDelegates || [])
+          .map(v => normalizeStatsIdentity(v))
+          .filter(Boolean)
       );
       const selectedCustomerKeys = new Set(
         Array.from(window.statsSelectedCustomers || []).map(v => String(v).trim()).filter(Boolean)
@@ -12180,12 +12189,20 @@
       const filteredInvoices = getActiveInvoices().filter(inv => {
         // فلتر المندوب متعدد الاختيار: يكفي تطابق الفاتورة مع أحد المندوبين المحددين.
         if (selectedDelegateUsernames.size) {
-          const invoiceDelegateUsername = String(
+          // المندوب شرط مستقل، ويُطبق مع فلتر الزبون كـ AND.
+          // ندعم أكثر من شكل محفوظ للمندوب في الفواتير القديمة والجديدة.
+          const invoiceDelegateUsername = normalizeStatsIdentity(
             inv.delegateUsername ??
             inv.delegate?.username ??
+            inv.delegate?.userName ??
+            inv.delegate?.name ??
+            inv.salesRepUsername ??
+            inv.salesmanUsername ??
             ''
-          ).trim();
-          if (!selectedDelegateUsernames.has(invoiceDelegateUsername)) return false;
+          );
+          if (!invoiceDelegateUsername || !selectedDelegateUsernames.has(invoiceDelegateUsername)) {
+            return false;
+          }
         }
 
         // فلتر الزبون متعدد الاختيار: يعمل مع فلتر المندوب كشرط AND.
@@ -12194,17 +12211,12 @@
         // ثم الاسم والهاتف كبدائل موثوقة، مع بقاء المندوب شرطاً مستقلاً.
         if (selectedCustomerKeys.size) {
           const invCustomer = inv.customer || {};
-          const invoiceUsernameRaw = String(invCustomer.username || '').trim();
-          const invoiceUsername = invoiceUsernameRaw
-            .replace(/^زبون:\s*/i, '')
-            .replace(/^customer:\s*/i, '')
-            .trim()
-            .toLowerCase();
+          const invoiceUsername = normalizeStatsIdentity(invCustomer.username || '');
           const invoiceName = String(invCustomer.name || '').trim().toLowerCase();
           const invoicePhone = String(invCustomer.phone || invCustomer.mobile || '').trim();
 
           const customerMatches = selectedCustomerOptions.some(selected => {
-            const selectedUsername = String(selected.username || '').trim().toLowerCase();
+            const selectedUsername = normalizeStatsIdentity(selected.username || '');
             const selectedName = String(selected.name || '').trim().toLowerCase();
             const selectedPhone = String(selected.phone || '').trim();
 
@@ -12327,7 +12339,7 @@
       let delegateRangeText = '';
       if (selectedDelegateUsernames.size) {
         const selectedLabels = normalizeStatsDelegateList()
-          .filter(d => selectedDelegateUsernames.has(String(d.username)))
+          .filter(d => selectedDelegateUsernames.has(normalizeStatsIdentity(d.username)))
           .map(d => String(d.fullname || d.username).trim())
           .filter(Boolean);
         delegateRangeText = ` • المندوبون: ${selectedLabels.join('، ') || `${selectedDelegateUsernames.size} محدد`}`;
