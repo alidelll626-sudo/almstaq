@@ -6405,7 +6405,15 @@
           tasks.push(loadNotificationsFromFirestore(false));
         }
 
-        await Promise.all(tasks);
+        // لا تجعل فشل مزامنة قسم واحد (مثل الإشعارات) يمنع بقية البيانات من التحديث.
+        // هذا مهم خصوصاً للمدير: يجب أن تبقى الفواتير وإحصائيات المنتجات متاحة حتى
+        // لو فشلت قراءة خدمة جانبية.
+        const results = await Promise.allSettled(tasks);
+        results.forEach((result, index) => {
+          if (result.status === 'rejected') {
+            console.warn('فشل أحد مهام التحديث اليدوي:', index, result.reason);
+          }
+        });
 
         saveData();
         updateNotificationsBadge();
@@ -12205,13 +12213,24 @@
       if (!modal) return;
       modal.classList.remove('hidden');
 
-      // اعرض التقرير فوراً بالبيانات المحلية، ثم حدّث قوائم الفلاتر من Firestore عند الحاجة.
+      // اعرض التقرير فوراً بالبيانات المحلية.
       try {
         renderProductStatsDelegateFilter();
         renderProductStatsCustomerFilter();
         renderProductStatsReceipt();
       } catch (err) {
         console.error('خطأ أولي في فتح إحصائيات المنتجات:', err);
+      }
+
+      // عند دخول المدير إلى إحصائيات المنتجات، اطلب الفواتير من Firestore مباشرةً.
+      // سابقاً كان القسم يعتمد على آخر نسخة محلية فقط، لذلك قد يظهر التقرير فارغاً
+      // بعد التحديث أو عند فتح التطبيق قبل اكتمال مزامنة الفواتير.
+      if (isAdmin || loggedAdmin) {
+        try {
+          await loadInvoicesFromFirestore();
+        } catch (err) {
+          console.warn('تعذر تحديث فواتير إحصائيات المنتجات، سيتم استخدام النسخة المحلية:', err);
+        }
       }
 
       try {
@@ -12230,7 +12249,7 @@
         console.warn('تعذر تحميل المندوبين من Firestore، سيتم استخدام البيانات المحلية:', err);
       }
 
-      // تحديث الفلاتر بعد اكتمال التحميل دون إعادة فتح النافذة.
+      // تحديث التقرير والفلاتر بعد اكتمال مزامنة البيانات دون إعادة فتح النافذة.
       try {
         renderProductStatsDelegateFilter();
         renderProductStatsCustomerFilter();
