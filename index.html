@@ -11972,8 +11972,8 @@
       const addCustomer = (customer) => {
         if (!customer) return;
         const username = String(customer.username || '').replace(/^زبون:\s*/i, '').trim();
-        const name = String(customer.name || '').trim();
-        const phone = String(customer.phone || '').trim();
+        const name = String(customer.name || customer.fullname || customer.fullName || '').trim();
+        const phone = String(customer.phone || customer.mobile || customer.phoneNumber || '').trim();
         const address = String(customer.address || '').trim();
         const key = username ? `u:${username.toLowerCase()}` : `n:${name.toLowerCase()}|p:${phone}`;
         if (key === 'n:|p:') return;
@@ -12211,30 +12211,29 @@
         // ثم الاسم والهاتف كبدائل موثوقة، مع بقاء المندوب شرطاً مستقلاً.
         if (selectedCustomerKeys.size) {
           const invCustomer = inv.customer || {};
-          const invoiceUsername = normalizeStatsIdentity(invCustomer.username || '');
-          const invoiceName = String(invCustomer.name || '').trim().toLowerCase();
-          const invoicePhone = String(invCustomer.phone || invCustomer.mobile || '').trim();
+          const invoiceUsername = normalizeStatsIdentity(invCustomer.username || invCustomer.userName || '');
+          const invoiceName = normalizeStatsIdentity(invCustomer.name || invCustomer.fullname || invCustomer.fullName || '');
+          const invoicePhone = String(invCustomer.phone || invCustomer.mobile || invCustomer.phoneNumber || '').replace(/\D/g, '');
 
           const customerMatches = selectedCustomerOptions.some(selected => {
             const selectedUsername = normalizeStatsIdentity(selected.username || '');
-            const selectedName = String(selected.name || '').trim().toLowerCase();
-            const selectedPhone = String(selected.phone || '').trim();
+            const selectedName = normalizeStatsIdentity(selected.name || '');
+            const selectedPhone = String(selected.phone || '').replace(/\D/g, '');
 
-            // 1) مطابقة اسم المستخدم للزبون العادي.
-            if (selectedUsername && invoiceUsername && invoiceUsername === selectedUsername) {
-              return true;
-            }
+            // أولاً: اسم المستخدم للزبون العادي.
+            if (selectedUsername && invoiceUsername && invoiceUsername === selectedUsername) return true;
 
-            // 2) مطابقة الاسم + الهاتف، وهي مهمة لفواتير المندوبين التي
-            // يكون فيها customer.username محفوظاً باسم المندوب.
+            // ثانياً: الاسم + الهاتف. هذا هو التطابق المهم لفاتورة أنشأها
+            // مندوب لزبون عادي، لأن customer.username في تلك الفاتورة قد يكون
+            // اسم المندوب بدلاً من اسم الزبون.
             if (selectedName && invoiceName && selectedPhone && invoicePhone) {
-              return selectedName === invoiceName && selectedPhone === invoicePhone;
+              if (selectedName === invoiceName && selectedPhone === invoicePhone) return true;
             }
 
-            // 3) إذا لم يوجد هاتف في أحد السجلين، نستخدم الاسم وحده فقط
-            // عندما يكون اسم المستخدم غير مطابق، لتغطية الفواتير القديمة.
-            if (selectedName && invoiceName && !selectedPhone && !invoicePhone) {
-              return selectedName === invoiceName;
+            // ثالثاً: الاسم + الهاتف الجزئي عند اختلاف تنسيق الهاتف.
+            if (selectedName && invoiceName && selectedName === invoiceName) {
+              if (!selectedPhone || !invoicePhone) return true;
+              if (selectedPhone.endsWith(invoicePhone) || invoicePhone.endsWith(selectedPhone)) return true;
             }
 
             return false;
