@@ -12127,17 +12127,8 @@
       const toVal = document.getElementById('stats-date-to')?.value || '';
       const timeFromVal = document.getElementById('stats-time-from')?.value || '';
       const timeToVal = document.getElementById('stats-time-to')?.value || '';
-      // توحيد معرفات الفلاتر قبل المقارنة حتى لا يختلف التطابق بسبب
-      // المسافات أو البادئات (مندوب:) أو اختلاف حالة الأحرف.
-      const normalizeStatsIdentity = value => String(value ?? '')
-        .replace(/^\s*(?:مندوب|delegate|زبون|customer)\s*:\s*/i, '')
-        .trim()
-        .toLowerCase();
-
       const selectedDelegateUsernames = new Set(
-        Array.from(window.statsSelectedDelegates || [])
-          .map(v => normalizeStatsIdentity(v))
-          .filter(Boolean)
+        Array.from(window.statsSelectedDelegates || []).map(v => String(v).trim()).filter(Boolean)
       );
       const selectedCustomerKeys = new Set(
         Array.from(window.statsSelectedCustomers || []).map(v => String(v).trim()).filter(Boolean)
@@ -12187,47 +12178,52 @@
       }
 
       const filteredInvoices = getActiveInvoices().filter(inv => {
-        // المندوبون والزبائن العاديون نظامان منفصلان تماماً.
-        // لذلك لا نحاول مطابقة زبون عادي مع زبائن المندوبين، ولا العكس.
-        const ownerRole = String(inv.ownerRole || '').trim().toLowerCase();
-        const isDelegateInvoice = ownerRole === 'delegate' || ownerRole === 'مندوب';
-        const isCustomerInvoice = ownerRole === 'customer' || ownerRole === 'زبون';
+        // المندوبون والزبائن العاديون كيانان منفصلان، لكن عند تحديد الاثنين معاً
+        // المطلوب هو جمع الفواتير: (مندوب محدد) OR (زبون عادي محدد)، وليس AND.
+        let matchesDelegate = false;
+        let matchesCustomer = false;
 
-        // المندوبون والزبائن العاديون نظامان منفصلان تماماً، لكن عند تحديد
-        // فلتر من كل نظام معاً نريد جمع النتائج (OR) وليس مطابقتها معاً (AND).
-        // أي: فواتير المندوب المحدد + فواتير الزبون العادي المحدد.
-        let matchesSelectedOwner = true;
-
-        if (selectedDelegateUsernames.size || selectedCustomerKeys.size) {
-          let delegateMatch = false;
-          let customerMatch = false;
-
-          if (selectedDelegateUsernames.size && isDelegateInvoice) {
-            const invoiceDelegateUsername = normalizeStatsIdentity(
-              inv.delegateUsername || inv.delegateUserName || inv.delegateLogin || ''
-            );
-            delegateMatch = !!invoiceDelegateUsername &&
-              Array.from(selectedDelegateUsernames).some(selected => selected === invoiceDelegateUsername);
-          }
-
-          if (selectedCustomerKeys.size && isCustomerInvoice) {
-            const invCustomer = inv.customer || {};
-            const invoiceUsername = normalizeStatsIdentity(
-              invCustomer.username || invCustomer.userName || ''
-            );
-
-            customerMatch = selectedCustomerOptions.some(selected => {
-              const selectedUsername = normalizeStatsIdentity(selected.username || '');
-              return !!selectedUsername && !!invoiceUsername && selectedUsername === invoiceUsername;
-            });
-          }
-
-          // إذا تم اختيار الفلترين: نقبل الفاتورة إذا كانت تابعة
-          // للمندوب المحدد أو للزبون العادي المحدد.
-          matchesSelectedOwner = delegateMatch || customerMatch;
+        if (selectedDelegateUsernames.size) {
+          const invoiceDelegateUsername = String(
+            inv.delegateUsername ??
+            inv.delegate?.username ??
+            inv.delegateUserName ??
+            inv.salesRepUsername ??
+            ''
+          ).trim();
+          matchesDelegate = selectedDelegateUsernames.has(invoiceDelegateUsername);
         }
 
-        if (!matchesSelectedOwner) return false;
+        if (selectedCustomerKeys.size) {
+          // لا نربط زبوناً عادياً بزبائن المندوبين. فلتر الزبائن العاديين
+          // يطبّق فقط على فواتير حسابات الزبائن العاديين.
+          const ownerRole = String(inv.ownerRole || '').trim().toLowerCase();
+          const isOrdinaryCustomerInvoice = ownerRole === 'customer' || ownerRole === 'زبون' ||
+            !!inv.loggedCustomerUsername || !!inv.customerUsername;
+
+          if (isOrdinaryCustomerInvoice) {
+            const invCustomer = inv.customer || {};
+            const invoiceUsername = String(
+              invCustomer.username || invCustomer.userName || inv.customerUsername || inv.loggedCustomerUsername || ''
+            ).replace(/^زبون:\s*/i, '').trim();
+            const invoiceName = String(
+              invCustomer.name || invCustomer.fullname || invCustomer.fullName || ''
+            ).trim();
+            const invoicePhone = String(
+              invCustomer.phone || invCustomer.mobile || invCustomer.phoneNumber || ''
+            ).trim();
+            const invoiceKey = invoiceUsername
+              ? `u:${invoiceUsername.toLowerCase()}`
+              : `n:${invoiceName.toLowerCase()}|p:${invoicePhone}`;
+            matchesCustomer = selectedCustomerKeys.has(invoiceKey);
+          }
+        }
+
+        // إذا كان أحد الفلترين محدداً، يكفي تطابق الفاتورة مع أي واحد منهما.
+        // وإذا لم يُحدد أي فلتر، تمر جميع الفواتير.
+        if (selectedDelegateUsernames.size || selectedCustomerKeys.size) {
+          if (!matchesDelegate && !matchesCustomer) return false;
+        }
 
         let invDate = inv.createdAt ? new Date(inv.createdAt) : null;
         if (!invDate || isNaN(invDate.getTime())) invDate = parseInvoiceDateString(inv.date, inv.rawDate);
@@ -12242,6 +12238,7 @@
           const invoiceMinutes = invDate.getHours() * 60 + invDate.getMinutes();
 
           if (timeFromMinutes !== null && timeToMinutesValue !== null) {
+            // إذا كان التاريخان متعددي الأيام، نستخدم الوقت كحد من/إلى على طرفي الفترة.
             if (fromVal && toVal && fromVal !== toVal) {
               if (fromVal === toVal) {
                 if (invoiceMinutes < timeFromMinutes || invoiceMinutes > timeToMinutesValue) return false;
@@ -12324,7 +12321,7 @@
       let delegateRangeText = '';
       if (selectedDelegateUsernames.size) {
         const selectedLabels = normalizeStatsDelegateList()
-          .filter(d => selectedDelegateUsernames.has(normalizeStatsIdentity(d.username)))
+          .filter(d => selectedDelegateUsernames.has(String(d.username)))
           .map(d => String(d.fullname || d.username).trim())
           .filter(Boolean);
         delegateRangeText = ` • المندوبون: ${selectedLabels.join('، ') || `${selectedDelegateUsernames.size} محدد`}`;
