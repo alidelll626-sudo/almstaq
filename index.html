@@ -5956,16 +5956,8 @@
 
         invoices = Array.from(byId.values());
 
-        // إصلاح تلقائي لمرة واحدة للفواتير القديمة التي لا تحتوي ownerUid.
-        // يتم ذلك قبل حفظ القائمة حتى لا تبقى الفواتير القديمة مخفية عن أصحابها.
-        if (isAdmin || loggedAdmin) {
-          const repaired = await repairLegacyInvoiceOwners(invoices);
-          if (repaired) {
-            console.info(`تم إصلاح ملكية ${repaired} فاتورة قديمة.`);
-          }
-          await autoArchiveOldInvoices();
-        }
-
+        // عرض البيانات الأساسية فوراً. عمليات إصلاح الملكية والأرشفة التلقائية
+        // عمليات صيانة ثقيلة ولا يجب أن تؤخر ظهور قائمة الفواتير للمدير.
         invoices.sort((a, b) =>
           getInvoiceCreatedTime(b) - getInvoiceCreatedTime(a) ||
           String(b.id).localeCompare(String(a.id))
@@ -5973,6 +5965,31 @@
 
         localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
         updateUnreadInvoicesBadge();
+
+        // تنفيذ الصيانة في الخلفية بعد تجهيز القائمة، ثم تحديث العرض إذا تغيرت البيانات.
+        if (isAdmin || loggedAdmin) {
+          Promise.resolve().then(async () => {
+            try {
+              const repaired = await repairLegacyInvoiceOwners(invoices);
+              if (repaired) console.info(`تم إصلاح ملكية ${repaired} فاتورة قديمة.`);
+              const archived = await autoArchiveOldInvoices();
+              if (repaired || archived) {
+                invoices.sort((a, b) =>
+                  getInvoiceCreatedTime(b) - getInvoiceCreatedTime(a) ||
+                  String(b.id).localeCompare(String(a.id))
+                );
+                localStorage.setItem('mustaqbal_invoices', JSON.stringify(invoices));
+                updateUnreadInvoicesBadge();
+                if (typeof renderInvoicesList === 'function' && !document.getElementById('invoices-modal')?.classList.contains('hidden')) {
+                  renderInvoicesList();
+                }
+              }
+            } catch (maintenanceErr) {
+              console.warn('تعذر إكمال صيانة الفواتير في الخلفية:', maintenanceErr);
+            }
+          });
+        }
+
         return true;
       } catch (err) {
         console.warn('تعذر تحميل الفواتير:', err);
@@ -11228,9 +11245,44 @@
       }
       if (invoicesSearch) invoicesSearch.value = '';
 
-      await loadInvoicesFromFirestore();
-      renderInvoicesList();
+      // اعرض النسخة المحلية فوراً إن كانت موجودة، ولا تجعل فتح النافذة
+      // ينتظر شبكة Firebase أو عمليات صيانة الفواتير القديمة.
+      let hasCachedInvoices = false;
+      try {
+        const cachedInvoices = JSON.parse(localStorage.getItem('mustaqbal_invoices') || '[]');
+        if (Array.isArray(cachedInvoices)) {
+          invoices = cachedInvoices;
+          hasCachedInvoices = cachedInvoices.length > 0;
+        }
+      } catch (_) {}
+
+      const invoicesList = document.getElementById('invoices-list');
+      if (hasCachedInvoices) {
+        renderInvoicesList();
+      } else if (invoicesList) {
+        invoicesList.innerHTML = '<div class="notification-empty" style="text-align:center;padding:24px;">⏳ جارٍ تحميل الفواتير السابقة...</div>';
+      }
       updateUnreadInvoicesBadge();
+
+      // تحديث البيانات من Firestore في الخلفية. لا ننتظر هذه العملية قبل عرض النافذة.
+      if (!window.__mustaqbalInvoicesLoadingPromise) {
+        window.__mustaqbalInvoicesLoadingPromise = loadInvoicesFromFirestore()
+          .then(() => {
+            if (!document.getElementById('invoices-modal')?.classList.contains('hidden')) {
+              renderInvoicesList();
+              updateUnreadInvoicesBadge();
+            }
+          })
+          .catch(err => {
+            console.warn('تعذر تحديث الفواتير السابقة:', err);
+            if (!hasCachedInvoices && !document.getElementById('invoices-modal')?.classList.contains('hidden')) {
+              renderInvoicesList();
+            }
+          })
+          .finally(() => {
+            window.__mustaqbalInvoicesLoadingPromise = null;
+          });
+      }
     }
 
     function renderInvoicesList() {
