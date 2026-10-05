@@ -6099,9 +6099,21 @@
         alert('إدارة واتساب متاحة للمدير الرئيسي فقط.');
         return;
       }
-      document.getElementById('admin-whatsapp-modal').classList.remove('hidden');
-      await loadWhatsAppSettings();
+      const modal = document.getElementById('admin-whatsapp-modal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      // loadWhatsAppSettings تقرأ النسخة المحلية أولاً، لذلك نعرضها فوراً ثم نحدّث من Firestore.
+      try {
+        const cached = JSON.parse(localStorage.getItem('mustaqbal_whatsapp_settings') || 'null');
+        if (cached && typeof cached === 'object') whatsappSettings = cached;
+      } catch (_) {}
       updateWhatsAppSettingsForm();
+      if (!window.__mustaqbalWhatsAppLoadingPromise) {
+        window.__mustaqbalWhatsAppLoadingPromise = loadWhatsAppSettings()
+          .then(() => updateWhatsAppSettingsForm())
+          .catch(err => console.warn('تعذر تحديث إعدادات واتساب في الخلفية:', err))
+          .finally(() => { window.__mustaqbalWhatsAppLoadingPromise = null; });
+      }
     }
 
     function closeAdminWhatsAppModal() {
@@ -6829,9 +6841,35 @@
     function openLoginModal() { document.getElementById('login-modal').classList.remove('hidden'); }
     function closeLoginModal() { document.getElementById('login-modal').classList.add('hidden'); }
 
-    async function openAdminCustomersModal() { if (!requireAdminPermission('viewCustomers') && !requireAdminPermission('createCustomers')) return; document.getElementById('admin-customers-modal').classList.remove('hidden'); await loadCustomersFromFirestore(); }
+    async function openAdminCustomersModal() {
+      if (!requireAdminPermission('viewCustomers') && !requireAdminPermission('createCustomers')) return;
+      const modal = document.getElementById('admin-customers-modal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      // اعرض النسخة المحلية فوراً، ثم حدّثها من Firestore في الخلفية.
+      try { customers = JSON.parse(localStorage.getItem('mustaqbal_customers') || '[]'); } catch (_) { customers = []; }
+      renderAdminCustomersList();
+      if (!window.__mustaqbalCustomersLoadingPromise) {
+        window.__mustaqbalCustomersLoadingPromise = loadCustomersFromFirestore()
+          .catch(err => console.warn('تعذر تحديث الزبائن في الخلفية:', err))
+          .finally(() => { window.__mustaqbalCustomersLoadingPromise = null; });
+      }
+    }
     function closeAdminCustomersModal() { document.getElementById('admin-customers-modal').classList.add('hidden'); }
-    async function openAdminDelegatesModal() { if (!requireAdminPermission('viewDelegates') && !requireAdminPermission('createDelegates')) return; document.getElementById('admin-delegates-modal').classList.remove('hidden'); await loadDelegatesFromFirestore(); }
+    async function openAdminDelegatesModal() {
+      if (!requireAdminPermission('viewDelegates') && !requireAdminPermission('createDelegates')) return;
+      const modal = document.getElementById('admin-delegates-modal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      // اعرض النسخة المحلية فوراً، ثم حدّثها من Firestore في الخلفية.
+      try { delegates = JSON.parse(localStorage.getItem('mustaqbal_delegates') || '[]'); } catch (_) { delegates = []; }
+      renderAdminDelegatesList();
+      if (!window.__mustaqbalDelegatesLoadingPromise) {
+        window.__mustaqbalDelegatesLoadingPromise = loadDelegatesFromFirestore()
+          .catch(err => console.warn('تعذر تحديث المندوبين في الخلفية:', err))
+          .finally(() => { window.__mustaqbalDelegatesLoadingPromise = null; });
+      }
+    }
     function closeAdminDelegatesModal() { document.getElementById('admin-delegates-modal').classList.add('hidden'); }
 
     /* ============================================================
@@ -6849,14 +6887,17 @@
       const search = document.getElementById('delegate-customer-account-search');
       if (search) search.value = '';
 
-      try {
-        await loadDelegatesFromFirestore();
-      } catch (err) {
-        console.warn('تعذر تحديث حسابات المندوبين قبل عرض زبائنهم:', err);
-      }
-
+      // لا ننتظر الشبكة قبل رسم النافذة؛ استخدم النسخة المحلية أولاً.
+      try { delegates = JSON.parse(localStorage.getItem('mustaqbal_delegates') || '[]'); } catch (_) { delegates = []; }
       populateDelegateCustomerDelegateSelect();
       renderDelegateCustomerAccounts();
+
+      if (!window.__mustaqbalDelegatesLoadingPromise) {
+        window.__mustaqbalDelegatesLoadingPromise = loadDelegatesFromFirestore()
+          .then(() => { populateDelegateCustomerDelegateSelect(); renderDelegateCustomerAccounts(); })
+          .catch(err => console.warn('تعذر تحديث حسابات المندوبين في الخلفية:', err))
+          .finally(() => { window.__mustaqbalDelegatesLoadingPromise = null; });
+      }
     }
 
     function closeDelegateCustomerAccountsModal() {
@@ -7579,14 +7620,38 @@
 
     async function openAdminNotificationsModal() {
       if (!requireAdminPermission('sendNotifications')) return;
-      document.getElementById('admin-notifications-modal').classList.remove('hidden');
-      await Promise.all([loadCustomersFromFirestore(), loadDelegatesFromFirestore(), loadNotificationsFromFirestore(true)]);
+      const modal = document.getElementById('admin-notifications-modal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+
+      // رسم فوري من الذاكرة المحلية، ثم مزامنة البيانات الثلاثة في الخلفية.
+      try { customers = JSON.parse(localStorage.getItem('mustaqbal_customers') || '[]'); } catch (_) { customers = []; }
+      try { delegates = JSON.parse(localStorage.getItem('mustaqbal_delegates') || '[]'); } catch (_) { delegates = []; }
+      try { notifications = JSON.parse(localStorage.getItem('mustaqbal_notifications_cache') || '[]'); } catch (_) { notifications = []; }
       updateNotificationRecipientOptions();
       renderAdminSentNotifications();
       const c = document.getElementById('notification-customers-count');
       const d = document.getElementById('notification-delegates-count');
       if (c) c.innerText = customers.length;
       if (d) d.innerText = delegates.length;
+
+      const jobs = [];
+      if (!window.__mustaqbalCustomersLoadingPromise) {
+        window.__mustaqbalCustomersLoadingPromise = loadCustomersFromFirestore().finally(() => { window.__mustaqbalCustomersLoadingPromise = null; });
+      }
+      jobs.push(window.__mustaqbalCustomersLoadingPromise);
+      if (!window.__mustaqbalDelegatesLoadingPromise) {
+        window.__mustaqbalDelegatesLoadingPromise = loadDelegatesFromFirestore().finally(() => { window.__mustaqbalDelegatesLoadingPromise = null; });
+      }
+      jobs.push(window.__mustaqbalDelegatesLoadingPromise);
+      jobs.push(loadNotificationsFromFirestore(true));
+      Promise.allSettled(jobs).then(() => {
+        if (document.getElementById('admin-notifications-modal')?.classList.contains('hidden')) return;
+        updateNotificationRecipientOptions();
+        renderAdminSentNotifications();
+        if (c) c.innerText = customers.length;
+        if (d) d.innerText = delegates.length;
+      });
     }
 
     function closeAdminNotificationsModal() { document.getElementById('admin-notifications-modal').classList.add('hidden'); }
@@ -7877,8 +7942,17 @@
 
     async function openAdminAccountsModal() {
       if (!isAdmin) { alert('إدارة حسابات المدراء متاحة للمدير الرئيسي فقط.'); return; }
-      document.getElementById('admin-accounts-modal').classList.remove('hidden');
-      await forceRenderAdminAccountsFromFirestore();
+      const modal = document.getElementById('admin-accounts-modal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      // عرض الحسابات المخزنة محلياً فوراً، مع تحديث الخادم في الخلفية.
+      try { adminAccounts = JSON.parse(localStorage.getItem('mustaqbal_admin_accounts') || '[]'); } catch (_) { adminAccounts = []; }
+      renderAdminAccountsList();
+      if (!window.__mustaqbalAdminAccountsLoadingPromise) {
+        window.__mustaqbalAdminAccountsLoadingPromise = forceRenderAdminAccountsFromFirestore()
+          .catch(err => console.warn('تعذر تحديث حسابات المدراء في الخلفية:', err))
+          .finally(() => { window.__mustaqbalAdminAccountsLoadingPromise = null; });
+      }
     }
     function closeAdminAccountsModal() { document.getElementById('admin-accounts-modal').classList.add('hidden'); }
     function setAdminPermissionCheckboxes(perms) {
@@ -10116,63 +10190,44 @@
       if (!modal || !list) return;
 
       modal.classList.remove('hidden');
-      list.innerHTML = '<div class="notification-empty">⏳ جارٍ تحميل سجل عمليات الإدارة...</div>';
 
-      let logs = [];
-      try {
-        const snap = await db.collection('auditLogs')
-          .orderBy('createdAt', 'desc')
-          .limit(200)
-          .get();
-        logs = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
-      } catch (err) {
-        console.warn('تعذر تحميل سجل الإدارة من Firestore، سيتم استخدام النسخة المحلية:', err);
-        logs = Array.isArray(auditLogs) ? [...auditLogs] : [];
-      }
-
-      logs.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
-
-      if (!logs.length) {
-        list.innerHTML = '<div class="notification-empty">📋 لا توجد عمليات إدارية مسجلة حتى الآن.</div>';
-        return;
-      }
-
-      const formatAuditDate = (value) => {
-        const d = new Date(Number(value) || value);
-        if (Number.isNaN(d.getTime())) return 'تاريخ غير معروف';
-        return d.toLocaleString('ar-IQ', {
-          year: 'numeric', month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit'
-        });
+      const renderLogs = (logs) => {
+        logs = Array.isArray(logs) ? [...logs] : [];
+        logs.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+        if (!logs.length) {
+          list.innerHTML = '<div class="notification-empty">📋 لا توجد عمليات إدارية مسجلة حتى الآن.</div>';
+          return;
+        }
+        const formatAuditDate = (value) => {
+          const d = new Date(Number(value) || value);
+          if (Number.isNaN(d.getTime())) return 'تاريخ غير معروف';
+          return d.toLocaleString('ar-IQ', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+        };
+        const roleLabel = (role) => ({ admin:'مدير', delegate:'مندوب', customer:'زبون' })[role] || 'غير معروف';
+        list.innerHTML = logs.map(log => {
+          const action = escapeHtml(log.action || 'عملية إدارية');
+          const details = escapeHtml(log.details || 'بدون تفاصيل');
+          const actor = escapeHtml(log.actor || 'غير معروف');
+          const role = escapeHtml(roleLabel(log.actorRole));
+          const date = escapeHtml(formatAuditDate(log.createdAt));
+          return `<div style="background:#fff;border:1px solid var(--border-color);border-radius:16px;padding:12px;box-shadow:0 4px 12px rgba(15,23,42,.04);"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div style="min-width:0;flex:1;"><div style="font-weight:900;color:var(--primary-dark);font-size:.86rem;">${action}</div><div style="margin-top:5px;color:#475569;font-size:.78rem;line-height:1.7;white-space:pre-wrap;word-break:break-word;">${details}</div></div><span class="notification-chip" style="white-space:nowrap;">${role}</span></div><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:9px;padding-top:8px;border-top:1px solid #f1f5f9;color:var(--text-muted);font-size:.68rem;"><span>👤 ${actor}</span><span>🕒 ${date}</span></div></div>`;
+        }).join('');
       };
 
-      const roleLabel = (role) => ({
-        admin: 'مدير', delegate: 'مندوب', customer: 'زبون'
-      })[role] || 'غير معروف';
-
-      list.innerHTML = logs.map(log => {
-        const action = escapeHtml(log.action || 'عملية إدارية');
-        const details = escapeHtml(log.details || 'بدون تفاصيل');
-        const actor = escapeHtml(log.actor || 'غير معروف');
-        const role = escapeHtml(roleLabel(log.actorRole));
-        const date = escapeHtml(formatAuditDate(log.createdAt));
-
-        return `
-          <div style="background:#fff;border:1px solid var(--border-color);border-radius:16px;padding:12px;box-shadow:0 4px 12px rgba(15,23,42,.04);">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
-              <div style="min-width:0;flex:1;">
-                <div style="font-weight:900;color:var(--primary-dark);font-size:.86rem;">${action}</div>
-                <div style="margin-top:5px;color:#475569;font-size:.78rem;line-height:1.7;white-space:pre-wrap;word-break:break-word;">${details}</div>
-              </div>
-              <span class="notification-chip" style="white-space:nowrap;">${role}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:9px;padding-top:8px;border-top:1px solid #f1f5f9;color:var(--text-muted);font-size:.68rem;">
-              <span>👤 ${actor}</span>
-              <span>🕒 ${date}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
+      // اعرض النسخة المحلية فوراً، ثم حدّث آخر 200 عملية من Firestore في الخلفية.
+      renderLogs(Array.isArray(auditLogs) ? auditLogs : []);
+      if (!window.__mustaqbalAuditLogLoadingPromise) {
+        window.__mustaqbalAuditLogLoadingPromise = (async () => {
+          try {
+            const snap = await db.collection('auditLogs').orderBy('createdAt', 'desc').limit(200).get();
+            const freshLogs = snap.docs.map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+            auditLogs = freshLogs;
+            if (!modal.classList.contains('hidden')) renderLogs(freshLogs);
+          } catch (err) {
+            console.warn('تعذر تحديث سجل الإدارة من Firestore، سيتم استخدام النسخة المحلية:', err);
+          }
+        })().finally(() => { window.__mustaqbalAuditLogLoadingPromise = null; });
+      }
     }
 
     const ORDER_TRACKING_STEPS = [
@@ -10209,8 +10264,17 @@
       if (!(isAdmin || loggedAdmin)) return alert('تتبع الطلبات متاح للمدير فقط.');
       const modal=document.getElementById('order-tracking-modal'); if(!modal)return;
       modal.classList.remove('hidden');
-      const box=document.getElementById('order-tracking-list'); if(box) box.innerHTML='<div class="notification-empty">⏳ جارٍ تحميل الطلبات...</div>';
-      await loadInvoicesFromFirestore(); renderOrderTrackingList();
+      // استخدم الفواتير الموجودة محلياً فوراً، ثم دع مسار الفواتير المحدّث يزامن السحابة بالخلفية.
+      const box=document.getElementById('order-tracking-list');
+      try { invoices = JSON.parse(localStorage.getItem('mustaqbal_invoices') || '[]'); } catch (_) { invoices = []; }
+      if (Array.isArray(invoices) && invoices.length) renderOrderTrackingList();
+      else if(box) box.innerHTML='<div class="notification-empty">⏳ جارٍ تحميل الطلبات...</div>';
+      if (!window.__mustaqbalInvoicesLoadingPromise) {
+        window.__mustaqbalInvoicesLoadingPromise = loadInvoicesFromFirestore()
+          .then(() => { if (!modal.classList.contains('hidden')) renderOrderTrackingList(); })
+          .catch(err => console.warn('تعذر تحديث تتبع الطلبات:', err))
+          .finally(() => { window.__mustaqbalInvoicesLoadingPromise = null; });
+      }
     }
     function closeOrderTrackingModal(){ document.getElementById('order-tracking-modal')?.classList.add('hidden'); if (window.smartAlertsReturnAfterChildClose) { window.smartAlertsReturnAfterChildClose = false; if (typeof returnToSmartAlerts === 'function') returnToSmartAlerts(); } }
     function renderOrderTrackingList(){
@@ -11382,8 +11446,14 @@
       modal.classList.remove('hidden');
       const search = document.getElementById('archived-invoices-search');
       if (search) search.value = '';
-      await loadInvoicesFromFirestore();
+      try { invoices = JSON.parse(localStorage.getItem('mustaqbal_invoices') || '[]'); } catch (_) { invoices = []; }
       renderArchivedInvoicesList();
+      if (!window.__mustaqbalInvoicesLoadingPromise) {
+        window.__mustaqbalInvoicesLoadingPromise = loadInvoicesFromFirestore()
+          .then(() => { if (!modal.classList.contains('hidden')) renderArchivedInvoicesList(); })
+          .catch(err => console.warn('تعذر تحديث الفواتير المؤرشفة:', err))
+          .finally(() => { window.__mustaqbalInvoicesLoadingPromise = null; });
+      }
     }
 
     function closeArchivedInvoicesModal() {
@@ -12117,18 +12187,33 @@
 
     async function openProductStatsModal() {
       if (!requireAdminPermission('viewProductStats')) return;
+      const modal = document.getElementById('product-stats-modal');
+      if (!modal) return;
 
-      // ضمان تحميل القائمتين قبل فتح الفلاتر.
-      // المندوبون يبقون كما هم، بينما فلتر الزبائن يعتمد على customers فقط.
-      await Promise.all([
-        loadCustomersFromFirestore(),
-        (!Array.isArray(delegates) || delegates.length === 0) ? loadDelegatesFromFirestore() : Promise.resolve(true)
-      ]);
-
+      // افتح النافذة واعرض الفلاتر من البيانات المحلية فوراً، ثم حدّثها من Firestore.
+      try { customers = JSON.parse(localStorage.getItem('mustaqbal_customers') || '[]'); } catch (_) { customers = []; }
+      try { delegates = JSON.parse(localStorage.getItem('mustaqbal_delegates') || '[]'); } catch (_) { delegates = []; }
       renderProductStatsDelegateFilter();
       renderProductStatsCustomerFilter();
       renderProductStatsReceipt();
-      document.getElementById('product-stats-modal').classList.remove('hidden');
+      modal.classList.remove('hidden');
+
+      const jobs = [];
+      if (!window.__mustaqbalCustomersLoadingPromise) {
+        window.__mustaqbalCustomersLoadingPromise = loadCustomersFromFirestore().finally(() => { window.__mustaqbalCustomersLoadingPromise = null; });
+      }
+      jobs.push(window.__mustaqbalCustomersLoadingPromise);
+      if (!window.__mustaqbalDelegatesLoadingPromise) {
+        window.__mustaqbalDelegatesLoadingPromise = loadDelegatesFromFirestore().finally(() => { window.__mustaqbalDelegatesLoadingPromise = null; });
+      }
+      jobs.push(window.__mustaqbalDelegatesLoadingPromise);
+      Promise.allSettled(jobs).then(() => {
+        if (!modal.classList.contains('hidden')) {
+          renderProductStatsDelegateFilter();
+          renderProductStatsCustomerFilter();
+          renderProductStatsReceipt();
+        }
+      });
     }
 
     function closeProductStatsModal() {
